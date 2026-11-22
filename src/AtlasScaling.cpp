@@ -46,6 +46,7 @@
 #include <atomic>
 #include "AtlasInternal.h"
 #include "AtlasScalingMath.h"
+#include "AtlasAffixes.h"
 
 namespace Atlas
 {
@@ -100,6 +101,7 @@ AtlasMgr::ScalingContext AtlasMgr::ContextOf(Session const& s)
     ctx.RoguelikeRunId = s.RoguelikeRunId;
     ctx.InstanceId     = s.InstanceId;
     ctx.ThemeId        = s.ThemeId;
+    ctx.Affixes        = s.Affixes;
     ctx.Effects        = s.Effects;
     return ctx;
 }
@@ -262,6 +264,21 @@ void AtlasMgr::ScaleCreature(Creature* c, ScalingContext const& ctx, CreatureRol
         mods.AddsPerWave = fx.BossAddsPerWave;
 
     RegisterOwnedCreature(c->GetGUID(), stats, mods, c->GetMap() ? c->GetMap()->GetInstanceId() : ctx.InstanceId);
+}
+
+void AtlasMgr::ScaleCreature(Creature* c, ScalingContext const& ctx, CreatureRole role,
+    std::vector<ActiveAffix> const& ownAffixes)
+{
+    if (ownAffixes.empty())
+    {
+        ScaleCreature(c, ctx, role);
+        return;
+    }
+
+    ScalingContext own = ctx;
+    own.Affixes.insert(own.Affixes.end(), ownAffixes.begin(), ownAffixes.end());
+    own.Effects = sAtlasAffixes->Aggregate(own.Affixes);
+    ScaleCreature(c, own, role);
 }
 
 float AtlasMgr::ReferenceTrashHit(ScalingContext const& ctx) const

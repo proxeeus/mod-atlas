@@ -39,6 +39,8 @@ public:
     bool IsAffixSpell(uint32 spellId) const;
 
     std::vector<ActiveAffix> Roll(uint32 tier, uint32 count, RunRng& rng) const;
+    // A rare's own modifiers: 2 or 3 creature affixes at the run's tier.
+    std::vector<ActiveAffix> RollRareModifiers(uint32 tier, RunRng& rng) const;
     AffixEffects Aggregate(std::vector<ActiveAffix> const& affixes) const;
     // Re-bands GM-forced affixes to the tier they now run at.
     std::vector<ActiveAffix> AtTier(std::vector<ActiveAffix> const& affixes, uint32 tier) const;

@@ -57,11 +57,23 @@ struct DifficultyTier
 };
 
 // Groups creature types for themed spawns; -1 = any type
+// Where a theme's creatures come from: config themes pick by creature type;
+// database themes (atlas_theme) are a dungeon's own inhabitants or a pool.
+enum class ThemeKind : uint8
+{
+    Type = 0,
+    Native,
+    Pool
+};
+
 struct Theme
 {
     uint32                  Id = 0;
     std::string             Name;
     std::vector<uint32>     CreatureTypes;
+    ThemeKind               Kind = ThemeKind::Type;
+    std::string             Description;
+    int32                   SortOrder = 100;
 
     bool IsRandom() const
     {
@@ -77,14 +89,6 @@ struct DungeonInfo
     uint8       MaxLevel    = 80;
     Position    EntrancePos;
     bool        IsAvailable = true;
-};
-
-struct SpawnPoint
-{
-    Position    Pos;
-    float       DistanceFromEntrance = 0.0f;
-    bool        IsBossPosition       = false;
-    bool        IsUsed               = false;
 };
 
 struct SpawnedCreature
@@ -155,7 +159,6 @@ struct Session
 
     std::vector<PlayerSessionData>  Players;
     std::vector<SpawnedCreature>    SpawnedCreatures;
-    std::vector<SpawnPoint>         SpawnPoints;
     std::vector<PendingPhaseCheck>  PendingPhaseChecks;
     std::vector<uint32>             RecentCreatureEntries;
 

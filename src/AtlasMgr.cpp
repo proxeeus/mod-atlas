@@ -103,6 +103,7 @@ void AtlasMgr::Initialize()
 void AtlasMgr::LoadFromDB()
 {
     sAtlasAffixes->Load();
+    LoadThemes();
     LoadCreaturePools();
     LoadDungeonBossPool();
     LoadRewardItems();

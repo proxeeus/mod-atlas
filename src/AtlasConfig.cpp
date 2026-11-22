@@ -118,6 +118,36 @@ void AtlasConfig::LoadConfig(bool reload)
     // Dungeon settings
     _bossCount       = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.BossCount",      1);
     _maxRunCreatures = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.MaxCreatures",   450);
+    _maxRares        = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.MaxRares",       2);
+    _packRadius      = std::clamp(sConfigMgr->GetOption<float>("Atlas.Population.PackRadius", 8.0f), 1.0f, 30.0f);
+    _maxPackSize     = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Population.MaxPackSize", 6), 1, 20);
+    _keepSmartAI     = sConfigMgr->GetOption<bool>  ("Atlas.Population.KeepSmartAI", true);
+    _scourgeThemeId  = sConfigMgr->GetOption<uint32>("Atlas.Corruption.ScourgeTheme", 51);
+    _touchedAura     = sConfigMgr->GetOption<uint32>("Atlas.Corruption.TouchedAura", 10848);
+    _touchedAffix    = StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Corruption.TouchedAffix", "M04"));
+
+    // Atlas.Corruption.Shares = "native,touched,scourge;..." for levels 0-5.
+    for (uint8 level = 0; level < 6; ++level)
+        _corruption[level] = DefaultCorruptionShares(level);
+    std::string const shares = StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Corruption.Shares", "", false));
+    if (!shares.empty())
+    {
+        auto levels = SplitString(shares, ';');
+        for (uint8 level = 0; level < 6 && level < levels.size(); ++level)
+        {
+            auto parts = SplitString(levels[level], ',');
+            try
+            {
+                if (parts.size() == 3)
+                    _corruption[level] = { static_cast<uint32>(std::stoul(parts[0])),
+                        static_cast<uint32>(std::stoul(parts[1])), static_cast<uint32>(std::stoul(parts[2])) };
+            }
+            catch (...)
+            {
+                LOG_ERROR("module", "Atlas: Bad Atlas.Corruption.Shares level {}; using the default.", level);
+            }
+        }
+    }
     _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
     _eliteChance     = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.EliteChance",    20);
     _aggroRadius     = sConfigMgr->GetOption<float> ("Atlas.Dungeon.AggroRadius",    15.0f);
@@ -235,6 +265,7 @@ void AtlasConfig::LoadThemes()
         Theme theme;
         theme.Id   = i;
         theme.Name = parts[0];
+        theme.SortOrder = 100 + static_cast<int32>(i);
 
         for (size_t j = 1; j < parts.size(); ++j)
         {
@@ -253,6 +284,25 @@ void AtlasConfig::LoadThemes()
         _themes.push_back(def);
         LOG_WARN("module", "Atlas: No themes configured, using Random.");
     }
+
+    _configThemes = _themes;
+    SetDatabaseThemes(_databaseThemes);
+}
+
+void AtlasConfig::SetDatabaseThemes(std::vector<Theme> themes)
+{
+    _databaseThemes = std::move(themes);
+    _themes = _configThemes;
+    for (Theme const& t : _databaseThemes)
+    {
+        // A database theme replaces a config theme with the same ID.
+        std::erase_if(_themes, [&t](Theme const& c) { return c.Id == t.Id; });
+        _themes.push_back(t);
+    }
+    std::stable_sort(_themes.begin(), _themes.end(), [](Theme const& a, Theme const& b)
+    {
+        return a.SortOrder != b.SortOrder ? a.SortOrder < b.SortOrder : a.Id < b.Id;
+    });
 }
 
     // hard-coded list of WotLK 5-man instances with level ranges

@@ -110,6 +110,17 @@ std::vector<ActiveAffix> AffixMgr::Roll(uint32 tier, uint32 count, RunRng& rng) 
     return RollAffixes(*defs, tier, count, sAtlasConfig->IsAffixBotSafeOnly(), rng);
 }
 
+std::vector<ActiveAffix> AffixMgr::RollRareModifiers(uint32 tier, RunRng& rng) const
+{
+    auto defs = Definitions();
+    std::vector<AffixDefinition> creature;
+    for (AffixDefinition const& d : *defs)
+        if (IsCreatureAffix(d.Handler))
+            creature.push_back(d);
+    uint32 const count = rng.Range(2, 3);
+    return RollAffixes(creature, tier, count, sAtlasConfig->IsAffixBotSafeOnly(), rng);
+}
+
 AffixEffects AffixMgr::Aggregate(std::vector<ActiveAffix> const& affixes) const
 {
     auto defs = Definitions();

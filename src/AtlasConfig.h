@@ -10,6 +10,7 @@
 #include "AtlasTypes.h"
 #include "RoguelikeTypes.h"
 #include "AtlasScalingMath.h"
+#include "AtlasTheme.h"
 #include <array>
 #include <vector>
 #include <unordered_map>
@@ -86,6 +87,19 @@ public:
     uint32 GetRecentCreatureEntries() const { return _recentCreatureEntries; }
     // Live creatures a run may spawn at most (pack-size affixes stop there).
     uint32 GetMaxRunCreatures()       const { return _maxRunCreatures; }
+    uint32 GetMaxRares()              const { return _maxRares; }
+
+    // --- Population (PLAN 1.3) ---
+    float  GetPackRadius()            const { return _packRadius; }
+    uint32 GetMaxPackSize()           const { return _maxPackSize; }
+    bool   KeepsSmartAI()             const { return _keepSmartAI; }
+    uint32 GetScourgeThemeId()        const { return _scourgeThemeId; }
+    uint32 GetTouchedAura()           const { return _touchedAura; }
+    std::string const& GetTouchedAffixCode() const { return _touchedAffix; }
+    // Native / touched / Scourge shares of a corruption level (0-5).
+    CorruptionShares GetCorruptionShares(uint8 level) const { return _corruption[std::min<uint8>(level, 5)]; }
+    // Themes from the database (atlas_theme), merged into the list by sort order.
+    void   SetDatabaseThemes(std::vector<Theme> themes);
 
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
@@ -161,6 +175,16 @@ private:
     // Dungeon
     uint32 _bossCount       = 1;
     uint32 _maxRunCreatures = 450;
+    uint32 _maxRares        = 2;
+    float  _packRadius      = 8.0f;
+    uint32 _maxPackSize     = 6;
+    bool   _keepSmartAI     = true;
+    uint32 _scourgeThemeId  = 51;
+    uint32 _touchedAura     = 10848;
+    std::string _touchedAffix = "M04";
+    std::array<CorruptionShares, 6> _corruption{};
+    std::vector<Theme> _configThemes;
+    std::vector<Theme> _databaseThemes;
     bool   _affixBotSafeOnly = true;
     uint32 _eliteChance     = 20;
     float  _aggroRadius     = 15.0f;

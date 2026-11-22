@@ -16,7 +16,9 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 
 ### Core System
 - **44 dungeons** — Classic, TBC, and WotLK 5-man instances (The Oculus is left out: it needs drake vehicles)
-- **9 timelines (creature themes)** — beasts, dragonkin, the Legion, elementals, giants, the Scourge, mortal warbands, rogue machines, or a shattered mix
+- **10 timelines (creature themes)** — the dungeon as it was (its own inhabitants, pack by pack), a timeline the Scourge swallowed (a curated Scourge pool), or one of eight creature types: beasts, dragonkin, the Legion, elementals, giants, mortal warbands, rogue machines, or a shattered mix
+- **Scourge corruption** — the higher the tier, the more packs the plague has touched or replaced: 10% touched at tiers 1-3, mostly Scourge from tier 10, all Scourge at 16
+- **Packs and rares** — creatures stand in packs where the dungeon's own creatures stood; a pack's leader may be a rare from another timeline, with 2-3 modifiers of its own
 - **6 difficulty tiers** — Novice through Grandmaster with tuned HP/damage/reward multipliers
 - **Level scaling** — Scale creatures to your party's level or use the tier's natural range
 - **Any dungeon, any level** — A level 80 can walk an echo of a classic dungeon scaled to 80, or at its original difficulty
@@ -31,7 +33,7 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Statistics & Leaderboards** — Separate tracking for normal runs and roguelike mode. Normal stats track win rate, kills, deaths, K/D ratio, and fastest clear. Roguelike stats track highest tier, most floors, total floors cleared, and longest run. Leaderboards include Normal Fastest Clears, Roguelike Highest Tier, and Roguelike Most Floors — with your own entries highlighted
 - **The Chronicle of Echoes** — With the `AtlasChronicle` client addon, the records open in a window styled as the Keepers of Time's chronicle: the swiftest mendings (filterable by dungeon), the deepest Endless descents, and your own thread. Without the addon, the Chronicler reads the records out in chat
 - **Level brackets** — A tier opens once everyone in the party reaches it and stays open afterwards; no dungeon may start above the party's lowest level
-- **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`
+- **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`, `.atlas run`, `.atlas seed`, `.atlas affix`, `.atlas curate`, `.atlas scaling`
 
 ### The Endless Timeways (roguelike mode)
 - **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
@@ -197,6 +199,40 @@ See `mod_atlas.conf.dist` for the full list with descriptions.
 
 ---
 
+## Population and corruption
+
+A run's creatures stand where the dungeon's own did: its stock spawns are clustered into packs (spots within `Population.PackRadius` yards on one floor, up to `Population.MaxPackSize`), nearest the entrance first, and its bosses' spots are the arenas.
+
+Each pack is native, Scourge-touched or Scourge, by the run's tier:
+
+| Tiers | Native | Touched | Scourge |
+|---|---|---|---|
+| 1-3 | 90 | 10 | 0 |
+| 4-6 | 60 | 25 | 15 |
+| 7-9 | 35 | 30 | 35 |
+| 10-12 | 15 | 25 | 60 |
+| 13-15 | 0 | 15 | 85 |
+| 16+ | 0 | 0 | 100 |
+
+- **Native** follows the timeline: "as it was" puts the dungeon's own creature back on each spot; the Scourge timeline and other pool themes draw from their pool by pack role (a leader, then melee, casters, the odd heavy and swarm); the creature-type themes pick by type as before.
+- **Touched** is the same pack marked by the plague: Shroud of Death (aura 10848) and the Necrotic affix (M04).
+- **Scourge** draws from the Scourge pool (theme 51, 147 creatures with their roles, `atlas_theme_creature`).
+- A pack's leader is rare at `Dungeon.RareSpawnChance` (times Rare-infested), at most `Dungeon.MaxRares` per run: larger, Rare role stats, 2-3 creature affixes of its own, announced to the party.
+- Bosses follow the same table: the arena's own master, the same touched, or a Scourge champion.
+
+Themes live in the world table `atlas_theme` (module SQL `atlas_themes.sql`) beside the config's `Themes.N`; database themes use ids below 100. `atlas_creature_curation` records which creatures behave in a run: blocked ones never spawn, untested and allowed ones do. Creatures with SmartAI and no C++ script keep their own AI and spells (`Population.KeepSmartAI`); everything else, and every boss, gets Atlas's melee AI.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `Population.PackRadius` | 8 | Spots this close (yards, same floor) form one pack |
+| `Population.MaxPackSize` | 6 | Most creatures in a pack |
+| `Population.KeepSmartAI` | 1 | SmartAI creatures keep their own AI |
+| `Corruption.ScourgeTheme` | 51 | The Scourge pool's theme |
+| `Corruption.TouchedAura` | 10848 | The mark of a touched creature (0 = none) |
+| `Corruption.TouchedAffix` | M04 | Affix codes a touched creature carries |
+| `Corruption.Shares` | (table above) | `native,touched,scourge;...` for corruption levels 0-5 |
+| `Dungeon.MaxRares` | 2 | Most rares per run |
+
 ## Affixes
 
 Affixes (instabilities, in the Keepers of Time's words) are data: the world table `atlas_affix` (module SQL `atlas_affixes.sql`), one row per affix with its handler, values per tier band (1-5, 6-10, 11-16), the lowest tier it rolls at, a weight, an exclusive group (two affixes of one group never roll together) and whether playerbots handle it. The Endless Timeways rolls them by depth: 1 from `Roguelike.AffixStartTier`, 2 and 3 from the second and third affix tiers. Echoes roll none; maps (PLAN 1.4) will carry their own.
@@ -240,6 +276,8 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas run` | GM | The target's (or your) current run: state, map, progress and the seed it was built from; for an Endless floor also the descent's seed, depth and affixes |
 | `.atlas affix list` | GM | Every loaded affix with its tiers and values |
 | `.atlas affix next <codes>\|clear` | GM | The target's (or your) next run carries these affixes, e.g. `M01 P02 A02` (an echo, or every depth of a descent) |
+| `.atlas curate <entry> [allowed\|blocked\|untested] [note]` | GM | Shows a creature's curation, AI and pools, or sets it (stored in `atlas_creature_curation`) |
+| `.atlas curate spawn <entry> [role]` | GM | Spawns a sample at your level as a run would (role stats, AI policy), to test a creature; role trash, elite (default), rare, miniboss, boss or add |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
@@ -255,9 +293,9 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
 - **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `atlas_open_instance` so a restart mid-run releases them at startup.
 - **Hot-path gating** — Damage, death and creature-add hooks check a lock-free "any run active?" flag and the map type before touching the session mutex.
-- **Cached lookups** — Dungeon entrances, spawn points and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
+- **Cached lookups** — Dungeon entrances, layouts (packs, arenas), themes, pools and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
-- **Custom creature AI** — Trash creatures use `AtlasCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
+- **Custom creature AI** — Creatures without SmartAI (and every boss) use `AtlasCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. SmartAI creatures keep their own. Affix events (engage, damage taken, death) run from the unit script, whatever the AI. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
 - **Creature spell and heal scaling** — Each run creature gets a spell scale and a heal scale at spawn (how far its melee and health moved from its template). The unit script applies them to its spells, damage over time and heals; its melee is already set at spawn and passes through.
 - **Multi-phase boss detection** — When a boss dies, the system waits 5 seconds and scans for new elite/boss creatures near the death location. If a phase-2 creature is detected, it is automatically promoted to boss status and the original death does not count as a kill.
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.
@@ -278,13 +316,14 @@ mod-atlas/
 ├── data/sql/
 │   ├── db-world/base/atlas_world_setup.sql
 │   ├── db-world/base/atlas_affixes.sql   # Affix table and the player affixes' passive spells
+│   ├── db-world/base/atlas_themes.sql    # Themes, the Scourge pool, creature curation
 │   └── db-characters/base/atlas_characters_setup.sql
 ├── tests/                            # Unit tests (AC unit_tests target)
 └── src/
     ├── AtlasConfig.cpp / .h          # Config loader
     ├── AtlasTypes.h                  # Shared data structures, chat prefixes
     ├── AtlasMgr.cpp / .h             # Run (session) manager: lifecycle, binds, deaths, update loop
-    ├── AtlasPopulation.cpp           # AtlasMgr: creature pools, clearing and populating a run
+    ├── AtlasPopulation.cpp           # AtlasMgr: themes, pools, curation, clearing and populating a run
     ├── AtlasScaling.cpp              # AtlasMgr: base stats, level ownership, damage scales
     ├── AtlasRewards.cpp              # AtlasMgr: reward and loot pools, run rewards, creature loot
     ├── AtlasRecords.cpp              # AtlasMgr: stats, leaderboard, run records and run log
@@ -292,6 +331,7 @@ mod-atlas/
     ├── AtlasLayout.h                 # Layout (entrance, anchors, arenas) and the LayoutProvider interface
     ├── StockLayoutProvider.cpp / .h  # Layouts of the stock dungeons echoes run in
     ├── RunRng.h                      # Seeded, reproducible RNG for run layout choices
+    ├── AtlasTheme.h                  # Packs, corruption and spawn clustering (pure)
     ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
     ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras
     ├── AtlasAffixEffects.cpp         # AtlasMgr: affixes in play (shields, death effects, waves, zones)

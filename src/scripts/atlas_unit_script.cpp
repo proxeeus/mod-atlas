@@ -1,6 +1,7 @@
 /*
  * mod-atlas — atlas_unit_script.cpp
- * Damage and healing around run creatures:
+ * Damage, healing and the affix events (engage, damage taken, death) around
+ * run creatures, whatever their AI:
  *   - Creatures the run owns (spawned or added mid-run): melee is set at spawn
  *     from the role table, so it passes through; their spells and damage over
  *     time take the creature's spell scale, their heals its heal scale
@@ -60,6 +61,25 @@ public:
             heal = static_cast<uint32>(std::min<double>(double(heal) * scale, UINT32_MAX));
     }
 
+    // Combat-start affixes (Ice-shielded), for every run creature, whatever
+    // its AI.
+    void OnUnitEnterCombat(Unit* unit, Unit* /*victim*/) override
+    {
+        if (!unit || !AtlasMgr::HasOwnedCreatures() || !sAtlasConfig->IsEnabled())
+            return;
+        if (Creature* creature = unit->ToCreature())
+            sAtlasMgr->OnRunCreatureEngaged(creature);
+    }
+
+    // Life-threshold affixes (Summoner).
+    void OnDamage(Unit* /*attacker*/, Unit* victim, uint32& damage) override
+    {
+        if (!damage || !victim || !victim->IsCreature() || !AtlasMgr::HasOwnedCreatures()
+            || !sAtlasConfig->IsEnabled() || !victim->GetMap() || !victim->GetMap()->IsDungeon())
+            return;
+        sAtlasMgr->OnRunCreatureDamaged(victim->ToCreature(), damage);
+    }
+
     void OnUnitDeath(Unit* unit, Unit* killer) override
     {
         if (!sAtlasConfig->IsEnabled() || !unit || !AtlasMgr::HasActiveSessions())
@@ -77,17 +97,20 @@ public:
                 player = killer->GetOwner()->ToPlayer();
         }
 
+        // Killed by a player (or their pet), or by nothing a player owns
+        // (an affix burst, a trap, a stock script): the instance's run.
         Session* session = nullptr;
         if (player)
             session = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
+        if (!session && creature->GetMap() && creature->GetMap()->IsDungeon())
+            session = sAtlasMgr->GetSessionByInstance(creature->GetInstanceId());
 
-        if (!session || !session->IsActive())
-            return;
+        if (session && session->IsActive() && creature->GetMapId() == session->MapId)
+            sAtlasMgr->HandleCreatureDeath(creature, session);
 
-        if (creature->GetMapId() != session->MapId)
-            return;
-
-        sAtlasMgr->HandleCreatureDeath(creature, session);
+        // Death affixes (burst, desecrated ground, splitting): after the kill
+        // is counted, outside the session lock.
+        sAtlasMgr->OnRunCreatureDied(creature);
     }
 
 private:

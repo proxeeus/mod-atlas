@@ -207,10 +207,15 @@ Atlas.Dungeon.EliteChance = 20
 Atlas.Dungeon.AggroRadius = 15.0
 
 #    Atlas.Dungeon.RareSpawnChance  (0-100)
-#        Chance for a rare enemy to spawn per dungeon run (rolled once).
-#        Rare mobs have a silver dragon portrait and enhanced loot.
+#        Chance for each pack's leader to be a rare: bigger, with 2-3 rare
+#        modifiers (monster affixes of its own) and better loot.
 #        Default: 5
 Atlas.Dungeon.RareSpawnChance = 5
+
+#    Atlas.Dungeon.MaxRares
+#        Most rares in one run.
+#        Default: 2
+Atlas.Dungeon.MaxRares = 2
 
 #    Atlas.Dungeon.Whitelist
 #        Comma-separated map IDs (empty = all allowed)
@@ -228,15 +233,20 @@ Atlas.Dungeon.Blacklist = ""
 ###############################################################################
 
 # Each theme is a fractured timeline: who rules the dungeon's halls there.
+# These pick creatures by type. Two more come from the database (atlas_theme,
+# module SQL atlas_themes.sql) and are listed first: "The timeline as it was"
+# (each dungeon keeps its own inhabitants) and "A timeline the Scourge
+# swallowed" (the curated Scourge pool, with pack roles). Keep the numbers
+# consecutive: the list stops at the first empty one.
 Atlas.Theme.1 = "A timeline where beasts reclaimed the halls,1"
 Atlas.Theme.2 = "A timeline where dragonkin rule,2"
 Atlas.Theme.3 = "A timeline where the Legion prevailed,3"
 Atlas.Theme.4 = "A timeline torn by unbound elements,4"
 Atlas.Theme.5 = "A timeline of giants,5"
-Atlas.Theme.6 = "A timeline the Scourge swallowed,6"
-Atlas.Theme.7 = "A timeline held by mortal warbands,7"
-Atlas.Theme.8 = "A timeline of rogue machines,9"
-Atlas.Theme.9 = "A shattered timeline (anything goes),-1"
+Atlas.Theme.6 = "A timeline held by mortal warbands,7"
+Atlas.Theme.7 = "A timeline of rogue machines,9"
+Atlas.Theme.8 = "A shattered timeline (anything goes),-1"
+Atlas.Theme.9 = ""
 Atlas.Theme.10 = ""
 Atlas.Theme.11 = ""
 Atlas.Theme.12 = ""
@@ -293,6 +303,50 @@ Atlas.Completion.TeleportDelay = 30
 #        Announce challenge start to the player
 #        Default: 1
 Atlas.Completion.Announcement = 1
+
+###############################################################################
+# POPULATION AND CORRUPTION (DESIGN section 8)
+#   A dungeon's stock spawns that stand together become a pack. Each pack is
+#   native (the chosen timeline), Scourge-touched (the same, marked by the
+#   plague: a dark shroud and a Necrotic touch) or Scourge, by the run's tier:
+#     tiers 1-3: 90 / 10 / 0      tiers 4-6: 60 / 25 / 15
+#     tiers 7-9: 35 / 30 / 35     tiers 10-12: 15 / 25 / 60
+#     tiers 13-15: 0 / 15 / 85    tier 16: 0 / 0 / 100
+#   Echoes are tier 1; the Endless Timeways uses its depth.
+###############################################################################
+
+#    Atlas.Population.PackRadius
+#        Stock spawns within this many yards of a pack member join its pack.
+#        Default: 8
+Atlas.Population.PackRadius = 8
+
+#    Atlas.Population.MaxPackSize
+#        Most creatures in one pack.
+#        Default: 6
+Atlas.Population.MaxPackSize = 6
+
+#    Atlas.Population.KeepSmartAI
+#        Creatures driven by SmartAI (most of the Scourge pool) keep their own
+#        AI and spells; everything else, and every boss, fights with the
+#        module's melee AI.
+#        Default: 1
+Atlas.Population.KeepSmartAI = 1
+
+#    Atlas.Corruption.ScourgeTheme
+#        Theme the Scourge packs come from (atlas_theme ID).
+#        Default: 51
+Atlas.Corruption.ScourgeTheme = 51
+
+#    Atlas.Corruption.TouchedAura / Atlas.Corruption.TouchedAffix
+#        The plague's mark on Scourge-touched creatures: a visual-only aura
+#        (10848 Shroud of Death) and one affix of their own (code, M04 Necrotic).
+Atlas.Corruption.TouchedAura = 10848
+Atlas.Corruption.TouchedAffix = "M04"
+
+#    Atlas.Corruption.Shares
+#        Overrides the table above: "native,touched,scourge;" for each of the six
+#        corruption levels. Empty keeps the defaults.
+Atlas.Corruption.Shares = ""
 
 ###############################################################################
 # AFFIXES (DESIGN section 10)

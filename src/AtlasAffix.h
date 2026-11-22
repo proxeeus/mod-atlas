@@ -125,6 +125,28 @@ inline AffixDefinition const* FindAffixByCode(std::vector<AffixDefinition> const
     return nullptr;
 }
 
+// Affixes that work on one creature alone: the ones a rare can carry as its
+// own modifiers (DESIGN §8 rares, BACKLOG R3).
+inline bool IsCreatureAffix(AffixHandler handler)
+{
+    switch (handler)
+    {
+        case AffixHandler::MeleeDealt:
+        case AffixHandler::ExtraHit:
+        case AffixHandler::AttackSpeed:
+        case AffixHandler::MoveSpeed:
+        case AffixHandler::MonsterLife:
+        case AffixHandler::PhysTaken:
+        case AffixHandler::SpellTaken:
+        case AffixHandler::CombatShield:
+        case AffixHandler::DeathBurst:
+        case AffixHandler::DeathPool:
+            return true;
+        default:
+            return false;
+    }
+}
+
 // Roll `count` affixes for a run of `tier`: from the definitions eligible at
 // that tier (and bot-safe ones only if asked), weighted, never two from one
 // exclusive group. Deterministic for a given RNG state (C8): candidates are

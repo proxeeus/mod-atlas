@@ -21,22 +21,33 @@
 namespace Atlas
 {
 
-// A place a pack spawns. Stock layouts have one anchor per stock creature
-// spawn (radius 0, a single creature); harvested layouts cluster them.
-struct LayoutAnchor
+// One creature's place in a pack, with who stood there in the stock dungeon
+// (0 when that creature isn't fit to fight: friendly, a critter, a trigger,
+// an invisible model). The native timeline puts that creature back.
+struct LayoutSpot
 {
     Position Pos;
-    float    DistanceFromEntrance = 0.0f;
-    float    Radius               = 0.0f;
-    uint32   PackBudget           = 1;
+    uint32   NativeEntry = 0;
 };
 
-// Where a boss fights.
+// A pack: stock spawns that stood together (clustered), nearest first. The
+// pack budget is how many creatures it holds.
+struct LayoutAnchor
+{
+    Position                Pos;                        // the first spot's
+    float                   DistanceFromEntrance = 0.0f;
+    float                   Radius               = 0.0f;
+    uint32                  PackBudget           = 1;
+    std::vector<LayoutSpot> Spots;
+};
+
+// Where a boss fights, and the stock boss that fought there.
 struct LayoutArena
 {
     Position Centre;
     float    DistanceFromEntrance = 0.0f;
     float    Radius               = 0.0f;
+    uint32   NativeEntry          = 0;
 };
 
 struct Layout

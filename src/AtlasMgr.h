@@ -10,7 +10,9 @@
 #include "AtlasConfig.h"
 #include "StockLayoutProvider.h"
 #include <mutex>
+#include <array>
 #include <map>
+#include <string_view>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -161,6 +163,7 @@ public:
         uint32       RoguelikeRunId = 0;
         uint32       InstanceId     = 0;
         uint32       ThemeId        = 0;
+        std::vector<ActiveAffix> Affixes;
         AffixEffects Effects;
     };
     static ScalingContext ContextOf(Session const& session);
@@ -199,6 +202,10 @@ public:
     // Level, role stats, the run's affixes and ownership in one step, for
     // anything a run spawns.
     void      ScaleCreature(Creature* creature, ScalingContext const& ctx, CreatureRole role);
+    // The same with affixes of the creature's own on top of the run's (a
+    // rare's modifiers, the plague's touch).
+    void      ScaleCreature(Creature* creature, ScalingContext const& ctx, CreatureRole role,
+                            std::vector<ActiveAffix> const& ownAffixes);
     // One melee hit of a warrior-class trash creature of the run (affix damage
     // that follows the run's strength is a share of it).
     float     ReferenceTrashHit(ScalingContext const& ctx) const;
@@ -223,6 +230,29 @@ public:
 
     // Level + stat scaling for a creature summoned by an Atlas mob.
     void ScaleSummonedCreature(Creature* creature, Session* session);
+
+    // -----------------------------------------------------------------------
+    // Themes, pools and curation (AtlasPopulation.cpp, DESIGN §8).
+    // -----------------------------------------------------------------------
+    enum class CurationStatus : uint8
+    {
+        Untested = 0,
+        Allowed,
+        Blocked
+    };
+    static char const* CurationName(CurationStatus status);
+    static CurationStatus ParseCuration(std::string_view name, bool& ok);
+
+    void           LoadThemes();   // atlas_theme, atlas_theme_creature, atlas_creature_curation
+    CurationStatus GetCuration(uint32 entry, std::string* note = nullptr) const;
+    // Memory and the world DB (`.atlas curate`).
+    void           SetCuration(uint32 entry, CurationStatus status, std::string const& note);
+    // Which themes and pack roles list an entry ("51:melee 51:leader").
+    std::string    DescribePoolMembership(uint32 entry) const;
+    // SmartAI creatures keep their own AI (Atlas.Population.KeepSmartAI).
+    static bool    KeepsStockAI(Creature const* creature);
+    // A creature spawned as a run would spawn it, at a GM's side (`.atlas curate spawn`).
+    Creature*      SpawnCurationSample(Player* gm, uint32 entry, CreatureRole role);
 
     // -----------------------------------------------------------------------
     // Affixes in play (AtlasAffixEffects.cpp).
@@ -266,6 +296,10 @@ private:
     // scaled, with the run's AI, despawning once dead (AtlasPopulation.cpp).
     Creature* SpawnRunAdd(Map* map, uint32 entry, Position const& pos, ScalingContext const& ctx,
                           CreatureRole role, float visualScale, Unit* target);
+
+    // A pool theme's creature for a pack role; falls back to other roles when
+    // the pool has none for it, skips blocked entries. 0 when empty.
+    uint32 PickPoolEntry(uint32 themeId, PackRole role, RunRng& rng) const;
 
     uint32 SelectCreatureForTheme(Theme const* theme, bool isBoss, RunRng& rng, Session const* session = nullptr);
     uint32 SelectDungeonBoss(Theme const* theme, RunRng& rng);
@@ -326,6 +360,15 @@ private:
 
     std::vector<LeaderboardEntry> _leaderboard;
     mutable std::mutex _leaderboardMutex;
+
+    // Pool themes by pack role, rebuilt by LoadThemes (startup, `.atlas reload`).
+    struct ThemePool
+    {
+        std::array<std::vector<uint32>, static_cast<std::size_t>(PackRole::Count)> ByRole;
+    };
+    std::map<uint32, ThemePool> _themePools;
+    std::unordered_map<uint32, std::pair<CurationStatus, std::string>> _curation;
+    mutable std::mutex _themeMutex;
 
     // Where runs happen (DESIGN §5). V0 runs in stock dungeons; clone layouts
     // come with PLAN stage 2 behind the same LayoutProvider interface.

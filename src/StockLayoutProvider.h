@@ -16,6 +16,12 @@ namespace Atlas
 
 struct DungeonInfo;
 
+// A creature entry fit to fight in a run: exists, hostile to players, not a
+// critter or trigger, not unselectable, every model visible and not one that
+// crashes the client (upstream mod-dungeon-master issue #17). Pools skip the
+// hostility test: their creatures are made hostile when spawned.
+bool IsFitToFight(uint32 entry, bool requireHostile = true);
+
 class StockLayoutProvider : public LayoutProvider
 {
 public:

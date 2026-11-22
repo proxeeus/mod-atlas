@@ -11,11 +11,13 @@
 #include "ChatCommand.h"
 #include "Player.h"
 #include "Group.h"
+#include "ObjectMgr.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
 #include "AtlasAffixes.h"
 #include "RoguelikeMgr.h"
 #include <algorithm>
+#include <cctype>
 #include <charconv>
 
 using namespace Acore::ChatCommands;
@@ -33,9 +35,15 @@ public:
             { "list",          HandleAffixList,      SEC_GAMEMASTER,     Console::Yes },
             { "next",          HandleAffixNext,      SEC_GAMEMASTER,     Console::No  },
         };
+        static ChatCommandTable curateTable =
+        {
+            { "spawn",         HandleCurateSpawn,    SEC_GAMEMASTER,     Console::No  },
+            { "",              HandleCurate,         SEC_GAMEMASTER,     Console::Yes },
+        };
         static ChatCommandTable atlasTable =
         {
             { "affix",         affixTable },
+            { "curate",        curateTable },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -53,6 +61,7 @@ public:
     {
         sAtlasConfig->LoadConfig(true);
         sAtlasAffixes->Load();
+        sAtlasMgr->LoadThemes();
         // Dungeon list or boss count may have changed: rebuild the cached
         // entrances / spawn points too (guarded by their own mutex).
         sAtlasMgr->LoadDungeonGeometry();
@@ -243,6 +252,82 @@ public:
         std::string const described = sAtlasAffixes->Describe(affixes, false);
         sAtlasAffixes->SetPending(target->GetGUID(), std::move(affixes));
         h->PSendSysMessage("Atlas: {}'s next run carries {} (values follow its tier).", target->GetName(), described);
+        return true;
+    }
+
+    // .atlas curate <entry> [allowed|blocked|untested] [note]: shows, or sets,
+    // whether a creature may appear in runs (blocked ones never do).
+    static bool HandleCurate(ChatHandler* h, uint32 entry, Optional<std::string> status, Tail note)
+    {
+        CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(entry);
+        if (!t)
+        {
+            h->PSendSysMessage("Atlas: no creature {}.", entry);
+            return false;
+        }
+
+        if (status)
+        {
+            bool ok = false;
+            AtlasMgr::CurationStatus const parsed = AtlasMgr::ParseCuration(*status, ok);
+            if (!ok)
+            {
+                h->SendSysMessage("Atlas: the status is allowed, blocked or untested.");
+                return false;
+            }
+            std::string text(note.data(), note.size());
+            if (text.empty())
+                sAtlasMgr->GetCuration(entry, &text);
+            sAtlasMgr->SetCuration(entry, parsed, text);
+        }
+
+        std::string currentNote;
+        AtlasMgr::CurationStatus const current = sAtlasMgr->GetCuration(entry, &currentNote);
+        std::string const pools = sAtlasMgr->DescribePoolMembership(entry);
+        h->PSendSysMessage("Atlas: {} ({}): {}, AI {}{}, pools: {}{}{}", t->Name, entry,
+            AtlasMgr::CurationName(current), t->AIName.empty() ? "none" : t->AIName, t->ScriptID ? " + script" : "",
+            pools.empty() ? "none" : pools, currentNote.empty() ? "" : " — ", currentNote);
+        return true;
+    }
+
+    // .atlas curate spawn <entry> [trash|elite|rare|miniboss|boss|add]: a
+    // sample at your level, as a run would spawn it (role stats, AI policy).
+    static bool HandleCurateSpawn(ChatHandler* h, uint32 entry, Optional<std::string> role)
+    {
+        Player* gm = h->GetPlayer();
+        if (!gm || !sObjectMgr->GetCreatureTemplate(entry))
+        {
+            h->PSendSysMessage("Atlas: no creature {}.", entry);
+            return false;
+        }
+
+        CreatureRole parsed = CreatureRole::Elite;
+        if (role)
+        {
+            parsed = CreatureRole::Count;
+            for (uint8 r = 0; r < static_cast<uint8>(CreatureRole::Count); ++r)
+            {
+                std::string name = RoleName(static_cast<CreatureRole>(r));
+                std::transform(name.begin(), name.end(), name.begin(),
+                    [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+                if (name == *role)
+                    parsed = static_cast<CreatureRole>(r);
+            }
+            if (parsed == CreatureRole::Count)
+            {
+                h->SendSysMessage("Atlas: the role is trash, elite, rare, miniboss, boss or add.");
+                return false;
+            }
+        }
+
+        Creature* c = sAtlasMgr->SpawnCurationSample(gm, entry, parsed);
+        if (!c)
+        {
+            h->PSendSysMessage("Atlas: creature {} could not be spawned here.", entry);
+            return false;
+        }
+        h->PSendSysMessage("Atlas: {} spawned as {} at level {}, {} health, {} AI.", c->GetName(), RoleName(parsed),
+            c->GetLevel(), c->GetMaxHealth(), AtlasMgr::KeepsStockAI(c) ? "its own" : "Atlas");
         return true;
     }
 

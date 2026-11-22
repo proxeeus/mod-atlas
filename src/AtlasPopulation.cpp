@@ -10,6 +10,7 @@
 #include "AtlasMgr.h"
 #include "AtlasBossSpawnQuery.h"
 #include "RoguelikeMgr.h"
+#include "AtlasAffixes.h"
 #include "AtlasConfig.h"
 #include "Player.h"
 #include "Group.h"
@@ -182,25 +183,6 @@ public:
         // later from HandleCreatureDeath (OnUnitDeath hook) which fires
         // AFTER the core's death processing is finished.
         sAtlasMgr->OnCreatureDeathHook(me);
-
-        // Death affixes (burst, desecrated ground, splitting): after the kill
-        // is counted, outside the session lock.
-        sAtlasMgr->OnRunCreatureDied(me);
-    }
-
-    // Combat-start affixes (Ice-shielded).
-    void JustEngagedWith(Unit* who) override
-    {
-        CreatureAI::JustEngagedWith(who);
-        sAtlasMgr->OnRunCreatureEngaged(me);
-    }
-
-    // Life-threshold affixes (Summoner).
-    void DamageTaken(Unit* attacker, uint32& damage, DamageEffectType damagetype, SpellSchoolMask schoolMask) override
-    {
-        CreatureAI::DamageTaken(attacker, damage, damagetype, schoolMask);
-        if (damage)
-            sAtlasMgr->OnRunCreatureDamaged(me, damage);
     }
 
 private:
@@ -422,31 +404,6 @@ Position AtlasMgr::GetDungeonEntrance(uint32 mapId)
     return layout ? layout->Entrance : Position(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-// V0's spawning still walks a flat list of spawn points: anchors in their
-// order, then one boss position per arena. Same order as before the layout
-// seam, so the draws of a seed don't change.
-static std::vector<SpawnPoint> ToSpawnPoints(Layout const& layout)
-{
-    std::vector<SpawnPoint> points;
-    points.reserve(layout.Anchors.size() + layout.Arenas.size());
-    for (LayoutAnchor const& anchor : layout.Anchors)
-    {
-        SpawnPoint sp;
-        sp.Pos = anchor.Pos;
-        sp.DistanceFromEntrance = anchor.DistanceFromEntrance;
-        points.push_back(sp);
-    }
-    for (LayoutArena const& arena : layout.Arenas)
-    {
-        SpawnPoint sp;
-        sp.Pos = arena.Centre;
-        sp.DistanceFromEntrance = arena.DistanceFromEntrance;
-        sp.IsBossPosition = true;
-        points.push_back(sp);
-    }
-    return points;
-}
-
 // Instance population
 void AtlasMgr::ClearDungeonCreatures(InstanceMap* map)
 {
@@ -617,11 +574,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                 toRemove.size(), p->GetName());
     }
 
-    if (std::shared_ptr<Layout const> layout = GetLayout(session->MapId))
-        session->SpawnPoints = ToSpawnPoints(*layout);
-    if (session->SpawnPoints.empty())
+    std::shared_ptr<Layout const> layout = GetLayout(session->MapId);
+    if (!layout || (layout->Anchors.empty() && layout->Arenas.empty()))
     {
-        LOG_ERROR("module", "Atlas: No spawn points for map {}", session->MapId);
+        LOG_ERROR("module", "Atlas: No layout for map {}", session->MapId);
         return;
     }
 
@@ -633,18 +589,32 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     auto& guidList = _instanceCreatureGuids[instanceId];
     guidList.clear();
 
+    // Corruption (DESIGN §8): native, Scourge-touched and Scourge packs by
+    // the run's tier; a Scourge timeline is Scourge throughout.
+    uint32 const scourgeThemeId = sAtlasConfig->GetScourgeThemeId();
+    CorruptionShares const shares = theme->Id == scourgeThemeId
+        ? CorruptionShares{ 0, 0, 100 }
+        : sAtlasConfig->GetCorruptionShares(CorruptionLevel(session->Tier));
+
     LOG_INFO("module", "Atlas: Populating session {} — theme '{}', band {}-{}, target lvl {}, tier {}, "
-        "health x{:.2f}, damage x{:.2f}",
+        "health x{:.2f}, damage x{:.2f}, packs {}/{}/{} native/touched/Scourge",
         session->SessionId, theme->Name, bandMin, bandMax, targetLevel, session->Tier,
-        SessionHealthFactor(*session), SessionDamageFactor(*session));
+        SessionHealthFactor(*session), SessionDamageFactor(*session), shares.Native, shares.Touched, shares.Scourge);
 
     // Every summon below is scaled here; keep the add-to-world hook out of it.
     OwnSpawnScope const ownSpawns;
     ScalingContext const ctx = ContextOf(*session);
     AffixEffects const& fx = session->Effects;
 
-    // Level, role stats (DESIGN §9), the run's affixes and AI for every spawn.
-    auto applyLevelAndStats = [&](Creature* c, CreatureRole role, bool isBoss)
+    // The plague's mark on Scourge-touched creatures: an aura and an affix.
+    uint32 const touchedAura = sAtlasConfig->GetTouchedAura();
+    std::string unknownTouched;
+    std::vector<ActiveAffix> const touchedAffixes =
+        sAtlasAffixes->Parse(sAtlasConfig->GetTouchedAffixCode(), session->Tier, unknownTouched);
+
+    // Level, role stats (DESIGN §9), the run's affixes (and the creature's
+    // own) and the AI for every spawn.
+    auto applyLevelAndStats = [&](Creature* c, CreatureRole role, bool isBoss, std::vector<ActiveAffix> const& own)
     {
         // Drop auras the template applied at spawn (creature_template_addon,
         // e.g. 28006 Grand Necrolord Antiok's 50494): they were tuned for the
@@ -657,21 +627,14 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         if (isBoss)
         {
             // The gold dragon frame comes from creature_template.rank, which the
-            // client caches per entry — it is not settable at runtime. The boss
-            // pool is already filtered to `rank IN (1,2)`, so every boss draws the
-            // elite frame on its own and nothing is needed here.
-            //
-            // The previous SetByteValue(UNIT_FIELD_BYTES_0, 2, 1) did not set rank:
-            // byte 2 of that field is gender (Unit.h; byte 0=race, 1=class,
-            // 2=gender, 3=power type — there is no classification byte). Its only
-            // effect was to render every boss as gender 1.
+            // client caches per entry; the boss pools hold elites, so it shows.
             c->SetObjectScale(1.3f);                      // 30% larger than normal
         }
 
         // Health, melee, armor and spell/heal scales from the role table, the
         // run's affixes; also clears the template's spell resistances and
         // records ownership.
-        ScaleCreature(c, ctx, role);
+        ScaleCreature(c, ctx, role, own);
 
         // --- Clear mechanic immunities ---
         for (uint32 mech = 1; mech < MAX_MECHANIC; ++mech)
@@ -695,20 +658,23 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             c->GetMotionMaster()->MoveRandom(5.0f);
         }
 
-        // --- Install custom AI ---
-        // All spawned creatures (trash and bosses alike) use AtlasCreatureAI,
-        // which handles aggro scanning, patrol movement, and death hooks.
-        // Bosses rely on auto-attack only — no scripted spell rotations.
+        // --- AI ---
+        // SmartAI creatures keep their own AI and spells (KeepsStockAI);
+        // everything else, and every boss, gets AtlasCreatureAI: aggro
+        // scanning, patrols, no positional evades, melee only.
         // AIM_Initialize deletes the creature's previous AI; Unit::SetAI only
         // swaps the pointer, which leaked one AI object per spawned creature.
         // Before deleting it, cancel the creature's pending events: stock
         // scripts queue lambdas on me->m_Events that capture their AI (e.g.
         // Murmur, Keleseth, Novos schedule them in Reset at spawn), and those
         // would fire into the deleted AI a few seconds later (use-after-free).
-        c->m_Events.KillAllEvents(false);
-        CreatureAI* dmAI = new AtlasCreatureAI(c);
-        if (!c->AIM_Initialize(dmAI))
-            delete dmAI;
+        if (isBoss || !KeepsStockAI(c))
+        {
+            c->m_Events.KillAllEvents(false);
+            CreatureAI* dmAI = new AtlasCreatureAI(c);
+            if (!c->AIM_Initialize(dmAI))
+                delete dmAI;
+        }
 
         // Force visibility refresh or client won't see the creature
         c->UpdateObjectVisibility(true);
@@ -717,33 +683,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         guidList.push_back(c->GetGUID());
     };
 
-    // Spawn trash mobs: one per anchor, plus the extra pack members the run's
-    // affixes add (Teeming, Swarming), up to the live-creature cap.
-    uint32 const eliteChance = std::min<uint32>(100,
-        sAtlasConfig->GetEliteChance() + static_cast<uint32>(fx.EliteChanceBonus));
-    uint32 const maxCreatures = sAtlasConfig->GetMaxRunCreatures();
-    uint32 spawnedMobs = 0;
-
-    auto spawnTrash = [&](Position const& pos, bool mayBeElite) -> bool
+    auto prepareHostile = [](Creature* c)
     {
-        // Every draw happens before the summon, so a summon that fails doesn't
-        // shift the draws of the points after it (C8).
-        uint32 entry = SelectCreatureForTheme(theme, false, session->Rng, session);
-        if (!entry)
-            return false;
-        bool const eliteRoll = session->Rng.Chance(eliteChance);
-        bool const isElite = mayBeElite && eliteRoll;
-
-        Creature* c = map->SummonCreature(entry, pos);
-        if (!c)
-            return false;
-
         c->SetFaction(14);               // hostile to all
         c->SetReactState(REACT_AGGRESSIVE);
-        float baseScale = c->GetObjectScale();
-        float typeScale = sAtlasConfig->GetVisualScaleForCreatureType(c->GetCreatureTemplate()->type);
-        c->SetObjectScale(std::clamp(baseScale * typeScale, 0.55f, 1.0f));
-        c->SetCorpseDelay(300);          // 5 min corpse before despawn
         c->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC
                                         | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_PACIFIED
                                         | UNIT_FLAG_STUNNED | UNIT_FLAG_FLEEING
@@ -752,12 +695,88 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         c->SetImmuneToPC(false);
         c->SetImmuneToNPC(false);
         c->setActive(true);             // Keep creature in grid update cycle for aggro detection
+    };
 
-        applyLevelAndStats(c, isElite ? CreatureRole::Elite : CreatureRole::Trash, false);
+    auto rankRole = [](uint32 entry)
+    {
+        CreatureTemplate const* t = sObjectMgr->GetCreatureTemplate(entry);
+        return t && t->rank > 0 ? CreatureRole::Elite : CreatureRole::Trash;
+    };
+
+    // A pack member's creature: the Scourge pool, the chosen pool, the
+    // dungeon's own inhabitant at that spot, or a creature of the chosen type.
+    auto pickEntry = [&](PackKind kind, LayoutSpot const* spot, std::size_t index, CreatureRole& role) -> uint32
+    {
+        if (kind == PackKind::Scourge || theme->Kind == ThemeKind::Pool)
+        {
+            PackRole const packRole = PickMemberRole(index, session->Rng);
+            uint32 const entry = PickPoolEntry(kind == PackKind::Scourge ? scourgeThemeId : theme->Id, packRole,
+                session->Rng);
+            role = packRole == PackRole::Leader ? CreatureRole::Elite : rankRole(entry);
+            return entry;
+        }
+        if (theme->Kind == ThemeKind::Native)
+        {
+            uint32 const entry = spot ? spot->NativeEntry : 0;
+            if (!entry || GetCuration(entry) == CurationStatus::Blocked)
+                return 0;
+            role = rankRole(entry);
+            return entry;
+        }
+        role = CreatureRole::Trash;
+        return SelectCreatureForTheme(theme, false, session->Rng, session);
+    };
+
+    uint32 const maxCreatures = sAtlasConfig->GetMaxRunCreatures();
+    uint32 const baseElite = std::min<uint32>(100,
+        sAtlasConfig->GetEliteChance() + static_cast<uint32>(fx.EliteChanceBonus));
+    uint32 const promoteElite = std::min<uint32>(100, static_cast<uint32>(fx.EliteChanceBonus));
+    uint32 const rareChance = std::min<uint32>(100,
+        static_cast<uint32>(sAtlasConfig->GetRareSpawnChance() * fx.RareChanceMult));
+    uint32 spawnedMobs = 0;
+    uint32 raresSpawned = 0;
+    std::vector<std::string> rareNotes;
+
+    auto spawnMember = [&](PackKind kind, LayoutSpot const* spot, Position const& pos, std::size_t index,
+        bool asRare, bool mayBeElite)
+    {
+        // Every draw for a member happens before the summon, so a summon that
+        // fails doesn't shift the draws after it (C8).
+        CreatureRole role = CreatureRole::Trash;
+        uint32 const entry = pickEntry(kind, spot, index, role);
+        bool const typeTheme = kind != PackKind::Scourge && theme->Kind == ThemeKind::Type;
+        bool const eliteRoll = session->Rng.Chance(typeTheme ? baseElite : promoteElite);
+        std::vector<ActiveAffix> own;
+        if (asRare && entry)
+            own = sAtlasAffixes->RollRareModifiers(session->Tier, session->Rng);
+        if (!entry)
+            return;
+
+        if (mayBeElite && eliteRoll && role == CreatureRole::Trash)
+            role = CreatureRole::Elite;
+        if (asRare)
+            role = CreatureRole::Rare;
+        bool const touched = kind == PackKind::Touched;
+        if (touched)
+            own.insert(own.end(), touchedAffixes.begin(), touchedAffixes.end());
+
+        Creature* c = map->SummonCreature(entry, pos);
+        if (!c)
+            return;
+
+        prepareHostile(c);
+        float baseScale = c->GetObjectScale();
+        float typeScale = sAtlasConfig->GetVisualScaleForCreatureType(c->GetCreatureTemplate()->type);
+        c->SetObjectScale(std::clamp(baseScale * typeScale * (asRare ? 1.15f : 1.0f), 0.55f, 1.15f));
+        c->SetCorpseDelay(300);          // 5 min corpse before despawn
+
+        applyLevelAndStats(c, role, false, own);
+        if (touched && touchedAura)
+            c->AddAura(touchedAura, c);
 
         SpawnedCreature sc;
         sc.Guid = c->GetGUID(); sc.Entry = entry;
-        sc.IsElite = isElite; sc.IsBoss = false;
+        sc.IsElite = role != CreatureRole::Trash; sc.IsBoss = false; sc.IsRare = asRare;
         session->SpawnedCreatures.push_back(sc);
         if (uint32 recentLimit = sAtlasConfig->GetRecentCreatureEntries(); recentLimit > 0)
         {
@@ -765,121 +784,85 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             if (session->RecentCreatureEntries.size() > recentLimit)
                 session->RecentCreatureEntries.erase(session->RecentCreatureEntries.begin());
         }
-
+        if (asRare)
+        {
+            ++raresSpawned;
+            rareNotes.push_back(Acore::StringFormat("|cFFFF8800{}|r ({})", c->GetName(),
+                sAtlasAffixes->Describe(own, false)));
+            LOG_INFO("module", "Atlas: Rare {} (entry {}) at ({:.1f}, {:.1f}, {:.1f}): {}", c->GetName(), entry,
+                pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), sAtlasAffixes->Codes(own));
+        }
         ++spawnedMobs;
-        return true;
     };
 
-    for (auto& sp : session->SpawnPoints)
+    // Packs, nearest first: a kind per pack, then each member at its spot,
+    // then the members the run's affixes add (Teeming, Swarming), up to the
+    // live-creature cap. A pack's leader may be a rare.
+    for (LayoutAnchor const& anchor : layout->Anchors)
     {
-        if (sp.IsBossPosition) continue;
         if (spawnedMobs >= maxCreatures)
             break;
 
-        spawnTrash(sp.Pos, true);
+        PackKind const kind = RollPackKind(shares, session->Rng);
+        bool const rareLeader = rareChance && session->Rng.Chance(rareChance)
+            && raresSpawned < sAtlasConfig->GetMaxRares();
 
-        // Extra pack members stand at the same anchor; their random patrol
-        // spreads them out. Rolled for every anchor, spawned or not (C8).
+        for (std::size_t i = 0; i < anchor.Spots.size() && spawnedMobs < maxCreatures; ++i)
+            spawnMember(kind, &anchor.Spots[i], anchor.Spots[i].Pos, i, rareLeader && i == 0, true);
+
         bool const extraPack  = fx.PackExtraPct  > 0.0f && session->Rng.Chance(uint32(fx.PackExtraPct));
         bool const extraSwarm = fx.SwarmExtraPct > 0.0f && session->Rng.Chance(uint32(fx.SwarmExtraPct));
+        LayoutSpot const* lead = anchor.Spots.empty() ? nullptr : &anchor.Spots.front();
         if (extraPack && spawnedMobs < maxCreatures)
-            spawnTrash(sp.Pos, true);
+            spawnMember(kind, lead, anchor.Pos, anchor.Spots.size(), false, true);
         if (extraSwarm && spawnedMobs < maxCreatures)
-            spawnTrash(sp.Pos, false);
+            spawnMember(kind, lead, anchor.Pos, anchor.Spots.size() + 1, false, false);
     }
     session->TotalMobs = spawnedMobs;
 
-    // --- Rare spawn (configurable chance, max 1 per run) ---
-    uint32 const rareChance = std::min<uint32>(100,
-        static_cast<uint32>(sAtlasConfig->GetRareSpawnChance() * fx.RareChanceMult));
-    if (rareChance > 0 && session->Rng.Chance(rareChance))
+    if (!rareNotes.empty())
     {
-        // Pick non-boss spawn points for rare placement (prefer middle of dungeon)
-        std::vector<size_t> validRarePoints;
-        for (size_t i = 0; i < session->SpawnPoints.size(); ++i)
-            if (!session->SpawnPoints[i].IsBossPosition)
-                validRarePoints.push_back(i);
-
-        if (!validRarePoints.empty())
-        {
-            size_t startIdx = validRarePoints.size() / 3;
-            size_t endIdx   = std::max(startIdx, validRarePoints.size() * 2 / 3);
-            if (endIdx >= validRarePoints.size()) endIdx = validRarePoints.size() - 1;
-            size_t pickIdx  = validRarePoints[session->Rng.Range(uint32(startIdx), uint32(endIdx))];
-            SpawnPoint& rareSP = session->SpawnPoints[pickIdx];
-
-            uint32 rareEntry = SelectCreatureForTheme(theme, true, session->Rng);
-            if (rareEntry)
-            {
-                Creature* r = map->SummonCreature(rareEntry, rareSP.Pos);
-                if (r)
-                {
-                    r->SetFaction(14);
-                    r->SetReactState(REACT_AGGRESSIVE);
-                    r->SetCorpseDelay(300);
-                    r->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC
-                                                    | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_PACIFIED
-                                                    | UNIT_FLAG_STUNNED | UNIT_FLAG_FLEEING
-                                                    | UNIT_FLAG_NOT_SELECTABLE);
-                    r->SetUInt32Value(UNIT_FIELD_FLAGS_2, 0);
-                    r->SetImmuneToPC(false);
-                    r->SetImmuneToNPC(false);
-                    r->setActive(true);
-
-                    // As above: byte 2 is gender, not rank, and 4 is not a valid
-                    // gender value. Rares come from the same `rank IN (1,2)` pool,
-                    // so they already carry an elite frame; size is the extra tell.
-                    r->SetObjectScale(1.15f);
-
-                    // Also installs the custom AI (rare = enhanced trash).
-                    applyLevelAndStats(r, CreatureRole::Rare, false);
-
-                    SpawnedCreature sc;
-                    sc.Guid = r->GetGUID(); sc.Entry = rareEntry;
-                    sc.IsElite = true; sc.IsBoss = false; sc.IsRare = true;
-                    session->SpawnedCreatures.push_back(sc);
-                    guidList.push_back(r->GetGUID());
-
-                    for (auto const& pd : session->Players)
-                        if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
-                            if (p->GetSession())
-                                ChatHandler(p->GetSession()).PSendSysMessage(
-                                    "{} Something |cFFFF8800rare|r has slipped into this echo from another timeline.",
-                                    CHAT_PREFIX);
-
-                    LOG_INFO("module", "Atlas: Rare creature spawned — entry {} at ({:.1f}, {:.1f}, {:.1f})",
-                        rareEntry, rareSP.Pos.GetPositionX(), rareSP.Pos.GetPositionY(), rareSP.Pos.GetPositionZ());
-                }
-            }
-        }
+        std::string notes;
+        for (std::string const& n : rareNotes)
+            notes += (notes.empty() ? "" : ", ") + n;
+        for (auto const& pd : session->Players)
+            if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                if (p->GetSession())
+                    ChatHandler(p->GetSession()).PSendSysMessage(
+                        "{} Something |cFFFF8800rare|r has slipped into this echo from another timeline: {}.",
+                        CHAT_PREFIX, notes);
     }
 
-    // Spawn bosses (real dungeon bosses)
+    // Bosses: the arena's own master (native), the same touched by the
+    // plague, or a Scourge champion, by the same corruption table.
     uint32 bossesSpawned = 0;
-    for (auto& sp : session->SpawnPoints)
+    for (LayoutArena const& arena : layout->Arenas)
     {
-        if (!sp.IsBossPosition || bossesSpawned >= sAtlasConfig->GetBossCount())
-            continue;
+        if (bossesSpawned >= sAtlasConfig->GetBossCount())
+            break;
 
-        uint32 entry = SelectDungeonBoss(theme, session->Rng);
+        PackKind const kind = RollPackKind(shares, session->Rng);
+        uint32 entry = 0;
+        if (kind == PackKind::Scourge || theme->Kind == ThemeKind::Pool)
+            entry = PickPoolEntry(kind == PackKind::Scourge ? scourgeThemeId : theme->Id, PackRole::Boss,
+                session->Rng);
+        else if (theme->Kind == ThemeKind::Native && arena.NativeEntry
+            && GetCuration(arena.NativeEntry) != CurationStatus::Blocked)
+            entry = arena.NativeEntry;
+        if (!entry)
+            entry = SelectDungeonBoss(theme, session->Rng);
         if (!entry) { LOG_WARN("module", "Atlas: No boss candidate."); continue; }
 
-        Creature* b = map->SummonCreature(entry, sp.Pos);
+        bool const touched = kind == PackKind::Touched;
+        Creature* b = map->SummonCreature(entry, arena.Centre);
         if (!b) continue;
 
-        b->SetFaction(14);
-        b->SetReactState(REACT_AGGRESSIVE);
+        prepareHostile(b);
         b->SetCorpseDelay(600);          // 10 min corpse for bosses
-        b->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC
-                                        | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_PACIFIED
-                                        | UNIT_FLAG_STUNNED | UNIT_FLAG_FLEEING
-                                        | UNIT_FLAG_NOT_SELECTABLE);
-        b->SetUInt32Value(UNIT_FIELD_FLAGS_2, 0);
-        b->SetImmuneToPC(false);
-        b->SetImmuneToNPC(false);
-        b->setActive(true);             // Keep creature in grid update cycle for aggro detection
 
-        applyLevelAndStats(b, CreatureRole::Boss, true);
+        applyLevelAndStats(b, CreatureRole::Boss, true, touched ? touchedAffixes : std::vector<ActiveAffix>());
+        if (touched && touchedAura)
+            b->AddAura(touchedAura, b);
 
         SpawnedCreature sc;
         sc.Guid = b->GetGUID(); sc.Entry = entry;
@@ -887,11 +870,9 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         session->SpawnedCreatures.push_back(sc);
         ++bossesSpawned;
 
-        LOG_INFO("module", "Atlas: Boss spawned — entry {}, name '{}', "
-            "AI: AtlasCreatureAI (auto-attack), ReactState: {}, Level: {}",
-            b->GetEntry(), b->GetName(),
-            static_cast<int>(b->GetReactState()),
-            b->GetLevel());
+        LOG_INFO("module", "Atlas: Boss spawned — entry {}, name '{}', {}, AI: AtlasCreatureAI (auto-attack), "
+            "Level: {}", b->GetEntry(), b->GetName(),
+            kind == PackKind::Scourge ? "Scourge" : touched ? "Scourge-touched" : "native", b->GetLevel());
     }
     session->TotalBosses = bossesSpawned;
 
@@ -960,6 +941,199 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     }
 }
 
+// ---------------------------------------------------------------------------
+// Themes, pools and curation (DESIGN §8, SCOURGE appendix)
+// ---------------------------------------------------------------------------
+
+char const* AtlasMgr::CurationName(CurationStatus status)
+{
+    switch (status)
+    {
+        case CurationStatus::Allowed: return "allowed";
+        case CurationStatus::Blocked: return "blocked";
+        default:                      return "untested";
+    }
+}
+
+AtlasMgr::CurationStatus AtlasMgr::ParseCuration(std::string_view name, bool& ok)
+{
+    ok = true;
+    if (name == "allowed")
+        return CurationStatus::Allowed;
+    if (name == "blocked")
+        return CurationStatus::Blocked;
+    if (name != "untested")
+        ok = false;
+    return CurationStatus::Untested;
+}
+
+void AtlasMgr::LoadThemes()
+{
+    std::vector<Theme> themes;
+    if (QueryResult r = WorldDatabase.Query(
+            "SELECT id, kind, name, description, sort_order FROM atlas_theme WHERE enabled = 1 ORDER BY id"))
+    {
+        do
+        {
+            Field* f = r->Fetch();
+            Theme t;
+            t.Id = f[0].Get<uint32>();
+            std::string const kind = f[1].Get<std::string>();
+            t.Kind = kind == "native" ? ThemeKind::Native : ThemeKind::Pool;
+            t.Name = f[2].Get<std::string>();
+            t.Description = f[3].Get<std::string>();
+            t.SortOrder = f[4].Get<int32>();
+            if (t.Id >= 100)
+            {
+                LOG_ERROR("module", "Atlas: atlas_theme {} skipped: theme IDs must stay below 100 (gossip menus).",
+                    t.Id);
+                continue;
+            }
+            themes.push_back(std::move(t));
+        } while (r->NextRow());
+    }
+    else
+        LOG_ERROR("module", "Atlas: table atlas_theme is empty or missing (module SQL not applied?): "
+            "only the config themes are available.");
+
+    std::map<uint32, ThemePool> pools;
+    uint32 poolRows = 0;
+    uint32 unfit = 0;
+    if (QueryResult r = WorldDatabase.Query(
+            "SELECT theme_id, entry, pack_role FROM atlas_theme_creature ORDER BY theme_id, entry, pack_role"))
+    {
+        do
+        {
+            Field* f = r->Fetch();
+            uint32 const themeId = f[0].Get<uint32>();
+            uint32 const entry = f[1].Get<uint32>();
+            PackRole const role = ParsePackRole(f[2].Get<std::string>());
+            if (role == PackRole::Count)
+                continue;
+            if (!IsFitToFight(entry, false))
+            {
+                ++unfit;
+                continue;
+            }
+            pools[themeId].ByRole[static_cast<std::size_t>(role)].push_back(entry);
+            ++poolRows;
+        } while (r->NextRow());
+    }
+
+    std::unordered_map<uint32, std::pair<CurationStatus, std::string>> curation;
+    if (QueryResult r = WorldDatabase.Query("SELECT entry, status, note FROM atlas_creature_curation"))
+    {
+        do
+        {
+            Field* f = r->Fetch();
+            bool ok = false;
+            CurationStatus const status = ParseCuration(f[1].Get<std::string>(), ok);
+            curation[f[0].Get<uint32>()] = { status, f[2].Get<std::string>() };
+        } while (r->NextRow());
+    }
+
+    std::size_t const themeCount = themes.size();
+    std::size_t const curationCount = curation.size();
+    {
+        std::lock_guard<std::mutex> lock(_themeMutex);
+        _themePools = std::move(pools);
+        _curation = std::move(curation);
+    }
+    sAtlasConfig->SetDatabaseThemes(std::move(themes));
+
+    LOG_INFO("module", "Atlas: {} database themes, {} pool entries ({} unfit to spawn, skipped), {} curation rows.",
+        themeCount, poolRows, unfit, curationCount);
+}
+
+AtlasMgr::CurationStatus AtlasMgr::GetCuration(uint32 entry, std::string* note) const
+{
+    std::lock_guard<std::mutex> lock(_themeMutex);
+    auto it = _curation.find(entry);
+    if (it == _curation.end())
+        return CurationStatus::Untested;
+    if (note)
+        *note = it->second.second;
+    return it->second.first;
+}
+
+void AtlasMgr::SetCuration(uint32 entry, CurationStatus status, std::string const& note)
+{
+    {
+        std::lock_guard<std::mutex> lock(_themeMutex);
+        _curation[entry] = { status, note };
+    }
+    std::string safeNote = note;
+    WorldDatabase.EscapeString(safeNote);
+    WorldDatabase.Execute("REPLACE INTO atlas_creature_curation (entry, status, note) VALUES ({}, '{}', '{}')",
+        entry, CurationName(status), safeNote);
+}
+
+std::string AtlasMgr::DescribePoolMembership(uint32 entry) const
+{
+    static char const* const roles[] = { "leader", "heavy", "melee", "caster", "swarm", "add", "rare", "boss" };
+    std::lock_guard<std::mutex> lock(_themeMutex);
+    std::string out;
+    for (auto const& [themeId, pool] : _themePools)
+        for (std::size_t r = 0; r < pool.ByRole.size(); ++r)
+            if (std::find(pool.ByRole[r].begin(), pool.ByRole[r].end(), entry) != pool.ByRole[r].end())
+                out += (out.empty() ? "" : " ") + std::to_string(themeId) + ":" + roles[r];
+    return out;
+}
+
+uint32 AtlasMgr::PickPoolEntry(uint32 themeId, PackRole role, RunRng& rng) const
+{
+    // Fallbacks when the pool has nobody for a role, nearest first.
+    static constexpr PackRole fallbacks[] = { PackRole::Melee, PackRole::Caster, PackRole::Heavy, PackRole::Leader,
+        PackRole::Swarm, PackRole::Rare, PackRole::Boss };
+
+    std::lock_guard<std::mutex> lock(_themeMutex);
+    auto it = _themePools.find(themeId);
+    if (it == _themePools.end())
+        return 0;
+
+    auto candidates = [&](PackRole r)
+    {
+        std::vector<uint32> out;
+        for (uint32 entry : it->second.ByRole[static_cast<std::size_t>(r)])
+        {
+            auto cur = _curation.find(entry);
+            if (cur == _curation.end() || cur->second.first != CurationStatus::Blocked)
+                out.push_back(entry);
+        }
+        return out;
+    };
+
+    std::vector<uint32> list = candidates(role);
+    for (PackRole r : fallbacks)
+    {
+        if (!list.empty())
+            break;
+        if (r != role)
+            list = candidates(r);
+    }
+    return list.empty() ? 0 : rng.Pick(list);
+}
+
+bool AtlasMgr::KeepsStockAI(Creature const* creature)
+{
+    if (!creature || !sAtlasConfig->KeepsSmartAI())
+        return false;
+    CreatureTemplate const* t = creature->GetCreatureTemplate();
+    return t && t->AIName == "SmartAI" && !t->ScriptID;
+}
+
+Creature* AtlasMgr::SpawnCurationSample(Player* gm, uint32 entry, CreatureRole role)
+{
+    if (!gm || !gm->GetMap())
+        return nullptr;
+
+    ScalingContext ctx;
+    ctx.Level      = gm->GetLevel();
+    ctx.PartySize  = 5;
+    ctx.InstanceId = gm->GetMap()->GetInstanceId();
+    return SpawnRunAdd(gm->GetMap(), entry, gm->GetNearPosition(5.0f, 0.0f), ctx, role, 1.0f, nullptr);
+}
+
 Creature* AtlasMgr::SpawnRunAdd(Map* map, uint32 entry, Position const& pos, ScalingContext const& ctx,
     CreatureRole role, float visualScale, Unit* target)
 {
@@ -991,12 +1165,15 @@ Creature* AtlasMgr::SpawnRunAdd(Map* map, uint32 entry, Position const& pos, Sca
         add->ApplySpellImmune(0, IMMUNITY_MECHANIC, mech, false);
     add->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_ALL, false);
 
-    // Same AI as every run creature (see PopulateDungeon for why the old
-    // events are cancelled first).
-    add->m_Events.KillAllEvents(false);
-    CreatureAI* ai = new AtlasCreatureAI(add);
-    if (!add->AIM_Initialize(ai))
-        delete ai;
+    // Same AI policy as every run creature (see PopulateDungeon for why the
+    // old events are cancelled first).
+    if (!KeepsStockAI(add))
+    {
+        add->m_Events.KillAllEvents(false);
+        CreatureAI* ai = new AtlasCreatureAI(add);
+        if (!add->AIM_Initialize(ai))
+            delete ai;
+    }
 
     add->UpdateObjectVisibility(true);
     if (target && target->IsAlive() && add->AI())
