@@ -3,7 +3,8 @@
 --    holds (dungeon, timeline, instabilities) is asked of the server
 --    (M:<req>:<bag>:<slot>, see atlas_chronicle_script.cpp).
 --  * Icons: the unpatched client has no Item.dbc rows for sigils and shows a
---    question mark on the bag button; this puts the sigil's rune there.
+--    question mark on the bag button; this puts the sigil's rune there, on
+--    Blizzard's bags, the bank and AdiBags.
 
 local PREFIX = "ATLAS"
 local SIGIL_BASE = 90000
@@ -131,6 +132,23 @@ if BankFrameItemButton_Update then
     end)
 end
 
+-- AdiBags draws its own buttons and says so after each redraw.
+local function hookAdiBags()
+    local ace = LibStub and LibStub("AceAddon-3.0", true)
+    local adi = ace and ace:GetAddon("AdiBags", true)
+    if not adi or not adi.RegisterMessage then
+        return
+    end
+    local listener = {}
+    adi.RegisterMessage(listener, "AdiBags_UpdateButton", function (_, button)
+        local tier, rarity = decode(button.itemId)
+        if tier and button.IconTexture then
+            button.IconTexture:SetTexture(ICONS[rarity])
+            button.IconTexture:SetTexCoord(0, 1, 0, 1)
+        end
+    end)
+end
+
 -- When the server answers, refresh the tooltip still showing that slot.
 local function refresh(key)
     if not GameTooltip:IsShown() then
@@ -148,7 +166,12 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_ADDON")
 events:RegisterEvent("BAG_UPDATE")
+events:RegisterEvent("PLAYER_LOGIN")
 events:SetScript("OnEvent", function (self, event, prefix, message, channel, sender)
+    if event == "PLAYER_LOGIN" then
+        hookAdiBags()
+        return
+    end
     if event == "BAG_UPDATE" then
         local bag = prefix
         for key in pairs(cache) do
