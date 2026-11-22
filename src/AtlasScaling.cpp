@@ -1,7 +1,8 @@
 /*
  * mod-atlas — AtlasScaling.cpp
- * Scaling: class/level base stats, creature level ownership, health and damage
- * multipliers, damage scales for session creatures and the environment.
+ * Scaling (DESIGN §9): role stats from the stock base stats of the run's
+ * level, creature ownership (so the stats survive anything that resets them),
+ * and the environmental damage scale. The math is in AtlasScalingMath.h.
  *
  * AtlasMgr is split across AtlasMgr.cpp, AtlasPopulation.cpp, AtlasScaling.cpp,
  * AtlasRewards.cpp and AtlasRecords.cpp; the class itself is in AtlasMgr.h.
@@ -44,60 +45,199 @@
 #include <cmath>
 #include <atomic>
 #include "AtlasInternal.h"
+#include "AtlasScalingMath.h"
 
 namespace Atlas
 {
 
-// Cache creature_classlevelstats for force-scaling
-void AtlasMgr::LoadClassLevelStats()
+// ---------------------------------------------------------------------------
+// Base stats and role stats
+// ---------------------------------------------------------------------------
+
+namespace
 {
-    _classLevelStats.clear();
-
-    QueryResult result = WorldDatabase.Query(
-        "SELECT level, class, basehp0, damage_base, basearmor, attackpower "
-        "FROM creature_classlevelstats "
-        "WHERE level > 0 AND level <= 83 "
-        "ORDER BY class, level");
-
-    if (!result)
+    struct LevelBase
     {
-        LOG_WARN("module", "Atlas: creature_classlevelstats not found — "
-                 "creature scaling will use template defaults.");
-        return;
+        float Health      = 1.0f;
+        float Damage      = 1.0f;
+        float AttackPower = 0.0f;
+        float Armor       = 0.0f;
+    };
+
+    // creature_classlevelstats through AzerothCore's own cache, in the column of
+    // `expansion`, falling back to a lower column where the table holds no
+    // value (1) for that level.
+    LevelBase BaseAt(uint8 level, uint8 unitClass, uint32 expansion)
+    {
+        CreatureBaseStats const* stats = sObjectMgr->GetCreatureBaseStats(std::max<uint8>(level, 1),
+            unitClass ? unitClass : 1);
+        LevelBase base;
+        if (!stats)
+            return base;
+
+        uint32 hpCol = std::min<uint32>(expansion, MAX_EXPANSIONS - 1);
+        while (hpCol > 0 && stats->BaseHealth[hpCol] <= 1)
+            --hpCol;
+        uint32 dmgCol = std::min<uint32>(expansion, MAX_EXPANSIONS - 1);
+        while (dmgCol > 0 && stats->BaseDamage[dmgCol] <= 1.0f)
+            --dmgCol;
+
+        base.Health      = static_cast<float>(std::max<uint32>(stats->BaseHealth[hpCol], 1));
+        base.Damage      = std::max(stats->BaseDamage[dmgCol], 1.0f);
+        base.AttackPower = static_cast<float>(stats->AttackPower);
+        base.Armor       = stats->BaseArmor;
+        return base;
     }
-
-    uint32 count = 0;
-    do
-    {
-        Field* f = result->Fetch();
-        uint8  level     = f[0].Get<uint8>();
-        uint8  unitClass = f[1].Get<uint8>();
-        ClassLevelStatEntry e;
-        e.BaseHP       = std::max(1u, f[2].Get<uint32>());
-        e.BaseDamage   = std::max(1.0f, f[3].Get<float>());
-        e.BaseArmor    = f[4].Get<uint32>();
-        e.AttackPower  = f[5].Get<uint32>();
-        _classLevelStats[{unitClass, level}] = e;
-        ++count;
-    } while (result->NextRow());
-
-    LOG_INFO("module", "Atlas: {} class-level stat entries cached.", count);
 }
 
-// Look up cached base stats
-ClassLevelStatEntry const* AtlasMgr::GetBaseStatsForLevel(
-    uint8 unitClass, uint8 level) const
+float AtlasMgr::SessionHealthFactor(Session const& s) const
 {
-    auto it = _classLevelStats.find({unitClass, level});
-    if (it != _classLevelStats.end())
-        return &it->second;
+    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s.DifficultyId);
+    float factor = (d ? d->HealthMultiplier : 1.0f)
+        * PartyFactor(static_cast<uint32>(s.Players.size()), sAtlasConfig->GetSoloMultiplier(),
+            sAtlasConfig->GetPerPlayerHealthMult());
+    factor *= s.RoguelikeRunId
+        ? sRoguelikeMgr->GetTierHealthMultiplier(s.RoguelikeRunId)
+        : TierMultiplier(sAtlasConfig->GetTierGrowth(), s.Tier);
+    return factor;
+}
 
-    // Fallback: try Warrior (class 1) at this level
-    it = _classLevelStats.find({1, level});
-    if (it != _classLevelStats.end())
-        return &it->second;
+float AtlasMgr::SessionDamageFactor(Session const& s) const
+{
+    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s.DifficultyId);
+    float factor = (d ? d->DamageMultiplier : 1.0f)
+        * PartyFactor(static_cast<uint32>(s.Players.size()), sAtlasConfig->GetSoloMultiplier(),
+            sAtlasConfig->GetPerPlayerDamageMult());
+    factor *= s.RoguelikeRunId
+        ? sRoguelikeMgr->GetTierDamageMultiplier(s.RoguelikeRunId)
+        : TierMultiplier(sAtlasConfig->GetTierGrowth(), s.Tier);
+    return factor;
+}
 
-    return nullptr;
+AtlasMgr::RoleStats AtlasMgr::ComputeRoleStats(Session const& session, CreatureTemplate const* tmpl,
+    CreatureRole role, float affixHealth, float affixDamage) const
+{
+    RoleStats stats;
+    if (!tmpl)
+        return stats;
+
+    uint8 const level = std::max<uint8>(session.EffectiveLevel, 1);
+    LevelBase const now = BaseAt(level, tmpl->unit_class, ExpansionForLevel(level));
+    RoleMultipliers const& r = sAtlasConfig->GetRole(role);
+
+    float const hpMult  = r.Health * SessionHealthFactor(session) * affixHealth;
+    float const dmgMult = r.Damage * SessionDamageFactor(session) * affixDamage;
+
+    stats.Level     = level;
+    stats.MaxHealth = std::max<uint32>(1, static_cast<uint32>(now.Health * hpMult));
+
+    // Weapon damage and attack power are set so AzerothCore's own melee formula
+    // lands on base x multiplier whatever the template's DamageModifier.
+    MeleeSetup const melee = ComputeMelee(now.Damage, now.AttackPower, dmgMult, tmpl->DamageModifier);
+    stats.WeaponMin   = melee.WeaponMin;
+    stats.WeaponMax   = melee.WeaponMax;
+    stats.AttackPower = melee.AttackPower;
+
+    float armor = now.Armor * r.Armor;
+    if (session.RoguelikeRunId)
+        armor *= std::max(1.0f, sRoguelikeMgr->GetTierArmorMultiplier(session.RoguelikeRunId));
+    stats.Armor = static_cast<uint32>(armor);
+
+    // Spells and heals keep their weight against melee and health: scale them
+    // by how much this creature's melee and health moved from its template
+    // (its own level, expansion and modifiers) to the run.
+    uint8 const origLevel = std::max<uint8>(tmpl->maxlevel, 1);
+    LevelBase const orig = BaseAt(origLevel, tmpl->unit_class, tmpl->expansion);
+    float const origMelee = (orig.Damage + orig.AttackPower / 14.0f) * std::max(tmpl->DamageModifier, 0.01f);
+    float const newMelee  = (now.Damage + now.AttackPower / 14.0f) * dmgMult;
+    stats.SpellScale = ClampScale(newMelee / std::max(origMelee, 1.0f), 0.05f, sAtlasConfig->GetSpellScaleMax());
+
+    float const origHealth = std::max(orig.Health * tmpl->ModHealth, 1.0f);
+    stats.HealScale = ClampScale(static_cast<float>(stats.MaxHealth) / origHealth, 0.05f, 100.0f);
+    return stats;
+}
+
+void AtlasMgr::ApplyRoleStats(Creature* c, RoleStats const& stats, bool keepHealthPct)
+{
+    if (!c)
+        return;
+
+    float const healthPct = keepHealthPct && c->GetMaxHealth()
+        ? static_cast<float>(c->GetHealth()) / static_cast<float>(c->GetMaxHealth())
+        : 1.0f;
+
+    // Set the stat system's base values (as Creature::SelectLevel does), not
+    // just the fields, so a later stat update (an aura, a buff) keeps them.
+    c->SetCreateHealth(stats.MaxHealth);
+    c->SetStatFlatModifier(UNIT_MOD_HEALTH, BASE_VALUE, static_cast<float>(stats.MaxHealth));
+
+    for (WeaponAttackType att : { BASE_ATTACK, OFF_ATTACK, RANGED_ATTACK })
+    {
+        c->SetBaseWeaponDamage(att, MINDAMAGE, stats.WeaponMin);
+        c->SetBaseWeaponDamage(att, MAXDAMAGE, stats.WeaponMax);
+    }
+    c->SetStatFlatModifier(UNIT_MOD_ATTACK_POWER, BASE_VALUE, stats.AttackPower);
+    c->SetStatFlatModifier(UNIT_MOD_ATTACK_POWER_RANGED, BASE_VALUE, stats.AttackPower);
+
+    // Armor from the run's level; spell resistances cleared (the template's
+    // were tuned for its own level).
+    c->SetStatFlatModifier(UNIT_MOD_ARMOR, BASE_VALUE, static_cast<float>(stats.Armor));
+    for (uint8 school = SPELL_SCHOOL_HOLY; school < MAX_SPELL_SCHOOL; ++school)
+        c->SetStatFlatModifier(UnitMods(UNIT_MOD_RESISTANCE_START + school), BASE_VALUE, 0.0f);
+
+    c->UpdateAllStats();
+
+    uint32 const health = std::max<uint32>(1, static_cast<uint32>(c->GetMaxHealth() * healthPct));
+    c->SetHealth(std::min(health, c->GetMaxHealth()));
+}
+
+void AtlasMgr::ScaleCreature(Creature* c, Session const& session, CreatureRole role, float affixHealth,
+    float affixDamage)
+{
+    if (!c)
+        return;
+
+    RoleStats const stats = ComputeRoleStats(session, c->GetCreatureTemplate(), role, affixHealth, affixDamage);
+    c->SetLevel(stats.Level);
+    ApplyRoleStats(c, stats, false);
+    RegisterOwnedCreature(c->GetGUID(), stats, c->GetMap() ? c->GetMap()->GetInstanceId() : session.InstanceId);
+}
+
+std::vector<std::string> AtlasMgr::DescribeRoleScaling(uint8 level, uint32 tier, uint32 partySize,
+    uint32 difficultyId) const
+{
+    // A warrior-class (unit_class 1) creature with stock modifiers, the
+    // reference the role table is tuned on.
+    CreatureTemplate tmpl;
+    tmpl.unit_class     = 1;
+    tmpl.maxlevel       = level;
+    tmpl.expansion      = ExpansionForLevel(level);
+    tmpl.DamageModifier = 1.0f;
+    tmpl.ModHealth      = 1.0f;
+
+    Session s;
+    s.EffectiveLevel = level;
+    s.Tier           = std::max<uint32>(tier, 1);
+    s.DifficultyId   = difficultyId;
+    s.Players.resize(std::max<uint32>(partySize, 1));
+
+    std::vector<std::string> lines;
+    DifficultyTier const* d = sAtlasConfig->GetDifficulty(difficultyId);
+    lines.push_back(Acore::StringFormat(
+        "Level {}, tier {}, party of {}, {}: health x{:.2f}, damage x{:.2f} (warrior-class creature, 2.0 s swing)",
+        level, s.Tier, s.Players.size(), d ? d->Name : "no difficulty", SessionHealthFactor(s),
+        SessionDamageFactor(s)));
+
+    for (uint8 r = 0; r < static_cast<uint8>(CreatureRole::Count); ++r)
+    {
+        CreatureRole const role = static_cast<CreatureRole>(r);
+        RoleStats const st = ComputeRoleStats(s, &tmpl, role, 1.0f, 1.0f);
+        float const hitMin = MeleeHit(st.WeaponMin, st.AttackPower, 1.0f, 2.0f);
+        float const hitMax = MeleeHit(st.WeaponMax, st.AttackPower, 1.0f, 2.0f);
+        lines.push_back(Acore::StringFormat("  {:<8} {:>9} health, hits {:.0f}-{:.0f}, armor {}",
+            RoleName(role), st.MaxHealth, hitMin, hitMax, st.Armor));
+    }
+    return lines;
 }
 
 // ---------------------------------------------------------------------------
@@ -113,19 +253,18 @@ bool AtlasMgr::HasOwnedCreatures()
     return g_dmOwnedCount.load(std::memory_order_relaxed) != 0;
 }
 
-void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, uint8 level, uint32 maxHealth, uint32 instanceId)
+void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, uint32 instanceId)
 {
-    if (!guid || !level)
+    if (!guid || !stats.Level)
         return;
 
     std::lock_guard<std::mutex> lock(_ownedMutex);
 
     OwnedCreature& oc = _ownedCreatures[guid];
-    if (oc.Level == 0)
+    if (oc.Stats.Level == 0)
         g_dmOwnedCount.fetch_add(1, std::memory_order_relaxed);
 
-    oc.Level      = level;
-    oc.MaxHealth  = maxHealth;
+    oc.Stats      = stats;
     oc.InstanceId = instanceId;
 }
 
@@ -137,8 +276,42 @@ bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth
     if (it == _ownedCreatures.end())
         return false;
 
-    level     = it->second.Level;
-    maxHealth = it->second.MaxHealth;
+    level     = it->second.Stats.Level;
+    maxHealth = it->second.Stats.MaxHealth;
+    return true;
+}
+
+float AtlasMgr::GetOwnedSpellScale(ObjectGuid guid) const
+{
+    std::lock_guard<std::mutex> lock(_ownedMutex);
+    auto it = _ownedCreatures.find(guid);
+    return it != _ownedCreatures.end() ? it->second.Stats.SpellScale : -1.0f;
+}
+
+float AtlasMgr::GetOwnedHealScale(ObjectGuid guid) const
+{
+    std::lock_guard<std::mutex> lock(_ownedMutex);
+    auto it = _ownedCreatures.find(guid);
+    return it != _ownedCreatures.end() ? it->second.Stats.HealScale : -1.0f;
+}
+
+bool AtlasMgr::ReapplyOwnedStats(Creature* creature, bool keepHealthPct)
+{
+    if (!creature)
+        return false;
+
+    RoleStats stats;
+    {
+        std::lock_guard<std::mutex> lock(_ownedMutex);
+        auto it = _ownedCreatures.find(creature->GetGUID());
+        if (it == _ownedCreatures.end())
+            return false;
+        stats = it->second.Stats;
+    }
+
+    if (creature->GetLevel() != stats.Level)
+        creature->SetLevel(stats.Level);
+    ApplyRoleStats(creature, stats, keepHealthPct);
     return true;
 }
 
@@ -169,255 +342,15 @@ void AtlasMgr::ForgetOwnedCreaturesForInstance(uint32 instanceId)
     }
 }
 
-// Scale an add summoned by an Atlas creature. SelectCreatureForTheme()
-// matches on creature type only and no summon hook was installed, so an add
-// would otherwise enter the instance at its own template level — e.g. a level-69
-// Fel Imp inside a level-25 run, which the client marks with a skull.
+// Adds summoned by Atlas creatures (or appearing mid-run) take the Add role.
+// Without it an add enters at its own template level, e.g. a level-69 Fel Imp
+// inside a level-25 run, which the client marks with a skull.
 void AtlasMgr::ScaleSummonedCreature(Creature* creature, Session* session)
 {
-    if (!creature || !session)
+    if (!creature || !session || !session->EffectiveLevel)
         return;
 
-    uint8 targetLevel = session->EffectiveLevel;
-    if (!targetLevel)
-        return;
-
-    creature->SetLevel(targetLevel);
-
-    uint8 unitClass = creature->GetCreatureTemplate()->unit_class;
-    ClassLevelStatEntry const* baseStats = GetBaseStatsForLevel(unitClass, targetLevel);
-
-    float hpMult  = CalculateHealthMultiplier(session);
-    float dmgMult = CalculateDamageMultiplier(session);
-
-    float finalHP = baseStats
-        ? static_cast<float>(baseStats->BaseHP) * hpMult
-        : creature->GetMaxHealth() * hpMult;
-
-    uint32 hp = std::max(1u, static_cast<uint32>(finalHP));
-    creature->SetMaxHealth(hp);
-    creature->SetHealth(hp);
-
-    if (baseStats)
-    {
-        float dmgBase = baseStats->BaseDamage;
-        float apBonus = static_cast<float>(baseStats->AttackPower) / 14.0f;
-        float atkTime = static_cast<float>(creature->GetCreatureTemplate()->BaseAttackTime) / 1000.0f;
-        if (atkTime <= 0.0f)
-            atkTime = 2.0f;
-
-        float minDmg = (dmgBase + apBonus) * atkTime * dmgMult;
-        float maxDmg = ((dmgBase * 1.15f) + apBonus) * atkTime * dmgMult;
-
-        minDmg = std::max(1.0f, minDmg);
-        maxDmg = std::max(minDmg, maxDmg);
-
-        creature->SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, minDmg);
-        creature->SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, maxDmg);
-        creature->UpdateDamagePhysical(BASE_ATTACK);
-    }
-
-    if (baseStats && baseStats->BaseArmor > 0)
-        creature->SetArmor(baseStats->BaseArmor);
-
-    for (uint8 school = SPELL_SCHOOL_HOLY; school < MAX_SPELL_SCHOOL; ++school)
-        creature->SetResistance(SpellSchools(school), 0);
-
-    RegisterOwnedCreature(creature->GetGUID(), targetLevel, hp, session->InstanceId);
-}
-
-// Scaling multipliers
-float AtlasMgr::CalculateHealthMultiplier(Session const* s) const
-{
-    if (!s) return 1.0f;
-    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s->DifficultyId);
-    if (!d) return 1.0f;
-
-    float base = d->HealthMultiplier;
-    uint32 n   = s->Players.size();
-    float mult;
-    if (n <= 1) mult = base * sAtlasConfig->GetSoloMultiplier();
-    else        mult = base * (1.0f + (n - 1) * sAtlasConfig->GetPerPlayerHealthMult());
-
-    // Roguelike tier scaling
-    if (s->RoguelikeRunId != 0)
-        mult *= sRoguelikeMgr->GetTierHealthMultiplier(s->RoguelikeRunId);
-
-    return mult;
-}
-
-float AtlasMgr::CalculateDamageMultiplier(Session const* s) const
-{
-    if (!s) return 1.0f;
-    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s->DifficultyId);
-    if (!d) return 1.0f;
-
-    float base = d->DamageMultiplier;
-    uint32 n   = s->Players.size();
-    float mult;
-    if (n <= 1) mult = base * sAtlasConfig->GetSoloMultiplier();
-    else        mult = base * (1.0f + (n - 1) * sAtlasConfig->GetPerPlayerDamageMult());
-
-    // Roguelike tier scaling
-    if (s->RoguelikeRunId != 0)
-        mult *= sRoguelikeMgr->GetTierDamageMultiplier(s->RoguelikeRunId);
-
-    return mult;
-}
-
-// Check if creature belongs to an active session
-bool AtlasMgr::IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creatureGuid)
-{
-    std::lock_guard<std::mutex> lock(_sessionMutex);
-    auto pit = _playerToSession.find(playerGuid);
-    if (pit == _playerToSession.end())
-        return false;
-
-    auto sit = _activeSessions.find(pit->second);
-    if (sit == _activeSessions.end())
-        return false;
-
-    return sit->second.IsSessionCreature(creatureGuid);
-}
-
-// Check if creature is a session boss
-bool AtlasMgr::IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureGuid)
-{
-    std::lock_guard<std::mutex> lock(_sessionMutex);
-    auto pit = _playerToSession.find(playerGuid);
-    if (pit == _playerToSession.end())
-        return false;
-
-    auto sit = _activeSessions.find(pit->second);
-    if (sit == _activeSessions.end())
-        return false;
-
-    for (auto const& sc : sit->second.SpawnedCreatures)
-        if (sc.Guid == creatureGuid)
-            return sc.IsBoss;
-
-    return false;
-}
-
-// Compute damage scale for a session creature attacking a session player.
-// Spell/ability damage is hard-coded in DBC at the boss's original design level.
-// This returns a multiplier to bring that damage in line with the session's level.
-float AtlasMgr::GetSessionCreatureDamageScale(
-    ObjectGuid playerGuid, ObjectGuid creatureGuid)
-{
-    std::lock_guard<std::mutex> lock(_sessionMutex);
-    auto pit = _playerToSession.find(playerGuid);
-    if (pit == _playerToSession.end())
-        return 1.0f;
-
-    auto sit = _activeSessions.find(pit->second);
-    if (sit == _activeSessions.end())
-        return 1.0f;
-
-    Session const& session = sit->second;
-
-    // Verify this creature belongs to the session
-    bool isBoss = false;
-    bool found  = false;
-    for (auto const& sc : session.SpawnedCreatures)
-    {
-        if (sc.Guid == creatureGuid)
-        {
-            found  = true;
-            isBoss = sc.IsBoss;
-            break;
-        }
-    }
-    if (!found)
-        return 1.0f;
-
-    // Trash mobs use our custom AI — melee is already scaled, no spells.
-    if (!isBoss)
-        return 1.0f;
-
-    // For bosses: compare session target level to the boss's original template
-    // level (ComputeLevelDamageScale). Find a player reference to resolve the GUID.
-    Creature* creature = nullptr;
-    for (auto const& pd : session.Players)
-    {
-        Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
-        if (p && p->IsInWorld())
-        {
-            creature = ObjectAccessor::GetCreature(*p, creatureGuid);
-            if (creature) break;
-        }
-    }
-
-    if (!creature)
-        return 1.0f;
-
-    return ComputeLevelDamageScale(session, creature);
-}
-
-// Adds that appear during a run (summons) are registered as owned and get
-// level-scaled melee on creation, but their spells keep template damage. Scale
-// those like a boss's. Returns a negative value if the creature is not owned,
-// so the caller falls back to the environmental cap.
-float AtlasMgr::GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature)
-{
-    uint8  ownedLevel = 0;
-    uint32 ownedHp    = 0;
-    if (!creature || !GetOwnedCreature(creature->GetGUID(), ownedLevel, ownedHp))
-        return -1.0f;
-
-    std::lock_guard<std::mutex> lock(_sessionMutex);
-    auto pit = _playerToSession.find(playerGuid);
-    if (pit == _playerToSession.end())
-        return -1.0f;
-
-    auto sit = _activeSessions.find(pit->second);
-    if (sit == _activeSessions.end())
-        return -1.0f;
-
-    return ComputeLevelDamageScale(sit->second, creature);
-}
-
-// Template-level spell damage → session-level damage, from the
-// creature_classlevelstats base damage ratio. Clamped to [0.03, 1].
-float AtlasMgr::ComputeLevelDamageScale(Session const& session, Creature const* creature) const
-{
-    uint8 targetLevel   = session.EffectiveLevel;
-    uint8 templateLevel = creature->GetCreatureTemplate()->maxlevel;
-
-    // If session level >= template level, boss is upscaled — no reduction needed.
-    if (targetLevel >= templateLevel)
-        return 1.0f;
-
-    // Use classlevelstats to get the proper damage ratio between levels.
-    uint8 unitClass = creature->GetCreatureTemplate()->unit_class;
-    ClassLevelStatEntry const* targetStats   = GetBaseStatsForLevel(unitClass, targetLevel);
-    ClassLevelStatEntry const* templateStats = GetBaseStatsForLevel(unitClass, templateLevel);
-
-    float scale;
-    if (targetStats && templateStats && templateStats->BaseDamage > 1.0f)
-    {
-        scale = targetStats->BaseDamage / templateStats->BaseDamage;
-    }
-    else
-    {
-        // Fallback: level ratio squared (spell damage scales ~quadratically)
-        float lvlRatio = static_cast<float>(targetLevel) / static_cast<float>(templateLevel);
-        scale = lvlRatio * lvlRatio;
-    }
-
-    // Apply solo/party multiplier so boss spells feel consistent with melee
-    uint32 n = session.Players.size();
-    if (n <= 1)
-        scale *= sAtlasConfig->GetSoloMultiplier();
-
-    // Clamp: never fully negate, never amplify
-    scale = std::max(0.03f, std::min(1.0f, scale));
-
-    LOG_DEBUG("module", "Atlas: Boss spell damage scale for session {} — "
-        "targetLvl={}, templateLvl={}, scale={:.3f}",
-        session.SessionId, targetLevel, templateLevel, scale);
-
-    return scale;
+    ScaleCreature(creature, *session, CreatureRole::Add, 1.0f, 1.0f);
 }
 
 // Scale environmental damage to party level

@@ -9,6 +9,8 @@
 
 #include "AtlasTypes.h"
 #include "RoguelikeTypes.h"
+#include "AtlasScalingMath.h"
+#include <array>
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
@@ -55,10 +57,10 @@ public:
     float GetPerPlayerHealthMult() const { return _perPlayerHealth; }
     float GetPerPlayerDamageMult() const { return _perPlayerDamage; }
     float GetSoloMultiplier()     const { return _soloMultiplier; }
-    float GetEliteHealthMult()    const { return _eliteHealthMult; }
-    float GetEliteDamageMult()    const { return _eliteDamageMult; }
-    float GetBossHealthMult()     const { return _bossHealthMult; }
-    float GetBossDamageMult()     const { return _bossDamageMult; }
+    // Role table (DESIGN §9), tier growth, and the cap on spell/heal rescaling.
+    RoleMultipliers const& GetRole(CreatureRole role) const { return _roles[static_cast<uint8>(role)]; }
+    float GetTierGrowth()         const { return _tierGrowth; }
+    float GetSpellScaleMax()      const { return _spellScaleMax; }
 
     // --- Rewards ---
     uint32 GetBaseGold()     const { return _baseGold; }
@@ -81,8 +83,6 @@ public:
     uint32 GetEliteChance()     const { return _eliteChance; }
     float  GetAggroRadius()     const { return _aggroRadius; }
     uint32 GetRareSpawnChance() const { return _rareSpawnChance; }
-    float  GetRareHealthMult()  const { return _rareHealthMult; }
-    float  GetRareDamageMult()  const { return _rareDamageMult; }
     uint32 GetRecentCreatureEntries() const { return _recentCreatureEntries; }
     float  GetVisualScaleForCreatureType(uint32 type) const;
 
@@ -139,10 +139,9 @@ private:
     float _perPlayerHealth = 0.25f;
     float _perPlayerDamage = 0.10f;
     float _soloMultiplier  = 0.50f;
-    float _eliteHealthMult = 2.0f;
-    float _eliteDamageMult = 1.5f;
-    float _bossHealthMult  = 8.0f;
-    float _bossDamageMult  = 1.5f;
+    std::array<RoleMultipliers, static_cast<uint8>(CreatureRole::Count)> _roles{};
+    float _tierGrowth      = 1.075f;
+    float _spellScaleMax   = 20.0f;
 
     // Rewards
     uint32 _baseGold    = 40000;
@@ -159,8 +158,6 @@ private:
     uint32 _eliteChance     = 20;
     float  _aggroRadius     = 15.0f;
     uint32 _rareSpawnChance = 5;
-    float  _rareHealthMult  = 4.0f;
-    float  _rareDamageMult  = 2.0f;
     uint32 _recentCreatureEntries = 12;
     float  _visualScaleBeast = 1.0f;
     float  _visualScaleDragonkin = 0.85f;

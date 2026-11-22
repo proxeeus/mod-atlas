@@ -134,6 +134,10 @@ struct Session
     uint64  Seed = 0;
     RunRng  Rng;
 
+    // Map tier (DESIGN §11), 1 for echoes; drives tier growth in the scaling.
+    // Endless floors use their depth curve instead.
+    uint32  Tier = 1;
+
     uint8   EffectiveLevel = 1;
     uint8   LevelBandMin   = 1;
     uint8   LevelBandMax   = 80;
@@ -197,14 +201,6 @@ struct CreaturePoolEntry
     uint32 Type     = 0;
     uint8  MinLevel = 1;
     uint8  MaxLevel = 80;
-};
-
-struct ClassLevelStatEntry
-{
-    uint32 BaseHP         = 1;
-    float  BaseDamage     = 1.0f;
-    uint32 BaseArmor      = 0;
-    uint32 AttackPower    = 0;
 };
 
 struct RewardItem

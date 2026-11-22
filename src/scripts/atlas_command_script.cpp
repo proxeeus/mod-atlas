@@ -1,7 +1,8 @@
 /*
  * mod-atlas — atlas_command_script.cpp
  * GM commands: .atlas reload, .atlas status, .atlas list, .atlas end, .atlas clearcooldown,
- * .atlas run (the current run and its seed), .atlas seed (replay a seed)
+ * .atlas run (the current run and its seed), .atlas seed (replay a seed),
+ * .atlas scaling (the role table at a level, tier, party size and difficulty)
  */
 
 #include "ScriptMgr.h"
@@ -12,6 +13,7 @@
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
 #include "RoguelikeMgr.h"
+#include <algorithm>
 #include <charconv>
 
 using namespace Acore::ChatCommands;
@@ -33,6 +35,7 @@ public:
             { "clearcooldown", HandleClearCD,        SEC_GAMEMASTER,     Console::No  },
             { "run",           HandleRun,            SEC_GAMEMASTER,     Console::No  },
             { "seed",          HandleSeed,           SEC_GAMEMASTER,     Console::No  },
+            { "scaling",       HandleScaling,        SEC_GAMEMASTER,     Console::Yes },
         };
         static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
@@ -124,6 +127,10 @@ public:
         }
 
         h->PSendSysMessage("Atlas: {}", sAtlasMgr->GetSessionStatusString(s));
+        h->PSendSysMessage(
+            "Atlas: level {}, tier {}, health x{:.2f}, damage x{:.2f} (roles: .atlas scaling {} {} {} {})",
+            s->EffectiveLevel, s->Tier, sAtlasMgr->SessionHealthFactor(*s), sAtlasMgr->SessionDamageFactor(*s),
+            s->EffectiveLevel, s->Tier, s->Players.size(), s->DifficultyId);
 
         uint32 depth = 0;
         uint64 descentSeed = 0;
@@ -165,6 +172,21 @@ public:
 
         sAtlasMgr->SetPendingSeed(target->GetGUID(), seed);
         h->PSendSysMessage("Atlas: {}'s next run will use seed {:016X}.", target->GetName(), seed);
+        return true;
+    }
+
+    // .atlas scaling [level] [tier] [party] [difficulty]: what each role gets.
+    // Defaults: level 80, tier 1, a party of five, the last difficulty.
+    static bool HandleScaling(ChatHandler* h, Optional<uint8> level, Optional<uint32> tier,
+        Optional<uint32> party, Optional<uint32> difficulty)
+    {
+        auto const& diffs = sAtlasConfig->GetDifficulties();
+        uint32 const diffId = difficulty.value_or(diffs.empty() ? 0 : diffs.back().Id);
+        uint8 const lvl = std::clamp<uint8>(level.value_or(80), 1, 83);
+
+        auto const lines = sAtlasMgr->DescribeRoleScaling(lvl, tier.value_or(1), party.value_or(5), diffId);
+        for (std::string const& line : lines)
+            h->SendSysMessage(line);
         return true;
     }
 

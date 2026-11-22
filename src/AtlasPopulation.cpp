@@ -605,9 +605,6 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         return;
     }
 
-    float hpMult  = CalculateHealthMultiplier(session);
-    float dmgMult = CalculateDamageMultiplier(session);
-
     uint8 bandMin = session->LevelBandMin;
     uint8 bandMax = session->LevelBandMax;
     uint8 targetLevel = session->EffectiveLevel;
@@ -616,22 +613,13 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     auto& guidList = _instanceCreatureGuids[instanceId];
     guidList.clear();
 
-    LOG_INFO("module", "Atlas: Populating session {} — theme '{}', band {}-{}, target lvl {}, HP x{:.2f}, DMG x{:.2f}",
-        session->SessionId, theme->Name, bandMin, bandMax, targetLevel, hpMult, dmgMult);
+    LOG_INFO("module", "Atlas: Populating session {} — theme '{}', band {}-{}, target lvl {}, tier {}, "
+        "health x{:.2f}, damage x{:.2f}",
+        session->SessionId, theme->Name, bandMin, bandMax, targetLevel, session->Tier,
+        SessionHealthFactor(*session), SessionDamageFactor(*session));
 
-    // Force-scale creature to target level
-    // Compute a boss-specific damage multiplier that only includes party scaling,
-    // NOT the difficulty tier's DamageMultiplier (to avoid double-stacking).
-    float bossOnlyDmgMult;
-    {
-        uint32 n = session->Players.size();
-        if (n <= 1) bossOnlyDmgMult = sAtlasConfig->GetSoloMultiplier();
-        else        bossOnlyDmgMult = 1.0f + (n - 1) * sAtlasConfig->GetPerPlayerDamageMult();
-        if (session->RoguelikeRunId != 0)
-            bossOnlyDmgMult *= sRoguelikeMgr->GetTierDamageMultiplier(session->RoguelikeRunId);
-    }
-
-    auto applyLevelAndStats = [&](Creature* c, float extraHpMult, float extraDmgMult, bool isBoss)
+    // Level, role stats (DESIGN §9) and the run's AI for every spawn.
+    auto applyLevelAndStats = [&](Creature* c, CreatureRole role, float affixHpMult, float affixDmgMult, bool isBoss)
     {
         // Drop auras the template applied at spawn (creature_template_addon,
         // e.g. 28006 Grand Necrolord Antiok's 50494): they were tuned for the
@@ -655,56 +643,9 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             c->SetObjectScale(1.3f);                      // 30% larger than normal
         }
 
-        uint8 unitClass = c->GetCreatureTemplate()->unit_class;
-        ClassLevelStatEntry const* baseStats = GetBaseStatsForLevel(unitClass, targetLevel);
-
-        float finalHP;
-        if (baseStats)
-            finalHP = static_cast<float>(baseStats->BaseHP) * hpMult * extraHpMult;
-        else
-            finalHP = c->GetMaxHealth() * hpMult * extraHpMult;
-
-        uint32 hp = std::max(1u, static_cast<uint32>(finalHP));
-        c->SetMaxHealth(hp);
-        c->SetHealth(hp);
-
-        // For bosses, use party-only scaling (bossOnlyDmgMult) instead of the full
-        // tier+party dmgMult to prevent double-stacking tier DamageMultiplier with BossDamageMult
-        float effectiveDmgMult = isBoss ? bossOnlyDmgMult : dmgMult;
-
-        if (baseStats)
-        {
-            float dmgBase  = baseStats->BaseDamage;
-            float apBonus  = static_cast<float>(baseStats->AttackPower) / 14.0f;
-            float atkTime  = static_cast<float>(c->GetCreatureTemplate()->BaseAttackTime) / 1000.0f;
-            if (atkTime <= 0.0f) atkTime = 2.0f;
-
-            float minDmg = (dmgBase + apBonus) * atkTime * effectiveDmgMult * extraDmgMult;
-            float maxDmg = ((dmgBase * 1.15f) + apBonus) * atkTime * effectiveDmgMult * extraDmgMult;
-
-            minDmg = std::max(1.0f, minDmg);
-            maxDmg = std::max(minDmg, maxDmg);
-
-            c->SetBaseWeaponDamage(BASE_ATTACK, MINDAMAGE, minDmg);
-            c->SetBaseWeaponDamage(BASE_ATTACK, MAXDAMAGE, maxDmg);
-            c->UpdateDamagePhysical(BASE_ATTACK);
-        }
-
-        // --- Armor (from classlevelstats for the TARGET level) ---
-        if (baseStats && baseStats->BaseArmor > 0)
-            c->SetArmor(baseStats->BaseArmor);
-
-        // --- Roguelike: additional armor scaling from tier progression ---
-        if (session->RoguelikeRunId != 0)
-        {
-            float armorMult = sRoguelikeMgr->GetTierArmorMultiplier(session->RoguelikeRunId);
-            if (armorMult > 1.0f)
-                c->SetArmor(static_cast<uint32>(c->GetArmor() * armorMult));
-        }
-
-        // --- Clear ALL spell resistances (original template values are for original level) ---
-        for (uint8 school = SPELL_SCHOOL_HOLY; school < MAX_SPELL_SCHOOL; ++school)
-            c->SetResistance(SpellSchools(school), 0);
+        // Health, melee, armor and spell/heal scales from the role table; also
+        // clears the template's spell resistances and records ownership.
+        ScaleCreature(c, *session, role, affixHpMult, affixDmgMult);
 
         // --- Clear mechanic immunities ---
         for (uint32 mech = 1; mech < MAX_MECHANIC; ++mech)
@@ -748,10 +689,6 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
 
         // Track this GUID for future cleanup
         guidList.push_back(c->GetGUID());
-
-        // Remember the assigned level so it can be re-asserted if anything
-        // reverts it.
-        RegisterOwnedCreature(c->GetGUID(), targetLevel, hp, instanceId);
     };
 
     // Spawn trash mobs
@@ -799,10 +736,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         c->SetImmuneToNPC(false);
         c->setActive(true);             // Keep creature in grid update cycle for aggro detection
 
-        float eliteHpMult  = isElite ? sAtlasConfig->GetEliteHealthMult() : 1.0f;
-        float eliteDmgMult = isElite ? 1.5f : 1.0f;
-
-        applyLevelAndStats(c, eliteHpMult * affixHpMult, eliteDmgMult * affixDmgMult, false);
+        applyLevelAndStats(c, isElite ? CreatureRole::Elite : CreatureRole::Trash, affixHpMult, affixDmgMult, false);
 
         SpawnedCreature sc;
         sc.Guid = c->GetGUID(); sc.Entry = entry;
@@ -860,9 +794,6 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                     // so they already carry an elite frame; size is the extra tell.
                     r->SetObjectScale(1.15f);
 
-                    float rareHpMult  = sAtlasConfig->GetRareHealthMult();
-                    float rareDmgMult = sAtlasConfig->GetRareDamageMult();
-
                     // Apply roguelike affix multipliers to rares
                     float affixHpM = 1.0f, affixDmgM = 1.0f, affixEliteM = 1.0f;
                     if (session->RoguelikeRunId != 0)
@@ -870,7 +801,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                             false, true, affixHpM, affixDmgM, affixEliteM);
 
                     // Also installs the custom AI (rare = enhanced trash).
-                    applyLevelAndStats(r, rareHpMult * affixHpM, rareDmgMult * affixDmgM, false);
+                    applyLevelAndStats(r, CreatureRole::Rare, affixHpM, affixDmgM, false);
 
                     SpawnedCreature sc;
                     sc.Guid = r->GetGUID(); sc.Entry = rareEntry;
@@ -923,9 +854,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             sRoguelikeMgr->GetAffixMultipliers(session->RoguelikeRunId,
                 true, true, bossAffixHpMult, bossAffixDmgMult, _unused);
 
-        applyLevelAndStats(b,
-            sAtlasConfig->GetBossHealthMult() * bossAffixHpMult,
-            sAtlasConfig->GetBossDamageMult() * bossAffixDmgMult, true);
+        applyLevelAndStats(b, CreatureRole::Boss, bossAffixHpMult, bossAffixDmgMult, true);
 
         SpawnedCreature sc;
         sc.Guid = b->GetGUID(); sc.Entry = entry;

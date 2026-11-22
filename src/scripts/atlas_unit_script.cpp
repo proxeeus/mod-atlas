@@ -1,9 +1,12 @@
 /*
  * mod-atlas — atlas_unit_script.cpp
- * Scales ALL incoming damage for session players:
- *   - Session boss spells/melee: scaled by level ratio (template level → session level)
- *   - Session trash: already scaled by custom AI melee, passed through
- *   - Environmental (non-session): capped at 3% max HP
+ * Damage and healing around run creatures:
+ *   - Creatures the run owns (spawned or added mid-run): melee is set at spawn
+ *     from the role table, so it passes through; their spells and damage over
+ *     time take the creature's spell scale, their heals its heal scale
+ *     (AtlasScaling.cpp, DESIGN §9).
+ *   - Anything else hitting a run player (hazards, traps, leftover stock
+ *     scripts): scaled to the party level and capped at 3% max HP.
  */
 
 #include "ScriptMgr.h"
@@ -13,6 +16,8 @@
 #include "SpellInfo.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
+#include <algorithm>
+#include <cstdint>
 
 using namespace Atlas;
 
@@ -25,20 +30,32 @@ public:
 
     void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* /*spellInfo*/) override
     {
-        ScaleDamage(target, attacker, damage);
+        ScaleDamage(target, attacker, damage, true);
     }
 
     void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* /*spellInfo*/) override
     {
         if (damage <= 0) return;
         uint32 udmg = static_cast<uint32>(damage);
-        ScaleDamage(target, attacker, udmg);
-        damage = static_cast<int32>(udmg);
+        ScaleDamage(target, attacker, udmg, true);
+        damage = static_cast<int32>(std::min<uint32>(udmg, INT32_MAX));
     }
 
     void ModifyMeleeDamage(Unit* target, Unit* attacker, uint32& damage) override
     {
-        ScaleDamage(target, attacker, damage);
+        ScaleDamage(target, attacker, damage, false);
+    }
+
+    // A run creature's heals scale with its health, like its spells with melee.
+    void ModifyHealReceived(Unit* /*target*/, Unit* healer, uint32& heal, SpellInfo const* /*spellInfo*/) override
+    {
+        if (!heal || !healer || !healer->IsCreature() || !AtlasMgr::HasOwnedCreatures()
+            || !sAtlasConfig->IsEnabled())
+            return;
+
+        float const scale = sAtlasMgr->GetOwnedHealScale(healer->GetGUID());
+        if (scale >= 0.0f)
+            heal = static_cast<uint32>(std::min<double>(double(heal) * scale, UINT32_MAX));
     }
 
     void OnUnitDeath(Unit* unit, Unit* killer) override
@@ -72,7 +89,7 @@ public:
     }
 
 private:
-    void ScaleDamage(Unit* target, Unit* attacker, uint32& damage)
+    void ScaleDamage(Unit* target, Unit* attacker, uint32& damage, bool isSpell)
     {
         // Runs for every damage event on the server: bail out before taking
         // the session mutex unless a session exists and the target is in a
@@ -88,38 +105,19 @@ private:
             return;
 
         ObjectGuid playerGuid = player->GetGUID();
-
         if (!sAtlasMgr->GetSessionByPlayer(playerGuid))
             return;
 
-        if (attacker)
+        // A creature the run owns: melee already comes from its role stats;
+        // spells and damage over time take its spell scale.
+        if (attacker && attacker->IsCreature())
         {
-            ObjectGuid attackerGuid = attacker->GetGUID();
-
-            // Session creature damage — scale bosses, pass through trash
-            if (sAtlasMgr->IsSessionCreature(playerGuid, attackerGuid))
+            float const scale = sAtlasMgr->GetOwnedSpellScale(attacker->GetGUID());
+            if (scale >= 0.0f)
             {
-                float scale = sAtlasMgr->GetSessionCreatureDamageScale(
-                    playerGuid, attackerGuid);
-
-                if (scale < 1.0f)
-                    damage = std::max(1u, static_cast<uint32>(damage * scale));
-
+                if (isSpell)
+                    damage = std::max(1u, static_cast<uint32>(std::min<double>(double(damage) * scale, UINT32_MAX)));
                 return;
-            }
-
-            // Adds summoned during the run: level-scaled like a boss, not
-            // capped like a hazard (the cap made them deal at most 3% max HP).
-            if (Creature const* creature = attacker->ToCreature())
-            {
-                float scale = sAtlasMgr->GetOwnedCreatureDamageScale(playerGuid, creature);
-                if (scale >= 0.0f)
-                {
-                    if (scale < 1.0f)
-                        damage = std::max(1u, static_cast<uint32>(damage * scale));
-
-                    return;
-                }
             }
         }
 

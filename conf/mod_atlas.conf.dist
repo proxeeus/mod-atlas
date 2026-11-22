@@ -31,14 +31,19 @@ Atlas.NpcEntry = 500000
 ###############################################################################
 # DIFFICULTY TIERS
 # Format: "Name,MinLevel,MaxLevel,HealthMult,DamageMult,RewardMult,MobMult"
+#
+# HealthMult and DamageMult multiply the role table (SCALING below). Creature
+# stats already follow the level (the stock base stats of each expansion), so
+# 1.0 is the tuned value at every bracket; raise or lower a bracket here to
+# make it harder or easier.
 ###############################################################################
 
-Atlas.Difficulty.1 = "Novice,10,19,0.6,0.6,1.0,0.5"
-Atlas.Difficulty.2 = "Apprentice,20,29,0.8,0.8,1.5,0.7"
+Atlas.Difficulty.1 = "Novice,10,19,1.0,1.0,1.0,0.5"
+Atlas.Difficulty.2 = "Apprentice,20,29,1.0,1.0,1.5,0.7"
 Atlas.Difficulty.3 = "Journeyman,30,44,1.0,1.0,2.0,0.85"
-Atlas.Difficulty.4 = "Expert,45,59,1.3,1.2,3.0,1.0"
-Atlas.Difficulty.5 = "Master,60,69,1.6,1.4,4.0,1.0"
-Atlas.Difficulty.6 = "Grandmaster,70,80,2.0,1.6,6.0,1.2"
+Atlas.Difficulty.4 = "Expert,45,59,1.0,1.0,3.0,1.0"
+Atlas.Difficulty.5 = "Master,60,69,1.0,1.0,4.0,1.0"
+Atlas.Difficulty.6 = "Grandmaster,70,80,1.0,1.0,6.0,1.2"
 Atlas.Difficulty.7 = ""
 Atlas.Difficulty.8 = ""
 Atlas.Difficulty.9 = ""
@@ -63,41 +68,59 @@ Atlas.Difficulty.10 = ""
 #        Default: 3
 Atlas.Scaling.LevelBand = 3
 
+# ROLE SCALING (DESIGN section 9)
+#   Every run creature has a role. Its stats come from the stock base stats of
+#   the run's level (creature_classlevelstats, the column of that level's
+#   expansion), never from its template's own modifiers:
+#     health = base x role health x tier x difficulty x party x affixes
+#     melee  = base x role damage x tier x difficulty x party x affixes
+#     armor  = base x role armor
+#   Its spells, damage over time and heals keep their weight against its melee
+#   and health: they scale by the same ratio.
+#   `.atlas scaling [level] [tier] [party] [difficulty]` prints the table.
+#
+#    Atlas.Scaling.Role.<Role> = "health,damage,armor"
+#        Roles: Trash, Elite, Rare, Miniboss, Boss, Add (summoned mid-run).
+#        Tuned for a party of five at tier 1. Defaults below.
+Atlas.Scaling.Role.Trash    = "1.0,1.0,1.0"
+Atlas.Scaling.Role.Elite    = "2.5,1.5,1.0"
+Atlas.Scaling.Role.Rare     = "6.0,2.0,1.0"
+Atlas.Scaling.Role.Miniboss = "15.0,2.5,1.0"
+Atlas.Scaling.Role.Boss     = "30.0,3.0,1.0"
+Atlas.Scaling.Role.Add      = "0.5,0.7,1.0"
+
+#    Atlas.Scaling.TierGrowth
+#        Health and damage grow by this factor per map tier above 1 (1.075 makes
+#        tier 16 about 3x). Echoes are tier 1; Endless floors use the Endless
+#        depth curve instead (ROGUELIKE below).
+#        Default: 1.075
+Atlas.Scaling.TierGrowth = 1.075
+
+#    Atlas.Scaling.SpellScaleMax
+#        Highest factor a creature's spells can be scaled up by (a level-20
+#        caster's spells brought to level 80, for example).
+#        Default: 20
+Atlas.Scaling.SpellScaleMax = 20
+
+#    Party factor: the role table is tuned for a party of five, which is 1.0.
+#    Smaller parties get the share of these settings relative to five:
+#    with the defaults, a solo player faces 25% health and 36% damage, a party
+#    of three 75% and 86%.
+#
 #    Atlas.Scaling.PerPlayerHealth
-#        HP multiplier added per party member beyond the first
-#        Default: 0.25  (each extra player adds 25% HP)
+#        Health added per party member beyond the first.
+#        Default: 0.25
 Atlas.Scaling.PerPlayerHealth = 0.25
 
 #    Atlas.Scaling.PerPlayerDamage
-#        Damage multiplier added per extra party member
+#        Damage added per party member beyond the first.
 #        Default: 0.1
 Atlas.Scaling.PerPlayerDamage = 0.1
 
 #    Atlas.Scaling.SoloMultiplier
-#        Overall difficulty reduction for solo players
-#        Default: 0.5  (creatures have 50% of normal stats)
+#        Health and damage of a solo player's creatures before the share of five.
+#        Default: 0.5
 Atlas.Scaling.SoloMultiplier = 0.5
-
-#    Atlas.Scaling.EliteHealthMult
-#        Health multiplier for elite trash mobs (on top of difficulty)
-#        Default: 2.0
-Atlas.Scaling.EliteHealthMult = 2.0
-
-#    Atlas.Scaling.EliteDamageMult
-#        Damage multiplier for elite trash mobs
-#        Default: 1.5
-Atlas.Scaling.EliteDamageMult = 1.5
-
-#    Atlas.Scaling.BossHealthMult
-#        Health multiplier for bosses (on top of party scaling)
-#        Default: 8.0
-Atlas.Scaling.BossHealthMult = 8.0
-
-#    Atlas.Scaling.BossDamageMult
-#        Damage multiplier for bosses (applied on top of party scaling only,
-#        NOT stacked with the difficulty tier's DamageMultiplier)
-#        Default: 1.5
-Atlas.Scaling.BossDamageMult = 1.5
 
 ###############################################################################
 # VISUAL SCALE AND VARIETY
@@ -165,7 +188,7 @@ Atlas.Rewards.MaxItemLevel = 219
 Atlas.Dungeon.BossCount = 1
 
 #    Atlas.Dungeon.EliteChance  (0-100)
-#        Chance for a trash mob to be elite (gets EliteHealthMult)
+#        Chance for a trash mob to be elite (takes the Elite role)
 #        Default: 20
 Atlas.Dungeon.EliteChance = 20
 
@@ -182,16 +205,6 @@ Atlas.Dungeon.AggroRadius = 15.0
 #        Rare mobs have a silver dragon portrait and enhanced loot.
 #        Default: 5
 Atlas.Dungeon.RareSpawnChance = 5
-
-#    Atlas.Scaling.RareHealthMult
-#        Health multiplier for rare spawns (between elite and boss).
-#        Default: 4.0
-Atlas.Scaling.RareHealthMult = 4.0
-
-#    Atlas.Scaling.RareDamageMult
-#        Damage multiplier for rare spawns.
-#        Default: 2.0
-Atlas.Scaling.RareDamageMult = 2.0
 
 #    Atlas.Dungeon.Whitelist
 #        Comma-separated map IDs (empty = all allowed)

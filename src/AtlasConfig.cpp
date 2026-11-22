@@ -77,10 +77,33 @@ void AtlasConfig::LoadConfig(bool reload)
     _perPlayerHealth = sConfigMgr->GetOption<float> ("Atlas.Scaling.PerPlayerHealth",   0.25f);
     _perPlayerDamage = sConfigMgr->GetOption<float> ("Atlas.Scaling.PerPlayerDamage",   0.10f);
     _soloMultiplier  = sConfigMgr->GetOption<float> ("Atlas.Scaling.SoloMultiplier",    0.50f);
-    _eliteHealthMult = sConfigMgr->GetOption<float> ("Atlas.Scaling.EliteHealthMult",   2.0f);
-    _eliteDamageMult = sConfigMgr->GetOption<float> ("Atlas.Scaling.EliteDamageMult",   1.5f);
-    _bossHealthMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.BossHealthMult",    8.0f);
-    _bossDamageMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.BossDamageMult",    1.5f);
+    _tierGrowth      = std::max(1.0f, sConfigMgr->GetOption<float>("Atlas.Scaling.TierGrowth", 1.075f));
+    _spellScaleMax   = std::max(1.0f, sConfigMgr->GetOption<float>("Atlas.Scaling.SpellScaleMax", 20.0f));
+
+    // Atlas.Scaling.Role.<Name> = "health,damage,armor"
+    for (uint8 r = 0; r < static_cast<uint8>(CreatureRole::Count); ++r)
+    {
+        CreatureRole const role = static_cast<CreatureRole>(r);
+        RoleMultipliers mult = DefaultRoleMultipliers(role);
+        std::string const key = std::string("Atlas.Scaling.Role.") + RoleName(role);
+        std::string const val = StripQuotes(sConfigMgr->GetOption<std::string>(key, "", false));
+        if (!val.empty())
+        {
+            auto parts = SplitString(val, ',');
+            try
+            {
+                if (parts.size() > 0) mult.Health = std::max(0.01f, std::stof(parts[0]));
+                if (parts.size() > 1) mult.Damage = std::max(0.01f, std::stof(parts[1]));
+                if (parts.size() > 2) mult.Armor  = std::max(0.0f, std::stof(parts[2]));
+            }
+            catch (...)
+            {
+                LOG_ERROR("module", "Atlas: Bad {} \"{}\"; using the defaults.", key, val);
+                mult = DefaultRoleMultipliers(role);
+            }
+        }
+        _roles[r] = mult;
+    }
 
     // Rewards
     _baseGold     = sConfigMgr->GetOption<uint32>("Atlas.Rewards.BaseGold",    40000);
@@ -97,8 +120,6 @@ void AtlasConfig::LoadConfig(bool reload)
     _eliteChance     = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.EliteChance",    20);
     _aggroRadius     = sConfigMgr->GetOption<float> ("Atlas.Dungeon.AggroRadius",    15.0f);
     _rareSpawnChance = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.RareSpawnChance", 5);
-    _rareHealthMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.RareHealthMult",  4.0f);
-    _rareDamageMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.RareDamageMult",  2.0f);
     _recentCreatureEntries = sConfigMgr->GetOption<uint32>("Atlas.Variety.RecentEntries", 12);
     _visualScaleBeast = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Beast", 1.0f), 0.55f, 1.0f);
     _visualScaleDragonkin = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Dragonkin", 0.85f), 0.55f, 1.0f);

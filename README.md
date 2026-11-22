@@ -131,7 +131,10 @@ Creatures are force-scaled to the session's target level regardless of their ori
 
 - **Effective Level** = party average (Scale to Party) or tier midpoint (Use Dungeon Difficulty)
 - **Level Band** = EffectiveLevel ± `LevelBand` (default ±3), clamped to the tier's range
-- Stats are recalculated from `creature_classlevelstats` for the target level
+- **Role stats** (DESIGN §9): every creature has a role (trash, elite, rare, miniboss, boss, add). Health, melee and armor come from the stock base stats of the run's level, in the column of that level's expansion (WotLK numbers at 71+), times the role's multipliers, the tier, the difficulty and the party factor (1.0 for a party of five). The template's own health and damage modifiers are ignored, so a boss with a huge DamageModifier hits like any other boss of the run
+- **Spells and heals** scale by the same ratio as the creature's melee and health moved from its template, so a classic caster's Fireball hits like a level-80 one, and a creature's heals keep their share of its health
+- Stats are set as the stat system's base values and re-applied if anything resets the creature (respawn, another module's `SetLevel`)
+- `.atlas scaling [level] [tier] [party] [difficulty]` prints the table
 
 ---
 
@@ -144,11 +147,12 @@ All settings live in `mod_atlas.conf`. Key options:
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `Scaling.LevelBand` | 3 | Creature level window: ±N levels from party |
-| `Scaling.SoloMultiplier` | 0.5 | HP/damage reduction for solo players |
-| `Scaling.PerPlayerHealth` | 0.25 | HP added per extra party member (25%) |
-| `Scaling.BossHealthMult` | 8.0 | Boss HP multiplier (on top of party scaling) |
-| `Scaling.BossDamageMult` | 1.5 | Boss damage multiplier (party scaling only, not stacked with tier) |
-| `Scaling.EliteHealthMult` | 2.0 | Elite trash HP multiplier |
+| `Scaling.Role.<Role>` | see conf | Health, damage, armor per role: Trash 1/1/1, Elite 2.5/1.5/1, Rare 6/2/1, Miniboss 15/2.5/1, Boss 30/3/1, Add 0.5/0.7/1 |
+| `Scaling.TierGrowth` | 1.075 | Health and damage growth per map tier above 1 |
+| `Scaling.SpellScaleMax` | 20 | Highest factor creature spells are scaled up by |
+| `Scaling.SoloMultiplier` | 0.5 | Party factor input for one player (relative to a party of five) |
+| `Scaling.PerPlayerHealth` | 0.25 | Health added per extra party member, relative to five |
+| `Scaling.PerPlayerDamage` | 0.1 | Damage added per extra party member, relative to five |
 
 ### Dungeon
 
@@ -219,6 +223,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas clearcooldown` | GM | Clear cooldown for target's whole group |
 | `.atlas reload` | Admin | Hot-reload configuration |
 | `.atlas run` | GM | The target's (or your) current run: state, map, progress and the seed it was built from; for an Endless floor also the descent's seed, depth and affixes |
+| `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
 Every run is logged in `atlas_run_log` (characters DB) with its seed and result (completed, failed, abandoned, or interrupted by a restart).
@@ -236,10 +241,9 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 - **Cached lookups** — Dungeon entrances, spawn points and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
 - **Custom creature AI** — Trash creatures use `AtlasCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
-- **Boss spell damage scaling** — Boss abilities have hard-coded damage values designed for their original level range. The unit script intercepts all incoming damage from session bosses (spells, periodic ticks, and melee) and scales it using `creature_classlevelstats` base damage ratios between the boss's template level and the session's effective level. This ensures a level-70 boss spell deals proportionally correct damage to a level-25 party.
+- **Creature spell and heal scaling** — Each run creature gets a spell scale and a heal scale at spawn (how far its melee and health moved from its template). The unit script applies them to its spells, damage over time and heals; its melee is already set at spawn and passes through.
 - **Multi-phase boss detection** — When a boss dies, the system waits 5 seconds and scans for new elite/boss creatures near the death location. If a phase-2 creature is detected, it is automatically promoted to boss status and the original death does not count as a kill.
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.
-- **Boss damage scaling** — Boss damage uses only party-size scaling (not stacked with the difficulty tier's DamageMultiplier) to prevent excessive damage when combined with level scaling.
 - **Standard AzerothCore** — All queries use standard AzerothCore column names. No fork-specific dependencies.
 - **Reserved IDs** — creature entries 500000–500001, creature guids 8000001–8000011, npc_text 500000, spells 91000–91099 (91001 = Timeways Resonance). The world SQL only deletes rows it created; a clash fails the install loudly.
 

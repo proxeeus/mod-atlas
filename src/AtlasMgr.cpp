@@ -103,7 +103,6 @@ void AtlasMgr::LoadFromDB()
 {
     LoadCreaturePools();
     LoadDungeonBossPool();
-    LoadClassLevelStats();
     LoadRewardItems();
     LoadLootPool();
     LoadAllPlayerStats();

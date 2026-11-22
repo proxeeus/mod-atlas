@@ -51,6 +51,16 @@ public:
             level = owned;
     }
 
+    // Runs at the end of Creature::SelectLevel(), which has just recomputed the
+    // stats from the template: put the role stats back (DESIGN §9).
+    void OnCreatureSelectLevel(CreatureTemplate const* /*cinfo*/, Creature* creature) override
+    {
+        if (!creature || !sAtlasConfig->IsEnabled() || !AtlasMgr::HasOwnedCreatures())
+            return;
+
+        sAtlasMgr->ReapplyOwnedStats(creature, false);
+    }
+
     // Clamp adds summoned by Atlas creatures. Player pets, totems and
     // guardians are left alone — they belong to the player, not the dungeon.
     void OnCreatureAddWorld(Creature* creature) override
@@ -123,16 +133,9 @@ public:
         if (creature->GetLevel() == owned)
             return;
 
-        creature->SetLevel(owned);
-
-        // SetLevel() alone leaves the creature with whatever max health the
-        // reverting module computed for the template level, so restore that too.
-        if (ownedHp && creature->GetMaxHealth() != ownedHp)
-        {
-            uint32 cur = creature->GetHealth();
-            creature->SetMaxHealth(ownedHp);
-            creature->SetHealth(std::min(cur ? cur : ownedHp, ownedHp));
-        }
+        // The reverting module recomputed the stats for the template level too:
+        // put the level and role stats back, keeping the health share.
+        sAtlasMgr->ReapplyOwnedStats(creature, true);
     }
 
     void OnCreatureRemoveWorld(Creature* creature) override

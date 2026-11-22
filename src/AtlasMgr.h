@@ -18,6 +18,7 @@
 class Player;
 class Group;
 class Creature;
+struct CreatureTemplate;
 class Map;
 class InstanceMap;
 
@@ -113,11 +114,7 @@ public:
     static std::string          InstanceCapNotice(Player const* capped);
 
     // Env damage scaling
-    bool  IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creatureGuid);
-    bool  IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureGuid);
     float GetEnvironmentalDamageScale(ObjectGuid playerGuid);
-    float GetSessionCreatureDamageScale(ObjectGuid playerGuid, ObjectGuid creatureGuid);
-    float GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature);
 
     Position    GetDungeonEntrance(uint32 mapId);
     std::shared_ptr<Layout const> GetLayout(uint32 mapId) const;
@@ -136,8 +133,43 @@ public:
     // what was assigned so it can be re-asserted. Deliberately independent of
     // which module caused the drift.
     // -----------------------------------------------------------------------
-    void RegisterOwnedCreature(ObjectGuid guid, uint8 level, uint32 maxHealth, uint32 instanceId);
+    // -----------------------------------------------------------------------
+    // Role scaling (AtlasScaling.cpp, DESIGN §9; math in AtlasScalingMath.h).
+    // -----------------------------------------------------------------------
+    struct RoleStats
+    {
+        uint8  Level       = 0;
+        uint32 MaxHealth   = 1;
+        float  WeaponMin   = 1.0f;
+        float  WeaponMax   = 1.0f;
+        float  AttackPower = 0.0f;
+        uint32 Armor       = 0;
+        float  SpellScale  = 1.0f;   // the creature's spell damage x this
+        float  HealScale   = 1.0f;   // its heals x this
+    };
+
+    // Tier growth (or the Endless depth curve) x the difficulty's multiplier x
+    // the party factor (1.0 for a party of five).
+    float     SessionHealthFactor(Session const& session) const;
+    float     SessionDamageFactor(Session const& session) const;
+    RoleStats ComputeRoleStats(Session const& session, CreatureTemplate const* tmpl, CreatureRole role,
+                               float affixHealth = 1.0f, float affixDamage = 1.0f) const;
+    static void ApplyRoleStats(Creature* creature, RoleStats const& stats, bool keepHealthPct);
+    // Level, role stats and ownership in one step, for anything a run spawns.
+    void      ScaleCreature(Creature* creature, Session const& session, CreatureRole role,
+                            float affixHealth = 1.0f, float affixDamage = 1.0f);
+    // `.atlas scaling`: the role table at a level, tier, party size and difficulty.
+    std::vector<std::string> DescribeRoleScaling(uint8 level, uint32 tier, uint32 partySize,
+                                                 uint32 difficultyId) const;
+
+    void RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, uint32 instanceId);
     bool GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const;
+    // For the damage and heal hooks; negative when the creature isn't owned.
+    float GetOwnedSpellScale(ObjectGuid guid) const;
+    float GetOwnedHealScale(ObjectGuid guid) const;
+    // After something reset an owned creature (SelectLevel, another module's
+    // SetLevel): its level and role stats again.
+    bool  ReapplyOwnedStats(Creature* creature, bool keepHealthPct);
     void ForgetOwnedCreature(ObjectGuid guid);
     void ForgetOwnedCreaturesForInstance(uint32 instanceId);
     static bool HasOwnedCreatures();
@@ -157,14 +189,8 @@ private:
     uint32 SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass);
     uint32 SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality, bool equipmentOnly = false, uint32 playerClass = 0);
 
-    float ComputeLevelDamageScale(Session const& session, Creature const* creature) const;
-    float CalculateHealthMultiplier(Session const* session) const;
-    float CalculateDamageMultiplier(Session const* session) const;
-    ClassLevelStatEntry const* GetBaseStatsForLevel(uint8 unitClass, uint8 level) const;
-
     void LoadCreaturePools();
     void LoadDungeonBossPool();
-    void LoadClassLevelStats();
     void LoadRewardItems();
     void LoadLootPool();
     void LoadLeaderboard();
@@ -195,14 +221,12 @@ private:
     std::map<uint32, std::vector<CreaturePoolEntry>> _bossCreatures;
     std::map<uint32, std::vector<CreaturePoolEntry>> _dungeonBossPool;
 
-    std::map<std::pair<uint8,uint8>, ClassLevelStatEntry> _classLevelStats;
     std::unordered_map<uint32, std::vector<ObjectGuid>> _instanceCreatureGuids;
 
     struct OwnedCreature
     {
-        uint8  Level      = 0;
-        uint32 MaxHealth  = 0;
-        uint32 InstanceId = 0;
+        RoleStats Stats;
+        uint32    InstanceId = 0;
     };
     std::unordered_map<ObjectGuid, OwnedCreature> _ownedCreatures;
     mutable std::mutex _ownedMutex;
