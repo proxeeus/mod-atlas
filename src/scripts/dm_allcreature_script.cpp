@@ -55,7 +55,23 @@ public:
     // guardians are left alone — they belong to the player, not the dungeon.
     void OnCreatureAddWorld(Creature* creature) override
     {
-        if (!creature || !sDMConfig->IsEnabled())
+        if (!creature)
+            return;
+
+        // The city NPC spawns come from world DB rows, so they exist even while
+        // the module is disabled. Hide them and drop the gossip flag so a
+        // disabled module leaves nothing behind in the cities (upstream #4).
+        if (!sDMConfig->IsEnabled())
+        {
+            if (creature->GetEntry() == sDMConfig->GetNpcEntry())
+            {
+                creature->SetVisible(false);
+                creature->RemoveNpcFlag(UNIT_NPC_FLAG_GOSSIP);
+            }
+            return;
+        }
+
+        if (!DungeonMasterMgr::HasActiveSessions())
             return;
 
         Map* map = creature->GetMap();

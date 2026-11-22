@@ -28,6 +28,7 @@
 #include "SpellAuras.h"
 #include "SpellAuraEffects.h"
 #include "InstanceScript.h"
+#include "InstanceSaveMgr.h"
 #include "CellImpl.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -37,6 +38,24 @@
 #include <cstdio>
 #include <cmath>
 #include <atomic>
+
+// Creature-pool filters shared by the trash and boss queries (alias `ct` =
+// creature_template). String literals so they concatenate into the queries.
+//
+// Display IDs whose CreatureDisplayInfoExtra record has an empty BakeName: the
+// 3.3.5 client crashes (Error #132) when one of them is spawned in view. List
+// taken from upstream issue #17, not re-verified against client data here.
+#define DM_CLIENT_CRASH_DISPLAY_FILTER \
+    "AND ct.entry NOT IN (SELECT ctmx.CreatureID FROM creature_template_model ctmx " \
+    "WHERE ctmx.CreatureDisplayID IN (15331,15332,15444,17116,20392,21951,23290,23296,23836,23886,29323)) "
+
+// Models with no geometry render invisible but still fight (same rule the
+// trash query already applied inline; now also used for the boss pool).
+#define DM_DEGENERATE_MODEL_FILTER \
+    "AND ct.entry NOT IN (SELECT ctmd.CreatureID FROM creature_template_model ctmd " \
+    "LEFT JOIN creature_model_info cmid ON cmid.DisplayID = ctmd.CreatureDisplayID " \
+    "WHERE ctmd.CreatureDisplayID = 0 OR cmid.DisplayID IS NULL " \
+    "OR cmid.BoundingRadius <= 0 OR cmid.CombatReach <= 0) "
 
 namespace DungeonMaster
 {
@@ -199,6 +218,13 @@ bool Session::IsGroupInCombat() const
     return false;
 }
 
+static std::atomic<uint32> g_dmActiveSessionCount{0};
+
+bool DungeonMasterMgr::HasActiveSessions()
+{
+    return g_dmActiveSessionCount.load(std::memory_order_relaxed) != 0;
+}
+
 // Singleton
 DungeonMasterMgr::DungeonMasterMgr()  = default;
 DungeonMasterMgr::~DungeonMasterMgr() = default;
@@ -247,6 +273,9 @@ void DungeonMasterMgr::LoadCreaturePools()
         "AND ct.ScriptName = '' "                                      // no C++ scripts (they override our scaling)
         "AND ct.npcflag = 0 "                                          // no vendors/quest givers/gossip NPCs
         "AND (ct.unit_flags & 2) = 0 "                                 // no NON_ATTACKABLE
+        "AND (ct.unit_flags & 33554432) = 0 "                          // no NOT_SELECTABLE (invisible attackers, upstream #17/#25)
+        "AND (ct.flags_extra & 128) = 0 "                              // no TRIGGER creatures (upstream #17)
+        DM_CLIENT_CRASH_DISPLAY_FILTER
         "AND (ct.subname = '' OR ct.subname IS NULL) "                 // no guild/title text under name
         "AND ct.name NOT LIKE '%[UNUSED]%' "
         "AND ct.name NOT LIKE '%[PH]%' "
@@ -356,7 +385,9 @@ void DungeonMasterMgr::LoadDungeonBossPool()
     }
 
     // Query for scripted elite creatures that spawn in dungeon maps.
-    char query[2048];
+    // 4096: the filters above made the query longer than the old 2048 buffer
+    // could safely hold together with the map list.
+    char query[4096];
     snprintf(query, sizeof(query),
         "SELECT DISTINCT ct.entry, ct.name, ct.type, ct.minlevel, ct.maxlevel "
         "FROM creature_template ct "
@@ -370,6 +401,10 @@ void DungeonMasterMgr::LoadDungeonBossPool()
         "AND ct.VehicleId = 0 "
         "AND (ctm.Ground IS NULL OR ctm.Ground != 0) "  // no water-only creatures
         "AND (ct.unit_flags & 2) = 0 "       // not NON_ATTACKABLE
+        "AND (ct.unit_flags & 33554432) = 0 " // not NOT_SELECTABLE
+        "AND (ct.flags_extra & 128) = 0 "    // not a TRIGGER
+        DM_CLIENT_CRASH_DISPLAY_FILTER
+        DM_DEGENERATE_MODEL_FILTER
         "AND ct.name NOT LIKE '%%Trigger%%' "
         "AND ct.name NOT LIKE '%%Invisible%%' "
         "AND ct.name NOT LIKE '%%Dummy%%' "
@@ -685,6 +720,7 @@ Session* DungeonMasterMgr::CreateSession(Player* leader, uint32 difficultyId,
     }
 
     _activeSessions[s.SessionId] = s;
+    g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
     for (const auto& pd : s.Players)
         _playerToSession[pd.PlayerGuid] = s.SessionId;
 
@@ -728,9 +764,102 @@ Session* DungeonMasterMgr::GetSessionByPlayer(ObjectGuid guid)
 
 // StartDungeon / TeleportPartyIn / TeleportPartyOut
 
+// Every account this session can bind: the players, plus the group leader
+// (in a group, a new instance is chosen from the leader's bind).
+static std::set<ObjectGuid> CollectBindOwners(Session const* session)
+{
+    std::set<ObjectGuid> guids;
+    for (auto const& pd : session->Players)
+        guids.insert(pd.PlayerGuid);
+
+    if (Player* leader = ObjectAccessor::FindPlayer(session->LeaderGuid))
+        if (Group* g = leader->GetGroup())
+            guids.insert(g->GetLeaderGUID());
+
+    return guids;
+}
+
+static void NotifySession(Session const* session, char const* msg)
+{
+    for (auto const& pd : session->Players)
+        if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+            if (p->GetSession())
+                ChatHandler(p->GetSession()).SendSysMessage(msg);
+}
+
+// Before a run: make sure the party lands in a fresh instance of the stock
+// dungeon instead of gutting one they (or their leader) are saved to.
+// Temporary Normal binds are released like a manual "Reset all instances";
+// a bind to an instance someone is still inside, or a permanent bind, blocks
+// the run instead.
+bool DungeonMasterMgr::ReleaseBindsBeforeRun(Session* session)
+{
+    std::set<ObjectGuid> const owners = CollectBindOwners(session);
+
+    for (ObjectGuid const& guid : owners)
+    {
+        InstancePlayerBind* bind = sInstanceSaveMgr->PlayerGetBoundInstance(
+            guid, session->MapId, DUNGEON_DIFFICULTY_NORMAL);
+        if (!bind || !bind->save)
+            continue;
+
+        Map* inUse = sMapMgr->FindMap(session->MapId, bind->save->GetInstanceId());
+        if (bind->perm || (inUse && inUse->HavePlayers()))
+        {
+            NotifySession(session,
+                "|cFFFF0000[Dungeon Master]|r Someone in your group is saved to this dungeon "
+                "and the instance is in use. Leave it and reset your instances first.");
+            return false;
+        }
+    }
+
+    for (ObjectGuid const& guid : owners)
+        if (sInstanceSaveMgr->PlayerGetBoundInstance(guid, session->MapId, DUNGEON_DIFFICULTY_NORMAL))
+            sInstanceSaveMgr->PlayerUnbindInstance(guid, session->MapId, DUNGEON_DIFFICULTY_NORMAL,
+                true, ObjectAccessor::FindConnectedPlayer(guid));
+
+    return true;
+}
+
+// After a run: drop every bind to the instance the run used. Once the instance
+// map unloads, AC then deletes its saved state (instance row, encounter data,
+// creature/gameobject respawn rows), so the gutted instance is never reused.
+void DungeonMasterMgr::ReleaseRunInstanceBinds(Session const& session)
+{
+    if (!session.InstanceId)
+        return;
+
+    for (ObjectGuid const& guid : CollectBindOwners(&session))
+    {
+        InstancePlayerBind* bind = sInstanceSaveMgr->PlayerGetBoundInstance(
+            guid, session.MapId, DUNGEON_DIFFICULTY_NORMAL);
+        if (bind && bind->save && bind->save->GetInstanceId() == session.InstanceId)
+            sInstanceSaveMgr->PlayerUnbindInstance(guid, session.MapId, DUNGEON_DIFFICULTY_NORMAL,
+                true, ObjectAccessor::FindConnectedPlayer(guid));
+    }
+}
+
 bool DungeonMasterMgr::StartDungeon(Session* session)
 {
     if (!session) return false;
+
+    // Normal difficulty only. In a heroic instance, killing a summoned stock
+    // boss that carries CREATURE_FLAG_EXTRA_INSTANCE_BIND perm-binds the whole
+    // group (Unit::Kill), i.e. a real heroic lockout from a challenge run.
+    for (auto const& pd : session->Players)
+    {
+        Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
+        if (p && p->GetDungeonDifficulty() != DUNGEON_DIFFICULTY_NORMAL)
+        {
+            NotifySession(session,
+                "|cFFFF0000[Dungeon Master]|r Challenges run on Normal difficulty only. "
+                "Set the dungeon difficulty to Normal and try again.");
+            return false;
+        }
+    }
+
+    if (!ReleaseBindsBeforeRun(session))
+        return false;
 
     session->EntrancePos = GetDungeonEntrance(session->MapId);
     if (session->EntrancePos.GetPositionX() == 0 &&
@@ -1157,7 +1286,12 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
 
     auto applyLevelAndStats = [&](Creature* c, float extraHpMult, float extraDmgMult, bool isBoss)
     {
-    
+        // Drop auras the template applied at spawn (creature_template_addon,
+        // e.g. 28006 Grand Necrolord Antiok's 50494): they were tuned for the
+        // original encounter and can make a creature unkillable here
+        // (upstream #24, cause not confirmed in game).
+        c->RemoveAllAuras();
+
         c->SetLevel(targetLevel);
 
     
@@ -1253,7 +1387,11 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         // All spawned creatures (trash and bosses alike) use DungeonMasterCreatureAI,
         // which handles aggro scanning, patrol movement, and death hooks.
         // Bosses rely on auto-attack only — no scripted spell rotations.
-        c->SetAI(new DungeonMasterCreatureAI(c));
+        // AIM_Initialize deletes the creature's previous AI; Unit::SetAI only
+        // swaps the pointer, which leaked one AI object per spawned creature.
+        CreatureAI* dmAI = new DungeonMasterCreatureAI(c);
+        if (!c->AIM_Initialize(dmAI))
+            delete dmAI;
 
         // Force visibility refresh or client won't see the creature
         c->UpdateObjectVisibility(true);
@@ -1379,10 +1517,8 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
                         sRoguelikeMgr->GetAffixMultipliers(session->RoguelikeRunId,
                             false, true, affixHpM, affixDmgM, affixEliteM);
 
+                    // Also installs the custom AI (rare = enhanced trash).
                     applyLevelAndStats(r, rareHpMult * affixHpM, rareDmgMult * affixDmgM, false);
-
-                    // Install custom AI (rare is treated as enhanced trash, not a scripted boss)
-                    r->SetAI(new DungeonMasterCreatureAI(r));
 
                     SpawnedCreature sc;
                     sc.Guid = r->GetGUID(); sc.Entry = rareEntry;
@@ -2582,6 +2718,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
 
             // Persist stats while session is still alive
             UpdatePlayerStatsFromSession(s, success);
+            ReleaseRunInstanceBinds(s);
 
             // Clean up mappings
             uint32 savedInstanceId = s.InstanceId;
@@ -2591,6 +2728,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
                 _playerToSession.erase(pd.PlayerGuid);
 
             _activeSessions.erase(it);
+            g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
         }
     } // lock released
 
@@ -2625,6 +2763,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
         SaveLeaderboardEntry(s);
 
     TeleportPartyOut(&s);
+    ReleaseRunInstanceBinds(s);
 
     // Save instance ID before cleanup
     uint32 savedInstanceId = s.InstanceId;
@@ -2639,6 +2778,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
         _playerToSession.erase(pd.PlayerGuid);
 
     _activeSessions.erase(it);
+    g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
 }
 
 void DungeonMasterMgr::AbandonSession(uint32 id) { EndSession(id, false); }
@@ -2657,6 +2797,8 @@ void DungeonMasterMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
     if (success && s.State == SessionState::Completed)
         SaveLeaderboardEntry(s);
 
+    // The floor's instance is never reused (next floor or teleport home).
+    ReleaseRunInstanceBinds(s);
 
     uint32 savedInstanceId = s.InstanceId;
 
@@ -2667,6 +2809,7 @@ void DungeonMasterMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
         _playerToSession.erase(pd.PlayerGuid);
 
     _activeSessions.erase(it);
+    g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
 
     LOG_DEBUG("module", "DungeonMaster: Roguelike session {} cleaned up (success={}).",
         sessionId, success);

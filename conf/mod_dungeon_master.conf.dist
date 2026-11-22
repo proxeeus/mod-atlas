@@ -13,8 +13,9 @@
 ###############################################################################
 
 #    DungeonMaster.Enable
-#        Default: 1
-DungeonMaster.Enable = 1
+#        Master switch. While 0, nothing runs and the city NPCs are hidden.
+#        Default: 0
+DungeonMaster.Enable = 0
 
 #    DungeonMaster.Debug
 #        Default: 0

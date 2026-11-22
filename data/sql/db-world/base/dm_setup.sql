@@ -19,9 +19,16 @@
 -- -----------------------------------------------
 -- Step 1: Clean slate  (safe DELETE, not TRUNCATE)
 -- -----------------------------------------------
-DELETE FROM `creature`               WHERE `id` = 500000;
-DELETE FROM `creature_template_model` WHERE `CreatureID` = 500000;
-DELETE FROM `creature_template`      WHERE `entry` = 500000;
+-- Every DELETE is restricted to rows this module created (its own guids, or
+-- an entry whose template carries this module's name/ScriptName). If another
+-- module or a custom edit already uses entry 500000 or guids 8000001-8000011,
+-- its rows are left alone and the INSERTs below fail loudly instead of
+-- silently replacing someone else's data.
+DELETE FROM `creature` WHERE `guid` BETWEEN 8000001 AND 8000011 AND `id` = 500000;
+DELETE FROM `creature_template_model` WHERE `CreatureID` = 500000
+    AND EXISTS (SELECT 1 FROM `creature_template` ct
+                WHERE ct.`entry` = 500000 AND ct.`ScriptName` = 'npc_dungeon_master');
+DELETE FROM `creature_template` WHERE `entry` = 500000 AND `ScriptName` = 'npc_dungeon_master';
 
 -- -----------------------------------------------
 -- Step 2: NPC Template
@@ -158,9 +165,14 @@ INSERT INTO `creature` (
 -- -----------------------------------------------
 -- Clean slate for vendor NPC
 -- -----------------------------------------------
-DELETE FROM `npc_vendor`             WHERE `entry` = 500001;
-DELETE FROM `creature_template_model` WHERE `CreatureID` = 500001;
-DELETE FROM `creature_template`      WHERE `entry` = 500001;
+-- Same rule as above: only touch entry 500001 if it is this module's vendor.
+DELETE FROM `npc_vendor` WHERE `entry` = 500001
+    AND EXISTS (SELECT 1 FROM `creature_template` ct
+                WHERE ct.`entry` = 500001 AND ct.`name` = 'Dungeon Provisioner');
+DELETE FROM `creature_template_model` WHERE `CreatureID` = 500001
+    AND EXISTS (SELECT 1 FROM `creature_template` ct
+                WHERE ct.`entry` = 500001 AND ct.`name` = 'Dungeon Provisioner');
+DELETE FROM `creature_template` WHERE `entry` = 500001 AND `name` = 'Dungeon Provisioner';
  
 -- -----------------------------------------------
 -- Vendor NPC Template
@@ -319,3 +331,43 @@ INSERT INTO `npc_vendor` (`entry`, `slot`, `item`, `maxcount`, `incrtime`, `Exte
 (500001, 0, 43234,  0, 0, 0),   -- Wound Poison VI         (lvl 72)
 (500001, 0, 43235,  0, 0, 0),   -- Wound Poison VII        (lvl 78)
 (500001, 0, 21835,  0, 0, 0);   -- Anesthetic Poison       (lvl 68)
+
+
+-- =============================================
+-- Roguelike buff spell (ID 91001), server-side only
+-- =============================================
+-- The module's own aura for the roguelike "+10% all stats per cleared floor"
+-- buff. It replaces the earlier use of Greater Blessing of Kings, a paladin
+-- class spell that had to be patched server-wide to stack (upstream #23).
+--
+--   Attributes      = 0x000000C0  PASSIVE | DO_NOT_DISPLAY
+--   Effect_1        = 6           APPLY_AURA
+--   EffectAura_1    = 137         MOD_TOTAL_STAT_PERCENTAGE
+--   EffectMiscValue = -1          all stats
+--   BasePoints+Die  = 9 + 1       10% per stack
+--   CumulativeAura  = 255         max stacks (stack n = n x 10%)
+--   DurationIndex   = 21          infinite
+--   ImplicitTarget  = 1           caster (applied with Unit::AddAura)
+--
+-- Passive: the server never sends it to clients (no Spell.dbc entry needed,
+-- nothing for unpatched clients to mis-render) and never saves it to
+-- character_aura, so the buff cannot outlive a run.
+--
+-- ID 91001 is free in stock data (stock spells end below 81000; core custom
+-- spell_dbc rows sit at 100001+). The DELETE only removes this module's own
+-- row; if another row already uses 91001 the INSERT fails loudly.
+-- -----------------------------------------------
+DELETE FROM `spell_dbc` WHERE `ID` = 91001 AND `Name_Lang_enUS` = 'Dungeon Master: Roguelike Might';
+INSERT INTO `spell_dbc` (
+    `ID`, `Attributes`, `CastingTimeIndex`, `DurationIndex`, `RangeIndex`,
+    `CumulativeAura`, `EquippedItemClass`,
+    `Effect_1`, `EffectDieSides_1`, `EffectBasePoints_1`, `ImplicitTargetA_1`,
+    `EffectAura_1`, `EffectMiscValue_1`,
+    `Name_Lang_enUS`
+) VALUES (
+    91001, 0x000000C0, 1, 21, 1,
+    255, -1,
+    6, 1, 9, 1,
+    137, -1,
+    'Dungeon Master: Roguelike Might'
+);

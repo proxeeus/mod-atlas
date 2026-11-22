@@ -9,6 +9,7 @@
 #include "ScriptMgr.h"
 #include "Player.h"
 #include "Creature.h"
+#include "Map.h"
 #include "SpellInfo.h"
 #include "DungeonMasterMgr.h"
 #include "DMConfig.h"
@@ -42,7 +43,7 @@ public:
 
     void OnUnitDeath(Unit* unit, Unit* killer) override
     {
-        if (!sDMConfig->IsEnabled() || !unit)
+        if (!sDMConfig->IsEnabled() || !unit || !DungeonMasterMgr::HasActiveSessions())
             return;
 
         Creature* creature = unit->ToCreature();
@@ -73,11 +74,14 @@ public:
 private:
     void ScaleDamage(Unit* target, Unit* attacker, uint32& damage)
     {
-        if (!sDMConfig->IsEnabled() || damage == 0)
+        // Runs for every damage event on the server: bail out before taking
+        // the session mutex unless a session exists and the target is in a
+        // dungeon (sessions only ever run in dungeon instances).
+        if (!sDMConfig->IsEnabled() || damage == 0 || !DungeonMasterMgr::HasActiveSessions())
             return;
 
         Player* player = target ? target->ToPlayer() : nullptr;
-        if (!player)
+        if (!player || !player->GetMap() || !player->GetMap()->IsDungeon())
             return;
 
         if (attacker && attacker->ToPlayer())

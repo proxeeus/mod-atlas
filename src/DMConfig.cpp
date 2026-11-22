@@ -68,7 +68,9 @@ void DMConfig::LoadConfig(bool reload)
     if (reload)
         LOG_INFO("module", "DungeonMaster: Reloading configuration...");
 
-    _enabled  = sConfigMgr->GetOption<bool>  ("DungeonMaster.Enable", true);
+    // Off unless explicitly enabled: a server that compiles the module in must
+    // not start running it just because no config file was copied yet.
+    _enabled  = sConfigMgr->GetOption<bool>  ("DungeonMaster.Enable", false);
     _debug    = sConfigMgr->GetOption<bool>  ("DungeonMaster.Debug",  false);
     _npcEntry = sConfigMgr->GetOption<uint32>("DungeonMaster.NpcEntry", 500000);
 
@@ -369,8 +371,9 @@ void DMConfig::LoadRoguelikeBuffPool()
 
     for (uint32 i = 1; i <= MAX_ROGUELIKE_BUFFS; ++i)
     {
+        // Optional keys: don't log "missing property" for each absent slot.
         std::string val = sConfigMgr->GetOption<std::string>(
-            "DungeonMaster.Roguelike.Buff." + std::to_string(i), "");
+            "DungeonMaster.Roguelike.Buff." + std::to_string(i), "", false);
         if (val.empty())
             break;
 

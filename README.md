@@ -17,7 +17,7 @@ Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dun
 - **Level scaling** — Scale creatures to your party's level or use the tier's natural range
 - **Any dungeon, any level** — A level 80 can run Deadmines scaled to 80, or at its original difficulty
 - **Real dungeon bosses** — Final bosses are pulled from a global pool of all dungeon bosses across Classic, TBC, and WotLK instances, matched to the session's theme.
-- **Party support** — Solo or groups up to 5
+- **Party support** — Solo or groups up to 5 (Normal dungeon difficulty only; each run starts in a fresh instance and the instance is released afterwards)
 - **Group Loot support** — Items dropped by enemies support the Group Loot game mechanic where party members roll Need or Greed on qualifying items
 - **Per-player difficulty** — HP and damage scale with party size; solo players get a reduction
 - **Auto-resurrect** — Dead players revive at the entrance when combat ends
@@ -30,7 +30,7 @@ Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dun
 ### Roguelike Mode
 - **Infinite progression** — Clear a dungeon, get teleported to the next one, repeat until you wipe
 - **Escalating difficulty** — Enemy HP and damage scale per tier (linear, then exponential)
-- **Stacking stat buff** — +10% all stats per dungeon cleared (Blessing of Kings aura, reapplied on death)
+- **Stacking stat buff** — +10% all stats per dungeon cleared (the module's own server-side aura, spell 91001; no class spell is modified)
 - **Mythic+ style affixes** — Fortified, Tyrannical, Raging, Bolstering, Savage; layered at configurable tier thresholds
 - **Random dungeon rotation** — Each floor picks a new dungeon appropriate for your level band
 - **Tier-scaled rewards** — Better loot at higher tiers, with increasing epic drop chance
@@ -64,7 +64,9 @@ Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dun
    cp modules/mod-dungeon-master/conf/mod_dungeon_master.conf.dist etc/mod_dungeon_master.conf
    ```
 
-6. **Restart the server.** The Dungeon Master NPC spawns automatically in all major cities.
+6. **Enable it:** set `DungeonMaster.Enable = 1` (the default is 0, also when no config file exists).
+
+7. **Restart the server.** The Dungeon Master NPC appears in all major cities (it stays hidden while the module is disabled).
 
 ---
 
@@ -219,7 +221,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 - **Async teleport handling** — 30-second grace period after teleports to prevent false "abandoned" detection.
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
-- **Custom creature AI** — Trash creatures use `DungeonMasterCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses retain their native ScriptName AI with all original spells and combat mechanics intact.
+- **Custom creature AI** — Trash creatures use `DungeonMasterCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
 - **Boss spell damage scaling** — Boss abilities have hard-coded damage values designed for their original level range. The unit script intercepts all incoming damage from session bosses (spells, periodic ticks, and melee) and scales it using `creature_classlevelstats` base damage ratios between the boss's template level and the session's effective level. This ensures a level-70 boss spell deals proportionally correct damage to a level-25 party.
 - **Multi-phase boss detection** — When a boss dies, the system waits 5 seconds and scans for new elite/boss creatures near the death location. If a phase-2 creature is detected, it is automatically promoted to boss status and the original death does not count as a kill.
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.

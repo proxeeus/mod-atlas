@@ -43,6 +43,8 @@ public:
 
     // Session ops
     bool StartDungeon(Session* session);
+    bool ReleaseBindsBeforeRun(Session* session);
+    void ReleaseRunInstanceBinds(Session const& session);
     bool TeleportPartyIn(Session* session);
     void TeleportPartyOut(Session* session);
     void HandlePlayerDeath(Player* player, Session* session);
@@ -77,6 +79,11 @@ public:
     void Update(uint32 diff);
 
     uint32 GetActiveSessionCount() const { return static_cast<uint32>(_activeSessions.size()); }
+
+    // Lock-free "is any session running?" check for hot paths (every damage
+    // event on the server reaches the unit script). Kept in sync under
+    // _sessionMutex whenever _activeSessions changes.
+    static bool HasActiveSessions();
     bool   CanCreateNewSession()   const;
 
     // Env damage scaling

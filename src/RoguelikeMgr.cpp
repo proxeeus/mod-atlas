@@ -821,28 +821,33 @@ std::string RoguelikeMgr::GetActiveAffixNames(uint32 runId) const
     return result;
 }
 
-// Buff system (+10% all stats per stack via direct stat modification)
-// In 3.3.5 clients, spell tooltips are hardcoded in the DBC and can't be updated
-// Buff system (+10% all stats per stack via BoK aura with visual stack count)
-// SetStackAmount(n) both displays the stack number on the buff icon AND
-// auto-multiplies the base 10% effect by n (so 3 stacks = 30%).
+// Buff system: +10% all stats per cleared floor, carried by the module's own
+// stacking aura (see ApplyBuffAura).
 
-static constexpr uint32 BUFF_SPELL_ID = 25898;  // Greater Blessing of Kings
+// The module's own passive aura (spell_dbc row in dm_setup.sql): +10% all
+// stats per stack, up to 255 stacks. It replaces Greater Blessing of Kings,
+// which had to be patched server-wide to stack and so let every paladin stack
+// it too (upstream #23). Being passive, it is never sent to clients and never
+// saved to character_aura.
+
+void RoguelikeMgr::StripRunBuff(Player* player)
+{
+    if (player)
+        player->RemoveAura(BUFF_SPELL_ID);
+}
 
 void RoguelikeMgr::ApplyBuffAura(Player* player, uint32 stacks)
 {
     if (!player || !player->IsInWorld() || stacks == 0) return;
 
-    // Remove old aura before reapplying with new stack count
-    player->RemoveAura(BUFF_SPELL_ID);
+    StripRunBuff(player);
 
+    // nullptr if the spell_dbc row is missing (logged once at startup).
     Aura* aura = player->AddAura(BUFF_SPELL_ID, player);
-    if (aura)
-    {
-        aura->SetStackAmount(static_cast<uint8>(stacks));
-        aura->SetMaxDuration(-1);
-        aura->SetDuration(-1);
-    }
+    if (!aura)
+        return;
+
+    aura->SetStackAmount(static_cast<uint8>(std::min<uint32>(stacks, 255)));
 }
 
 void RoguelikeMgr::IncrementBuffStacks(uint32 runId)
@@ -888,7 +893,7 @@ void RoguelikeMgr::ApplyBuffStacks(Player* player, uint32 runId)
 void RoguelikeMgr::RemoveBuffStacks(Player* player, uint32 runId)
 {
     if (!player || !player->IsInWorld()) return;
-    player->RemoveAura(BUFF_SPELL_ID);
+    StripRunBuff(player);
 }
 
 // AFFIX SELECTION

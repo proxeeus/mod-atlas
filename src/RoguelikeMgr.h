@@ -56,6 +56,12 @@ public:
     void RemoveBuffStacks(Player* player, uint32 runId);
     void ApplyBuffAura(Player* player, uint32 stacks);
 
+    // Removes the run buff from a player. Safe for players outside any run.
+    static void StripRunBuff(Player* player);
+
+    // Module-owned passive aura defined in dm_setup.sql (spell_dbc).
+    // IDs 91000-91099 are reserved for this module.
+    static constexpr uint32 BUFF_SPELL_ID = 91001;
     static constexpr float BUFF_PCT_PER_STACK = 10.0f;
 
     void Update(uint32 diff);
