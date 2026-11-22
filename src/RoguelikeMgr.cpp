@@ -215,12 +215,11 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
         }
     }
 
-    // Select the first dungeon
-    uint32 mapId = SelectRandomDungeon(run);
-    if (!mapId)
+    // Every floor is a new instance, so a party at the hourly cap cannot descend.
+    std::vector<Player*> const party = AtlasMgr::GatherParty(leader);
+    if (Player* capped = AtlasMgr::FindAtInstanceCap(party))
     {
-        ChatHandler(leader->GetSession()).PSendSysMessage(
-            "{} No echo can be reached at your level.", CHAT_PREFIX_ENDLESS);
+        ChatHandler(leader->GetSession()).SendSysMessage(AtlasMgr::InstanceCapNotice(capped));
         return false;
     }
 
@@ -228,34 +227,13 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     for (auto const& pd : run.Players)
         sAtlasMgr->ClearCooldown(pd.PlayerGuid);
 
-    // Create the Atlas session with the player's scaling choice
-    Session* session = sAtlasMgr->CreateSession(
-        leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty);
-    if (!session)
+    // Open the first floor
+    uint32 const mapId = OpenRandomFloor(run, leader, party);
+    if (!mapId)
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
-            "{} The first echo would not hold.", CHAT_PREFIX_ENDLESS);
-        return false;
-    }
-
-    // Tag the session as roguelike
-    session->RoguelikeRunId = run.RunId;
-    run.CurrentSessionId    = session->SessionId;
-
-    // Start the dungeon
-    if (!sAtlasMgr->StartDungeon(session))
-    {
-        ChatHandler(leader->GetSession()).PSendSysMessage(
-            "{} The first echo could not be opened.", CHAT_PREFIX_ENDLESS);
-        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
-        return false;
-    }
-
-    if (!sAtlasMgr->TeleportPartyIn(session))
-    {
-        ChatHandler(leader->GetSession()).PSendSysMessage(
-            "{} The timeways would not carry you.", CHAT_PREFIX_ENDLESS);
-        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
+            "{} No echo would open for your whole party. Some dungeons ask for an attunement quest "
+            "or an item level that not everyone has.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
@@ -392,7 +370,10 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
     // Transition to the next dungeon
     if (!TransitionToNextDungeon(*run))
     {
-        // Failed to create next dungeon — end the run gracefully
+        // Failed to create next dungeon — end the run gracefully. The new depth
+        // never opened, so step back to the last floor actually mended: it sets
+        // the rewards and the leaderboard entry.
+        --run->CurrentTier;
         AnnounceToRun(*run, Acore::StringFormat(
             "{} No further echo can be reached. The descent ends at |cFFFFD700depth {}|r "
             "after |cFFFFFFFF{}|r echo{}.",
@@ -894,19 +875,36 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 
 // DUNGEON SELECTION
 
-uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run) const
-{
-    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(run.BaseDifficultyId);
-    if (!diff)
-    {
-        // Fallback: use broadest range
-        auto dgs = sAtlasConfig->GetDungeonsForLevel(1, 80);
-        if (dgs.empty()) return 0;
-        return dgs[RandInt<size_t>(0, dgs.size() - 1)]->MapId;
-    }
+// A floor the pre-checks allowed can still be refused at the door (another
+// module's entry hook, a full instance). Reroll this many times before giving up.
+static constexpr uint32 MAX_FLOOR_ATTEMPTS = 3;
 
-    auto dgs = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
-    if (dgs.empty()) return 0;
+uint32 RoguelikeMgr::PickFloorTheme(RoguelikeRun const& run) const
+{
+    // Run-locked theme, or a fresh random one per floor
+    if (run.ThemeId != 0)
+        return run.ThemeId;
+
+    auto const& themes = sAtlasConfig->GetThemes();
+    return themes.empty() ? 0 : themes[RandInt<size_t>(0, themes.size() - 1)].Id;
+}
+
+uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run, std::vector<Player*> const& party,
+    std::set<uint32> const& tried) const
+{
+    // Fallback without a difficulty: the broadest range
+    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(run.BaseDifficultyId);
+    std::vector<DungeonInfo const*> inRange = diff
+        ? sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel)
+        : sAtlasConfig->GetDungeonsForLevel(1, 80);
+
+    std::erase_if(inRange, [&tried](DungeonInfo const* d) { return tried.count(d->MapId) != 0; });
+
+    // Only dungeons everyone may enter: an attunement quest or item level gate
+    // would otherwise end the descent at the door.
+    std::vector<DungeonInfo const*> dgs = AtlasMgr::FilterEnterable(inRange, party);
+    if (dgs.empty())
+        return 0;
 
     // Try to avoid repeating the same dungeon
     if (dgs.size() > 1 && run.PreviousMapId != 0)
@@ -923,18 +921,68 @@ uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run) const
     return dgs[RandInt<size_t>(0, dgs.size() - 1)]->MapId;
 }
 
+bool RoguelikeMgr::OpenFloor(RoguelikeRun& run, Player* leader, uint32 mapId)
+{
+    Session* session = sAtlasMgr->CreateSession(
+        leader, run.BaseDifficultyId, PickFloorTheme(run), mapId, run.ScaleToParty);
+    if (!session)
+    {
+        LOG_ERROR("module", "RoguelikeMgr: Failed to create session for run {} tier {} (map {})",
+            run.RunId, run.CurrentTier, mapId);
+        return false;
+    }
+
+    // Tag the session as roguelike
+    uint32 const sessionId  = session->SessionId;
+    session->RoguelikeRunId = run.RunId;
+    run.CurrentSessionId    = sessionId;
+    {
+        std::lock_guard<std::mutex> lock(_runMutex);
+        _sessionToRun[sessionId] = run.RunId;
+    }
+
+    char const* failedStep = nullptr;
+    if (!sAtlasMgr->StartDungeon(session))
+        failedStep = "StartDungeon";
+    else if (!sAtlasMgr->TeleportPartyIn(session))
+        failedStep = "Teleport";
+
+    if (!failedStep)
+        return true;
+
+    LOG_ERROR("module", "RoguelikeMgr: {} failed for run {} (map {})", failedStep, run.RunId, mapId);
+
+    // The cleanup frees the session, so only the saved id is used from here on.
+    sAtlasMgr->CleanupRoguelikeSession(sessionId, false);
+    {
+        std::lock_guard<std::mutex> lock(_runMutex);
+        _sessionToRun.erase(sessionId);
+    }
+    run.CurrentSessionId = 0;
+    return false;
+}
+
+uint32 RoguelikeMgr::OpenRandomFloor(RoguelikeRun& run, Player* leader, std::vector<Player*> const& party)
+{
+    std::set<uint32> tried;
+    for (uint32 attempt = 0; attempt < MAX_FLOOR_ATTEMPTS; ++attempt)
+    {
+        uint32 const mapId = SelectRandomDungeon(run, party, tried);
+        if (!mapId)
+            break;
+
+        if (OpenFloor(run, leader, mapId))
+            return mapId;
+
+        tried.insert(mapId);
+    }
+    return 0;
+}
+
 // Transition between dungeons
 
 bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
 {
-    uint32 mapId = SelectRandomDungeon(run);
-    if (!mapId)
-    {
-        LOG_WARN("module", "RoguelikeMgr: No dungeon available for run {} tier {}",
-            run.RunId, run.CurrentTier);
-        return false;
-    }
-
     // Find leader or first online player
     Player* leader = ObjectAccessor::FindPlayer(run.LeaderGuid);
     if (!leader)
@@ -952,59 +1000,25 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
         return false;
     }
 
+    // Every floor is a new instance; the realm's hourly cap ends the descent.
+    std::vector<Player*> const party = AtlasMgr::GatherParty(leader);
+    if (Player* capped = AtlasMgr::FindAtInstanceCap(party))
+    {
+        AnnounceToRun(run, AtlasMgr::InstanceCapNotice(capped));
+        LOG_INFO("module", "RoguelikeMgr: Run {} stopped by the hourly instance cap ({})",
+            run.RunId, capped->GetName());
+        return false;
+    }
+
     // Clear cooldowns (EndSession might have set them)
     for (auto const& pd : run.Players)
         sAtlasMgr->ClearCooldown(pd.PlayerGuid);
 
-    // Select theme: run-locked theme or random
-    uint32 themeId = run.ThemeId;
-    if (themeId == 0)
+    uint32 const mapId = OpenRandomFloor(run, leader, party);
+    if (!mapId)
     {
-        auto const& themes = sAtlasConfig->GetThemes();
-        if (!themes.empty())
-            themeId = themes[RandInt<size_t>(0, themes.size() - 1)].Id;
-    }
-
-    // Create the new Atlas session
-    Session* session = sAtlasMgr->CreateSession(
-        leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty);
-    if (!session)
-    {
-        LOG_ERROR("module", "RoguelikeMgr: Failed to create session for run {} tier {}",
+        LOG_WARN("module", "RoguelikeMgr: No dungeon would open for run {} tier {}",
             run.RunId, run.CurrentTier);
-        return false;
-    }
-
-    // Tag as roguelike
-    session->RoguelikeRunId = run.RunId;
-    run.CurrentSessionId    = session->SessionId;
-
-    // Register session mapping
-    {
-        std::lock_guard<std::mutex> lock(_runMutex);
-        _sessionToRun[session->SessionId] = run.RunId;
-    }
-
-    // Start and teleport
-    if (!sAtlasMgr->StartDungeon(session))
-    {
-        LOG_ERROR("module", "RoguelikeMgr: StartDungeon failed for run {}", run.RunId);
-        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
-        {
-            std::lock_guard<std::mutex> lock2(_runMutex);
-            _sessionToRun.erase(session->SessionId);
-        }
-        return false;
-    }
-
-    if (!sAtlasMgr->TeleportPartyIn(session))
-    {
-        LOG_ERROR("module", "RoguelikeMgr: Teleport failed for run {}", run.RunId);
-        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
-        {
-            std::lock_guard<std::mutex> lock2(_runMutex);
-            _sessionToRun.erase(session->SessionId);
-        }
         return false;
     }
 

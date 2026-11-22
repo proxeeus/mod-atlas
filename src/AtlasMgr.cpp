@@ -29,6 +29,7 @@
 #include "SpellAuraEffects.h"
 #include "InstanceScript.h"
 #include "InstanceSaveMgr.h"
+#include "DisableMgr.h"
 #include "CellImpl.h"
 #include "GridNotifiers.h"
 #include "GridNotifiersImpl.h"
@@ -1856,7 +1857,7 @@ void AtlasMgr::HandleCreatureDeath(Creature* creature, Session* session)
     if (!creature || !session || !session->IsActive())
         return;
 
-    LOG_INFO("module", "Atlas: HandleCreatureDeath called for {} (GUID: {}) in session {}",
+    LOG_DEBUG("module", "Atlas: HandleCreatureDeath called for {} (GUID: {}) in session {}",
         creature->GetName(), creature->GetGUID().GetCounter(), session->SessionId);
 
     for (auto& sc : session->SpawnedCreatures)
@@ -1868,7 +1869,8 @@ void AtlasMgr::HandleCreatureDeath(Creature* creature, Session* session)
             if (!sc.IsDead)
                 sc.IsDead = true;
 
-            LOG_INFO("module", "Atlas: Processing death for {} (Boss: {}, Elite: {}, LootFilled: {}, KillCredited: {})",
+            LOG_DEBUG("module",
+                "Atlas: Processing death for {} (Boss: {}, Elite: {}, LootFilled: {}, KillCredited: {})",
                 creature->GetName(), sc.IsBoss, sc.IsElite, sc.LootFilled, sc.KillCredited);
 
             // ---- Loot: always fill here (OnUnitDeath fires AFTER core death processing) ----
@@ -1894,7 +1896,7 @@ void AtlasMgr::HandleCreatureDeath(Creature* creature, Session* session)
                     ppc.Resolved   = false;
                     session->PendingPhaseChecks.push_back(ppc);
 
-                    LOG_INFO("module", "Atlas: Boss '{}' died — deferring kill count for phase check",
+                    LOG_DEBUG("module", "Atlas: Boss '{}' died — deferring kill count for phase check",
                         creature->GetName());
                 }
                 else
@@ -1931,7 +1933,7 @@ void AtlasMgr::OnCreatureDeathHook(Creature* creature)
 {
     if (!creature) return;
 
-    LOG_INFO("module", "Atlas: OnCreatureDeathHook called for {} (GUID: {})",
+    LOG_DEBUG("module", "Atlas: OnCreatureDeathHook called for {} (GUID: {})",
         creature->GetName(), creature->GetGUID().GetCounter());
 
     std::lock_guard<std::mutex> lock(_sessionMutex);
@@ -1955,7 +1957,7 @@ void AtlasMgr::OnCreatureDeathHook(Creature* creature)
                 }
 
                 sc.IsDead = true;
-                LOG_INFO("module", "Atlas: OnCreatureDeathHook processing death for {} (Boss: {}, Elite: {})",
+                LOG_DEBUG("module", "Atlas: OnCreatureDeathHook processing death for {} (Boss: {}, Elite: {})",
                     creature->GetName(), sc.IsBoss, sc.IsElite);
 
                 // ----------------------------------------------------------
@@ -1986,7 +1988,7 @@ void AtlasMgr::OnCreatureDeathHook(Creature* creature)
                         ppc.Resolved   = false;
                         session.PendingPhaseChecks.push_back(ppc);
 
-                        LOG_INFO("module", "Atlas: Boss '{}' died — deferring kill count for phase check (entry {})",
+                        LOG_DEBUG("module", "Atlas: Boss '{}' died — deferring kill count for phase check (entry {})",
                             creature->GetName(), creature->GetEntry());
                     }
                     else
@@ -2160,7 +2162,7 @@ void AtlasMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
         return;
     }
 
-    LOG_INFO("module", "Atlas: Giving item {} to {} (level {}, quality {}, class {})",
+    LOG_DEBUG("module", "Atlas: Giving item {} to {} (level {}, quality {}, class {})",
         itemEntry, player->GetName(), level, quality, playerClass);
 
     ItemPosCountVec dest;
@@ -2443,7 +2445,7 @@ uint32 AtlasMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass
 
         if (!cands.empty())
         {
-            LOG_INFO("module", "Atlas: SelectRewardItem(level={}, quality={}, class={}) "
+            LOG_DEBUG("module", "Atlas: SelectRewardItem(level={}, quality={}, class={}) "
                 "-> {} candidates in window [{}, {}]",
                 level, quality, playerClass, cands.size(), lo, hi);
 
@@ -2532,7 +2534,7 @@ uint32 AtlasMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality,
 
         if (!cands.empty())
         {
-            LOG_INFO("module", "Atlas: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
+            LOG_DEBUG("module", "Atlas: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
                 "-> {} candidates in window [{}, {}]",
                 level, minQuality, maxQuality, equipmentOnly, playerClass, cands.size(), lo, hi);
 
@@ -2616,7 +2618,7 @@ void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBos
         LootStoreItem storeItem(entry, 0, 100.0f, false, 1, 0, 1, 1);
         loot.AddItem(storeItem);
         ++itemsAdded;
-        LOG_INFO("module", "Atlas: Added loot item {} (quality {}-{}) to {} (boss={})",
+        LOG_DEBUG("module", "Atlas: Added loot item {} (quality {}-{}) to {} (boss={})",
             entry, minQ, maxQ, creature->GetName(), isBoss);
         return true;
     };
@@ -2716,7 +2718,7 @@ void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBos
                 creature->SendUpdateToPlayer(p);
         }
 
-        LOG_INFO("module", "Atlas: Group loot triggered for {} — {} items, "
+        LOG_DEBUG("module", "Atlas: Group loot triggered for {} — {} items, "
             "lootMethod={}, threshold={}, groupSize={}",
             creature->GetName(), loot.items.size(),
             static_cast<int>(group->GetLootMethod()), threshold, group->GetMembersCount());
@@ -2726,7 +2728,7 @@ void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBos
         creature->SetLootRecipient(looter);
     }
 
-    LOG_INFO("module", "Atlas: FillCreatureLoot complete for {} (GUID: {}, Boss: {}, Level: {}, Gold: {}, Items: {})",
+    LOG_DEBUG("module", "Atlas: FillCreatureLoot complete for {} (GUID: {}, Boss: {}, Level: {}, Gold: {}, Items: {})",
         creature->GetName(), creature->GetGUID().GetCounter(), isBoss, level, loot.gold, itemsAdded);
 }
 
@@ -3015,6 +3017,69 @@ uint32 AtlasMgr::GetRemainingCooldown(ObjectGuid g) const
 bool AtlasMgr::CanCreateNewSession() const
 {
     return _activeSessions.size() < sAtlasConfig->GetMaxConcurrentRuns();
+}
+
+// Entry checks (see AtlasMgr.h)
+
+std::vector<Player*> AtlasMgr::GatherParty(Player* leader)
+{
+    std::vector<Player*> party;
+    if (!leader)
+        return party;
+
+    party.push_back(leader);
+    if (Group* g = leader->GetGroup())
+        for (GroupReference* ref = g->GetFirstMember(); ref; ref = ref->next())
+            if (Player* m = ref->GetSource())
+                if (m != leader && m->IsInWorld())
+                    party.push_back(m);
+    return party;
+}
+
+bool AtlasMgr::CanPartyEnter(std::vector<Player*> const& party, uint32 mapId)
+{
+    if (party.empty())
+        return false;
+
+    // Runs are Normal-only (see StartDungeon), so only the Normal requirement applies.
+    DungeonProgressionRequirements const* ar = sObjectMgr->GetAccessRequirement(mapId, DUNGEON_DIFFICULTY_NORMAL);
+    for (Player* p : party)
+    {
+        // Asked first because Satisfy() announces a closed map even when told not to report.
+        if (sDisableMgr->IsDisabledFor(DISABLE_TYPE_MAP, mapId, p))
+            return false;
+        if (!p->Satisfy(ar, mapId, false))
+            return false;
+    }
+    return true;
+}
+
+std::vector<DungeonInfo const*> AtlasMgr::FilterEnterable(std::vector<DungeonInfo const*> const& dungeons,
+                                                          std::vector<Player*> const& party)
+{
+    std::vector<DungeonInfo const*> out;
+    for (DungeonInfo const* dg : dungeons)
+        if (CanPartyEnter(party, dg->MapId))
+            out.push_back(dg);
+    return out;
+}
+
+Player* AtlasMgr::FindAtInstanceCap(std::vector<Player*> const& party)
+{
+    // Every echo is a fresh instance, so it counts against the hourly cap.
+    // Game masters bypass the cap in MapMgr::PlayerCannotEnter.
+    for (Player* p : party)
+        if (!p->IsGameMaster() && !p->CheckInstanceCount(0))
+            return p;
+    return nullptr;
+}
+
+std::string AtlasMgr::InstanceCapNotice(Player const* capped)
+{
+    return Acore::StringFormat(
+        "{} The timeways are strained: |cFFFFFFFF{}|r has entered {} dungeons within the hour, "
+        "as many as this realm allows. Rest until an hour has passed since the first of them.",
+        CHAT_PREFIX, capped->GetName(), sWorld->getIntConfig(CONFIG_MAX_INSTANCES_PER_HOUR));
 }
 
 // Player Statistics & Leaderboard

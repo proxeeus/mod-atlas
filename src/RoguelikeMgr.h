@@ -8,7 +8,10 @@
 
 #include "RoguelikeTypes.h"
 #include <mutex>
+#include <set>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 class Player;
 class Group;
@@ -82,7 +85,15 @@ public:
 private:
     void BuildAffixPool();
     void SelectAffixesForTier(RoguelikeRun& run);
-    uint32 SelectRandomDungeon(RoguelikeRun const& run) const;
+    uint32 PickFloorTheme(RoguelikeRun const& run) const;
+    // A dungeon in the run's level range that the whole party may enter, skipping `tried`.
+    uint32 SelectRandomDungeon(RoguelikeRun const& run, std::vector<Player*> const& party,
+                               std::set<uint32> const& tried) const;
+    // Opens one floor on mapId; on failure no session is left behind.
+    bool OpenFloor(RoguelikeRun& run, Player* leader, uint32 mapId);
+    // Picks and opens a floor, rerolling past dungeons that still refuse the party.
+    // Returns the opened map, or 0.
+    uint32 OpenRandomFloor(RoguelikeRun& run, Player* leader, std::vector<Player*> const& party);
     bool TransitionToNextDungeon(RoguelikeRun& run);
     void TeleportRunPlayersOut(RoguelikeRun& run);
     void AnnounceCountdown(RoguelikeRun const& run, uint32 remainingSec);

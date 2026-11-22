@@ -10,7 +10,9 @@
 #include "AtlasConfig.h"
 #include <mutex>
 #include <map>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 class Player;
 class Group;
@@ -87,6 +89,18 @@ public:
     // _sessionMutex whenever _activeSessions changes.
     static bool HasActiveSessions();
     bool   CanCreateNewSession()   const;
+
+    // Entry checks run before a dungeon is picked, so a run never rolls one its
+    // party is turned away from. They mirror MapMgr::PlayerCannotEnter and say
+    // nothing to the players. GatherParty = the leader plus in-world group members.
+    static std::vector<Player*> GatherParty(Player* leader);
+    static bool                 CanPartyEnter(std::vector<Player*> const& party, uint32 mapId);
+    static std::vector<DungeonInfo const*> FilterEnterable(std::vector<DungeonInfo const*> const& dungeons,
+                                                           std::vector<Player*> const& party);
+    // First party member who may not enter another new dungeon this hour
+    // (AccountInstancesPerHour), or nullptr.
+    static Player*              FindAtInstanceCap(std::vector<Player*> const& party);
+    static std::string          InstanceCapNotice(Player const* capped);
 
     // Env damage scaling
     bool  IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creatureGuid);

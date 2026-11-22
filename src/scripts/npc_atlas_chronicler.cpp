@@ -27,6 +27,7 @@
 #include "AtlasConfig.h"
 #include <algorithm>
 #include <mutex>
+#include <vector>
 
 using namespace Atlas;
 
@@ -407,7 +408,9 @@ private:
         DifficultyTier const* diff = sAtlasConfig->GetDifficulty(diffId);
         if (!diff) { player->PlayerTalkClass->SendCloseGossip(); return; }
 
-        auto dungeons = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
+        // Only dungeons the whole party may enter (attunement quests, item level).
+        auto dungeons = AtlasMgr::FilterEnterable(
+            sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel), AtlasMgr::GatherParty(player));
 
         // Clamp page in case the dungeon list shrank or page ran past the end.
         uint32 total      = static_cast<uint32>(dungeons.size());
@@ -439,7 +442,7 @@ private:
 
         if (dungeons.empty())
             AddGossipItemFor(player, GOSSIP_ICON_CHAT,
-                "No echo can be reached from here.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
+                "No echo here would admit your whole party.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
 
         // Page navigation, rendered conditionally.
         if (page > 0)
@@ -798,17 +801,33 @@ private:
             return;
         }
 
+        // An echo is a new instance: refuse up front rather than at the door.
+        std::vector<Player*> const party = AtlasMgr::GatherParty(player);
+        if (Player* capped = AtlasMgr::FindAtInstanceCap(party))
+        {
+            chat.SendSysMessage(AtlasMgr::InstanceCapNotice(capped));
+            return;
+        }
+
         // Resolve "let the timeways choose"
         uint32 mapId = sel.MapId;
         if (mapId == 0)
         {
-            auto dgs = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
+            auto dgs = AtlasMgr::FilterEnterable(
+                sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel), party);
             if (dgs.empty())
             {
-                chat.PSendSysMessage("{} No echo can be reached from here.", CHAT_PREFIX);
+                chat.PSendSysMessage("{} No echo here would admit your whole party.", CHAT_PREFIX);
                 return;
             }
             mapId = dgs[urand(0, static_cast<uint32>(dgs.size()) - 1)]->MapId;
+        }
+        else if (!AtlasMgr::CanPartyEnter(party, mapId))
+        {
+            // The party changed since the list was shown.
+            chat.PSendSysMessage("{} That echo is sealed to someone in your party: it asks for an "
+                "attunement quest or an item level they lack.", CHAT_PREFIX);
+            return;
         }
 
         Session* s = sAtlasMgr->CreateSession(player, sel.DifficultyId, sel.ThemeId, mapId, sel.ScaleToParty);
