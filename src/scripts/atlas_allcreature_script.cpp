@@ -1,8 +1,8 @@
 /*
- * mod-dungeon-master - dm_allcreature_script.cpp
+ * mod-atlas - atlas_allcreature_script.cpp
  *
- * Keeps Dungeon Master creature levels from being reverted, and clamps adds
- * summoned by Dungeon Master creatures.
+ * Keeps Atlas creature levels from being reverted, and clamps adds
+ * summoned by Atlas creatures.
  *
  * Two independent mechanisms revert an assigned level:
  *
@@ -14,7 +14,7 @@
  *   2. Another module calling SetLevel() from its own update hook. mod-autobalance
  *      is the common case: it hooks OnPlayerLevelChanged, marks every creature on
  *      the map stale, and ResetCreatureIfNeeded() then calls
- *      SetLevel(UnmodifiedLevel) — the template value. This is why Dungeon Master
+ *      SetLevel(UnmodifiedLevel) — the template value. This is why Atlas
  *      mobs sprout a skull the moment a party member levels up.
  *
  * Case 2 is a plain SetLevel() from outside this module, so no core hook can
@@ -29,29 +29,29 @@
 #include "Map.h"
 #include "Player.h"
 #include "TemporarySummon.h"
-#include "DungeonMasterMgr.h"
-#include "DMConfig.h"
+#include "AtlasMgr.h"
+#include "AtlasConfig.h"
 
-using namespace DungeonMaster;
+using namespace Atlas;
 
-class dm_allcreature_script : public AllCreatureScript
+class atlas_allcreature_script : public AllCreatureScript
 {
 public:
-    dm_allcreature_script() : AllCreatureScript("dm_allcreature_script") {}
+    atlas_allcreature_script() : AllCreatureScript("atlas_allcreature_script") {}
 
     // Runs inside Creature::SelectLevel(), before the rolled level is applied.
     void OnBeforeCreatureSelectLevel(CreatureTemplate const* /*cinfo*/, Creature* creature, uint8& level) override
     {
-        if (!creature || !sDMConfig->IsEnabled() || !DungeonMasterMgr::HasOwnedCreatures())
+        if (!creature || !sAtlasConfig->IsEnabled() || !AtlasMgr::HasOwnedCreatures())
             return;
 
         uint8  owned   = 0;
         uint32 ownedHp = 0;
-        if (sDungeonMasterMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp) && owned)
+        if (sAtlasMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp) && owned)
             level = owned;
     }
 
-    // Clamp adds summoned by Dungeon Master creatures. Player pets, totems and
+    // Clamp adds summoned by Atlas creatures. Player pets, totems and
     // guardians are left alone — they belong to the player, not the dungeon.
     void OnCreatureAddWorld(Creature* creature) override
     {
@@ -61,9 +61,9 @@ public:
         // The city NPC spawns come from world DB rows, so they exist even while
         // the module is disabled. Hide them and drop the gossip flag so a
         // disabled module leaves nothing behind in the cities (upstream #4).
-        if (!sDMConfig->IsEnabled())
+        if (!sAtlasConfig->IsEnabled())
         {
-            if (creature->GetEntry() == sDMConfig->GetNpcEntry())
+            if (creature->GetEntry() == sAtlasConfig->GetNpcEntry())
             {
                 creature->SetVisible(false);
                 creature->RemoveNpcFlag(UNIT_NPC_FLAG_GOSSIP);
@@ -71,7 +71,7 @@ public:
             return;
         }
 
-        if (!DungeonMasterMgr::HasActiveSessions())
+        if (!AtlasMgr::HasActiveSessions())
             return;
 
         Map* map = creature->GetMap();
@@ -91,23 +91,23 @@ public:
         // Already owned (the module's own spawn path registers during scaling).
         uint8  owned   = 0;
         uint32 ownedHp = 0;
-        if (sDungeonMasterMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp))
+        if (sAtlasMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp))
             return;
 
-        Session* session = sDungeonMasterMgr->GetSessionByInstance(instanceId);
+        Session* session = sAtlasMgr->GetSessionByInstance(instanceId);
         if (!session || !session->IsActive())
             return;
 
         if (creature->GetLevel() == session->EffectiveLevel)
             return;
 
-        sDungeonMasterMgr->ScaleSummonedCreature(creature, session);
+        sAtlasMgr->ScaleSummonedCreature(creature, session);
     }
 
     // Re-assert against silent external SetLevel() calls.
     void OnAllCreatureUpdate(Creature* creature, uint32 /*diff*/) override
     {
-        if (!creature || !sDMConfig->IsEnabled() || !DungeonMasterMgr::HasOwnedCreatures())
+        if (!creature || !sAtlasConfig->IsEnabled() || !AtlasMgr::HasOwnedCreatures())
             return;
 
         // Cheap gate: creatures are only ever owned inside instanced dungeons.
@@ -117,7 +117,7 @@ public:
 
         uint8  owned   = 0;
         uint32 ownedHp = 0;
-        if (!sDungeonMasterMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp) || !owned)
+        if (!sAtlasMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp) || !owned)
             return;
 
         if (creature->GetLevel() == owned)
@@ -137,14 +137,14 @@ public:
 
     void OnCreatureRemoveWorld(Creature* creature) override
     {
-        if (!creature || !DungeonMasterMgr::HasOwnedCreatures())
+        if (!creature || !AtlasMgr::HasOwnedCreatures())
             return;
 
-        sDungeonMasterMgr->ForgetOwnedCreature(creature->GetGUID());
+        sAtlasMgr->ForgetOwnedCreature(creature->GetGUID());
     }
 };
 
-void AddSC_dm_allcreature_script()
+void AddSC_atlas_allcreature_script()
 {
-    new dm_allcreature_script();
+    new atlas_allcreature_script();
 }

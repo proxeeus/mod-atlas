@@ -1,12 +1,12 @@
 /*
- * mod-dungeon-master — npc_dungeon_master.cpp
+ * mod-atlas — npc_atlas_chronicler.cpp
  * Gossip NPC (Chronicler Esmadormu, Keepers of Time): menu flow for
  * difficulty / theme / dungeon selection of an "echo" run.
  *
  * Lore frame: the bronze dragonflight opens echoes of known dungeons from
  * fractured timelines, where the halls belong to other masters (the chosen
  * creature theme). The endless mode descends through ever less stable
- * timeways. Internal names (classes, config keys) keep "DungeonMaster".
+ * timeways. Internal names (classes, config keys) keep "Atlas".
  */
 
 #include "ScriptMgr.h"
@@ -21,17 +21,17 @@
 #include "ObjectAccessor.h"
 #include "Random.h"
 #include "StringFormat.h"
-#include "DungeonMasterMgr.h"
+#include "AtlasMgr.h"
 #include "RoguelikeMgr.h"
 #include "RoguelikeTypes.h"
-#include "DMConfig.h"
+#include "AtlasConfig.h"
 #include <algorithm>
 #include <mutex>
 
-using namespace DungeonMaster;
+using namespace Atlas;
 
 // Gossip action IDs (encoded so ranges never overlap)
-enum DMGossipActions
+enum AtlasGossipActions
 {
     GOSSIP_ACTION_MAIN_START    = 1,
     GOSSIP_ACTION_MAIN_INFO     = 2,
@@ -72,7 +72,7 @@ enum DMGossipActions
 
 namespace
 {
-    // Greeting text (npc_text row in dm_setup.sql).
+    // Greeting text (npc_text row in atlas_world_setup.sql).
     constexpr uint32 NPC_TEXT_GREETING = 500000;
 
     std::string FormatTime(uint32 seconds)
@@ -102,25 +102,25 @@ struct PlayerDMSelection
 static std::unordered_map<ObjectGuid, PlayerDMSelection> sSelections;
 static std::mutex sSelMutex;
 
-class npc_dungeon_master : public CreatureScript
+class npc_atlas_chronicler : public CreatureScript
 {
 public:
-    npc_dungeon_master() : CreatureScript("npc_dungeon_master") { }
+    npc_atlas_chronicler() : CreatureScript("npc_atlas_chronicler") { }
 
     bool OnGossipHello(Player* player, Creature* creature) override
     {
         ChatHandler chat(player->GetSession());
 
-        if (!sDMConfig->IsEnabled())
+        if (!sAtlasConfig->IsEnabled())
         {
             chat.PSendSysMessage("{} The timeways are closed for now.", CHAT_PREFIX);
             player->PlayerTalkClass->SendCloseGossip();
             return true;
         }
 
-        if (sDungeonMasterMgr->GetSessionByPlayer(player->GetGUID()))
+        if (sAtlasMgr->GetSessionByPlayer(player->GetGUID()))
         {
-            LOG_INFO("module", "DungeonMaster: NPC blocked {} — still in active session", player->GetName());
+            LOG_INFO("module", "Atlas: NPC blocked {} — still in active session", player->GetName());
             chat.PSendSysMessage("{} You are already walking an echo.", CHAT_PREFIX);
             player->PlayerTalkClass->SendCloseGossip();
             return true;
@@ -146,10 +146,10 @@ public:
             return true;
         }
 
-        if (sDungeonMasterMgr->IsOnCooldown(player->GetGUID()))
+        if (sAtlasMgr->IsOnCooldown(player->GetGUID()))
         {
-            uint32 rem = sDungeonMasterMgr->GetRemainingCooldown(player->GetGUID());
-            LOG_INFO("module", "DungeonMaster: NPC blocked {} — cooldown {}s remaining", player->GetName(), rem);
+            uint32 rem = sAtlasMgr->GetRemainingCooldown(player->GetGUID());
+            LOG_INFO("module", "Atlas: NPC blocked {} — cooldown {}s remaining", player->GetName(), rem);
             chat.PSendSysMessage(
                 "{} The timeways need |cFFFFFFFF{}|r min |cFFFFFFFF{}|r sec to settle before your next echo.",
                 CHAT_PREFIX, rem / 60, rem % 60);
@@ -168,7 +168,7 @@ public:
 
         if (action == GOSSIP_ACTION_MAIN_START)
         {
-            if (!sDungeonMasterMgr->CanCreateNewSession())
+            if (!sAtlasMgr->CanCreateNewSession())
             {
                 chat.PSendSysMessage("{} Too many echoes are open at once. Return shortly.", CHAT_PREFIX);
                 player->PlayerTalkClass->SendCloseGossip();
@@ -310,7 +310,7 @@ private:
         player->PlayerTalkClass->ClearMenus();
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "Show me an echo to walk.",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_MAIN_START);
-        if (sDMConfig->IsRoguelikeEnabled())
+        if (sAtlasConfig->IsRoguelikeEnabled())
             AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFFCD7F32I will descend the Endless Timeways.|r",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_START);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "What are these echoes?",
@@ -340,7 +340,7 @@ private:
         player->PlayerTalkClass->ClearMenus();
         uint8 lvl = player->GetLevel();
 
-        for (auto const& d : sDMConfig->GetDifficulties())
+        for (auto const& d : sAtlasConfig->GetDifficulties())
             AddGossipItemFor(player,
                 d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, false), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
@@ -359,10 +359,10 @@ private:
           if (it == sSelections.end()) { player->PlayerTalkClass->SendCloseGossip(); return; }
           sel = it->second; }
 
-        DifficultyTier const* diff = sDMConfig->GetDifficulty(sel.DifficultyId);
+        DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
         if (!diff) { player->PlayerTalkClass->SendCloseGossip(); return; }
 
-        uint8 partyLevel = sDungeonMasterMgr->ComputeEffectiveLevel(player);
+        uint8 partyLevel = sAtlasMgr->ComputeEffectiveLevel(player);
 
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE,
             Acore::StringFormat("|cFF00FF00Attune the echo to my party|r (Lv {}) — a full challenge at your level",
@@ -380,7 +380,7 @@ private:
     void ShowThemeMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
-        for (auto const& t : sDMConfig->GetThemes())
+        for (auto const& t : sAtlasConfig->GetThemes())
             AddGossipItemFor(player, GOSSIP_ICON_BATTLE, t.Name, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_THEME_BASE + t.Id);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
@@ -404,10 +404,10 @@ private:
           diffId = it->second.DifficultyId;
           page   = it->second.DungeonPage; }
 
-        DifficultyTier const* diff = sDMConfig->GetDifficulty(diffId);
+        DifficultyTier const* diff = sAtlasConfig->GetDifficulty(diffId);
         if (!diff) { player->PlayerTalkClass->SendCloseGossip(); return; }
 
-        auto dungeons = sDMConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
+        auto dungeons = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
 
         // Clamp page in case the dungeon list shrank or page ran past the end.
         uint32 total      = static_cast<uint32>(dungeons.size());
@@ -463,12 +463,12 @@ private:
           if (it == sSelections.end()) { player->PlayerTalkClass->SendCloseGossip(); return; }
           sel = it->second; }
 
-        DifficultyTier const* diff = sDMConfig->GetDifficulty(sel.DifficultyId);
-        Theme const*          theme = sDMConfig->GetTheme(sel.ThemeId);
+        DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
+        Theme const*          theme = sAtlasConfig->GetTheme(sel.ThemeId);
 
         std::string dgName = "Chosen by the timeways";
         if (sel.MapId > 0)
-            if (DungeonInfo const* dg = sDMConfig->GetDungeon(sel.MapId))
+            if (DungeonInfo const* dg = sAtlasConfig->GetDungeon(sel.MapId))
                 dgName = dg->Name;
 
         Group* g = player->GetGroup();
@@ -516,7 +516,7 @@ private:
         player->PlayerTalkClass->ClearMenus();
         AddGossipItemFor(player, GOSSIP_ICON_TABARD, "My echoes",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_NORMAL);
-        if (sDMConfig->IsRoguelikeEnabled())
+        if (sAtlasConfig->IsRoguelikeEnabled())
             AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFCD7F32My descents into the Endless Timeways|r",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_ROGUELIKE);
         AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFFFD700Chronicles of the fastest and deepest|r",
@@ -529,7 +529,7 @@ private:
     void ShowNormalStats(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
-        PlayerStats st = sDungeonMasterMgr->GetPlayerStats(player->GetGUID());
+        PlayerStats st = sAtlasMgr->GetPlayerStats(player->GetGUID());
         ChatHandler chat(player->GetSession());
 
         chat.SendSysMessage("|cFFFFD700═══════════ My Echoes ═══════════|r");
@@ -604,7 +604,7 @@ private:
         AddGossipItemFor(player, GOSSIP_ICON_TABARD,
             "|cFFFFD700Echoes — fastest mended|r",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_NORMAL);
-        if (sDMConfig->IsRoguelikeEnabled())
+        if (sAtlasConfig->IsRoguelikeEnabled())
         {
             AddGossipItemFor(player, GOSSIP_ICON_TABARD,
                 "|cFFCD7F32Endless Timeways — deepest descents|r",
@@ -622,7 +622,7 @@ private:
     {
         player->PlayerTalkClass->ClearMenus();
 
-        auto entries = sDungeonMasterMgr->GetOverallLeaderboard(10);
+        auto entries = sAtlasMgr->GetOverallLeaderboard(10);
         ChatHandler chat(player->GetSession());
 
         chat.SendSysMessage("|cFFFFD700═══════ Echoes — Fastest Mended ═══════|r");
@@ -636,8 +636,8 @@ private:
             for (auto const& e : entries)
             {
                 ++rank;
-                DifficultyTier const* diff = sDMConfig->GetDifficulty(e.DifficultyId);
-                DungeonInfo const* dg = sDMConfig->GetDungeon(e.MapId);
+                DifficultyTier const* diff = sAtlasConfig->GetDifficulty(e.DifficultyId);
+                DungeonInfo const* dg = sAtlasConfig->GetDungeon(e.MapId);
                 bool isMe = (e.Guid == myGuid);
 
                 chat.PSendSysMessage("  {}#{}|r |cFFFFFFFF{}|r — |cFF00FFFF{}|r — {} ({}) {}P{}{}",
@@ -704,7 +704,7 @@ private:
         chat.SendSysMessage("|cFFFF0000If your whole party falls, the descent ends.|r");
         chat.SendSysMessage("|cFFCD7F32==========================================|r");
 
-        for (auto const& d : sDMConfig->GetDifficulties())
+        for (auto const& d : sAtlasConfig->GetDifficulties())
             AddGossipItemFor(player,
                 d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, true), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
@@ -718,7 +718,7 @@ private:
     {
         player->PlayerTalkClass->ClearMenus();
 
-        uint8 partyLevel = sDungeonMasterMgr->ComputeEffectiveLevel(player);
+        uint8 partyLevel = sAtlasMgr->ComputeEffectiveLevel(player);
 
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE,
             Acore::StringFormat("|cFF00FF00Attune the echoes to my party|r (Lv {})", partyLevel),
@@ -734,7 +734,7 @@ private:
     void ShowRoguelikeThemeMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
-        for (auto const& t : sDMConfig->GetThemes())
+        for (auto const& t : sAtlasConfig->GetThemes())
             AddGossipItemFor(player, GOSSIP_ICON_BATTLE, t.Name,
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_THEME + t.Id);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
@@ -758,7 +758,7 @@ private:
           sel = it->second;
           sSelections.erase(it); }
 
-        DifficultyTier const* diff = sDMConfig->GetDifficulty(sel.DifficultyId);
+        DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
         if (!diff || !diff->IsValidForLevel(player->GetLevel()))
         {
             chat.PSendSysMessage("{} You are not yet ready for echoes this strong.", CHAT_PREFIX_ENDLESS);
@@ -791,7 +791,7 @@ private:
           sel = it->second;
           sSelections.erase(it); }
 
-        DifficultyTier const* diff = sDMConfig->GetDifficulty(sel.DifficultyId);
+        DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
         if (!diff || !diff->IsValidForLevel(player->GetLevel()))
         {
             chat.PSendSysMessage("{} You are not yet ready for an echo this strong.", CHAT_PREFIX);
@@ -802,7 +802,7 @@ private:
         uint32 mapId = sel.MapId;
         if (mapId == 0)
         {
-            auto dgs = sDMConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
+            auto dgs = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
             if (dgs.empty())
             {
                 chat.PSendSysMessage("{} No echo can be reached from here.", CHAT_PREFIX);
@@ -811,31 +811,31 @@ private:
             mapId = dgs[urand(0, static_cast<uint32>(dgs.size()) - 1)]->MapId;
         }
 
-        Session* s = sDungeonMasterMgr->CreateSession(player, sel.DifficultyId, sel.ThemeId, mapId, sel.ScaleToParty);
+        Session* s = sAtlasMgr->CreateSession(player, sel.DifficultyId, sel.ThemeId, mapId, sel.ScaleToParty);
         if (!s)
         {
             chat.PSendSysMessage("{} The echo would not hold. Try again later.", CHAT_PREFIX);
             return;
         }
 
-        if (!sDungeonMasterMgr->StartDungeon(s))
+        if (!sAtlasMgr->StartDungeon(s))
         {
             chat.PSendSysMessage("{} The echo could not be opened.", CHAT_PREFIX);
-            sDungeonMasterMgr->AbandonSession(s->SessionId);
+            sAtlasMgr->AbandonSession(s->SessionId);
             return;
         }
 
-        if (!sDungeonMasterMgr->TeleportPartyIn(s))
+        if (!sAtlasMgr->TeleportPartyIn(s))
         {
             chat.PSendSysMessage("{} The timeways would not carry you.", CHAT_PREFIX);
-            sDungeonMasterMgr->AbandonSession(s->SessionId);
+            sAtlasMgr->AbandonSession(s->SessionId);
             return;
         }
 
-        if (sDMConfig->ShouldAnnounceCompletion())
+        if (sAtlasConfig->ShouldAnnounceCompletion())
         {
-            Theme const* theme = sDMConfig->GetTheme(sel.ThemeId);
-            DungeonInfo const* dg = sDMConfig->GetDungeon(mapId);
+            Theme const* theme = sAtlasConfig->GetTheme(sel.ThemeId);
+            DungeonInfo const* dg = sAtlasConfig->GetDungeon(mapId);
 
             std::string const opened = Acore::StringFormat(
                 "{} |cFFFFFFFF{}|r opened a |cFFFFD700{}|r echo: |cFF00FFFF{}|r.",
@@ -856,7 +856,7 @@ private:
     }
 };
 
-void AddSC_npc_dungeon_master()
+void AddSC_npc_atlas_chronicler()
 {
-    new npc_dungeon_master();
+    new npc_atlas_chronicler();
 }

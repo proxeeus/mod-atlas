@@ -1,5 +1,5 @@
 -- =============================================
--- Dungeon Master Module - Characters DB Setup
+-- mod-atlas (V0) - Characters DB Setup
 -- =============================================
 -- Run this on your CHARACTERS database (not world).
 -- Creates tables for persistent player statistics
@@ -9,7 +9,7 @@
 -- ---------------------------------------------------------------------------
 -- Normal run player stats (standalone challenges only)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `dm_player_stats` (
+CREATE TABLE IF NOT EXISTS `atlas_player_stats` (
     `guid`               INT UNSIGNED NOT NULL,
     `total_runs`         INT UNSIGNED NOT NULL DEFAULT 0,
     `completed_runs`     INT UNSIGNED NOT NULL DEFAULT 0,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS `dm_player_stats` (
 -- ---------------------------------------------------------------------------
 -- Normal run leaderboard (fastest clears per dungeon/difficulty)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `dm_leaderboard` (
+CREATE TABLE IF NOT EXISTS `atlas_leaderboard` (
     `id`              INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `guid`            INT UNSIGNED NOT NULL,
     `char_name`       VARCHAR(48)  NOT NULL DEFAULT '',
@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS `dm_leaderboard` (
 -- ---------------------------------------------------------------------------
 -- Roguelike player stats (roguelike mode only — separate from normal)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `dm_roguelike_player_stats` (
+CREATE TABLE IF NOT EXISTS `atlas_roguelike_player_stats` (
     `guid`                 INT UNSIGNED NOT NULL,
     `total_runs`           INT UNSIGNED NOT NULL DEFAULT 0,
     `highest_tier`         INT UNSIGNED NOT NULL DEFAULT 0,
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS `dm_roguelike_player_stats` (
 -- those instances at startup, so nobody is left saved to an emptied dungeon.
 -- Rows are removed as soon as a run ends normally.
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `dm_open_instance` (
+CREATE TABLE IF NOT EXISTS `atlas_open_instance` (
     `instance_id` INT UNSIGNED NOT NULL,
     `map_id`      SMALLINT UNSIGNED NOT NULL,
     `opened_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `dm_open_instance` (
 -- ---------------------------------------------------------------------------
 -- Roguelike leaderboard (sorted by tier reached, then floors, then speed)
 -- ---------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `dm_roguelike_leaderboard` (
+CREATE TABLE IF NOT EXISTS `atlas_roguelike_leaderboard` (
     `id`               INT UNSIGNED NOT NULL AUTO_INCREMENT,
     `guid`             INT UNSIGNED NOT NULL,
     `char_name`        VARCHAR(64)  NOT NULL DEFAULT '',
@@ -93,34 +93,3 @@ CREATE TABLE IF NOT EXISTS `dm_roguelike_leaderboard` (
     INDEX `idx_floors` (`dungeons_cleared` DESC, `tier_reached` DESC),
     INDEX `idx_guid`   (`guid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- ---------------------------------------------------------------------------
--- MIGRATION: If upgrading from a previous version, this adds new columns
--- to existing tables.  Safe to run on fresh installs (columns already exist).
--- ---------------------------------------------------------------------------
-DROP PROCEDURE IF EXISTS `dm_migrate`;
-DELIMITER //
-CREATE PROCEDURE `dm_migrate`()
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_leaderboard' AND COLUMN_NAME = 'effective_level') THEN
-        ALTER TABLE `dm_leaderboard` ADD COLUMN `effective_level` TINYINT UNSIGNED NOT NULL DEFAULT 0 AFTER `scaled`;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_leaderboard' AND COLUMN_NAME = 'mobs_killed') THEN
-        ALTER TABLE `dm_leaderboard` ADD COLUMN `mobs_killed` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `effective_level`;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_leaderboard' AND COLUMN_NAME = 'bosses_killed') THEN
-        ALTER TABLE `dm_leaderboard` ADD COLUMN `bosses_killed` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `mobs_killed`;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_leaderboard' AND COLUMN_NAME = 'deaths') THEN
-        ALTER TABLE `dm_leaderboard` ADD COLUMN `deaths` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `bosses_killed`;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_roguelike_leaderboard' AND COLUMN_NAME = 'total_bosses') THEN
-        ALTER TABLE `dm_roguelike_leaderboard` ADD COLUMN `total_bosses` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `total_kills`;
-    END IF;
-    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'dm_roguelike_leaderboard' AND COLUMN_NAME = 'total_deaths') THEN
-        ALTER TABLE `dm_roguelike_leaderboard` ADD COLUMN `total_deaths` INT UNSIGNED NOT NULL DEFAULT 0 AFTER `total_bosses`;
-    END IF;
-END //
-DELIMITER ;
-CALL `dm_migrate`();
-DROP PROCEDURE IF EXISTS `dm_migrate`;

@@ -1,5 +1,5 @@
 /*
- * mod-dungeon-master — dm_unit_script.cpp
+ * mod-atlas — atlas_unit_script.cpp
  * Scales ALL incoming damage for session players:
  *   - Session boss spells/melee: scaled by level ratio (template level → session level)
  *   - Session trash: already scaled by custom AI melee, passed through
@@ -11,17 +11,17 @@
 #include "Creature.h"
 #include "Map.h"
 #include "SpellInfo.h"
-#include "DungeonMasterMgr.h"
-#include "DMConfig.h"
+#include "AtlasMgr.h"
+#include "AtlasConfig.h"
 
-using namespace DungeonMaster;
+using namespace Atlas;
 
 static constexpr float ENV_DAMAGE_MAX_PCT = 0.03f;
 
-class dm_unit_script : public UnitScript
+class atlas_unit_script : public UnitScript
 {
 public:
-    dm_unit_script() : UnitScript("dm_unit_script") {}
+    atlas_unit_script() : UnitScript("atlas_unit_script") {}
 
     void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* /*spellInfo*/) override
     {
@@ -43,7 +43,7 @@ public:
 
     void OnUnitDeath(Unit* unit, Unit* killer) override
     {
-        if (!sDMConfig->IsEnabled() || !unit || !DungeonMasterMgr::HasActiveSessions())
+        if (!sAtlasConfig->IsEnabled() || !unit || !AtlasMgr::HasActiveSessions())
             return;
 
         Creature* creature = unit->ToCreature();
@@ -60,7 +60,7 @@ public:
 
         Session* session = nullptr;
         if (player)
-            session = sDungeonMasterMgr->GetSessionByPlayer(player->GetGUID());
+            session = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
 
         if (!session || !session->IsActive())
             return;
@@ -68,7 +68,7 @@ public:
         if (creature->GetMapId() != session->MapId)
             return;
 
-        sDungeonMasterMgr->HandleCreatureDeath(creature, session);
+        sAtlasMgr->HandleCreatureDeath(creature, session);
     }
 
 private:
@@ -77,7 +77,7 @@ private:
         // Runs for every damage event on the server: bail out before taking
         // the session mutex unless a session exists and the target is in a
         // dungeon (sessions only ever run in dungeon instances).
-        if (!sDMConfig->IsEnabled() || damage == 0 || !DungeonMasterMgr::HasActiveSessions())
+        if (!sAtlasConfig->IsEnabled() || damage == 0 || !AtlasMgr::HasActiveSessions())
             return;
 
         Player* player = target ? target->ToPlayer() : nullptr;
@@ -89,7 +89,7 @@ private:
 
         ObjectGuid playerGuid = player->GetGUID();
 
-        if (!sDungeonMasterMgr->GetSessionByPlayer(playerGuid))
+        if (!sAtlasMgr->GetSessionByPlayer(playerGuid))
             return;
 
         if (attacker)
@@ -97,9 +97,9 @@ private:
             ObjectGuid attackerGuid = attacker->GetGUID();
 
             // Session creature damage — scale bosses, pass through trash
-            if (sDungeonMasterMgr->IsSessionCreature(playerGuid, attackerGuid))
+            if (sAtlasMgr->IsSessionCreature(playerGuid, attackerGuid))
             {
-                float scale = sDungeonMasterMgr->GetSessionCreatureDamageScale(
+                float scale = sAtlasMgr->GetSessionCreatureDamageScale(
                     playerGuid, attackerGuid);
 
                 if (scale < 1.0f)
@@ -112,7 +112,7 @@ private:
             // capped like a hazard (the cap made them deal at most 3% max HP).
             if (Creature const* creature = attacker->ToCreature())
             {
-                float scale = sDungeonMasterMgr->GetOwnedCreatureDamageScale(playerGuid, creature);
+                float scale = sAtlasMgr->GetOwnedCreatureDamageScale(playerGuid, creature);
                 if (scale >= 0.0f)
                 {
                     if (scale < 1.0f)
@@ -125,7 +125,7 @@ private:
 
         // Anything else (no attacker, or a creature the run doesn't own:
         // environmental hazards, traps, leftover dungeon scripts)
-        float envScale = sDungeonMasterMgr->GetEnvironmentalDamageScale(playerGuid);
+        float envScale = sAtlasMgr->GetEnvironmentalDamageScale(playerGuid);
         if (envScale < 1.0f)
             damage = static_cast<uint32>(damage * envScale);
 
@@ -140,7 +140,7 @@ private:
     }
 };
 
-void AddSC_dm_unit_script()
+void AddSC_atlas_unit_script()
 {
-    new dm_unit_script();
+    new atlas_unit_script();
 }

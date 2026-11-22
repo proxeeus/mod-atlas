@@ -1,6 +1,6 @@
 /*
- * mod-dungeon-master — dm_command_script.cpp
- * GM commands: .dm reload, .dm status, .dm list, .dm end, .dm clearcooldown
+ * mod-atlas — atlas_command_script.cpp
+ * GM commands: .atlas reload, .atlas status, .atlas list, .atlas end, .atlas clearcooldown
  */
 
 #include "ScriptMgr.h"
@@ -8,20 +8,20 @@
 #include "ChatCommand.h"
 #include "Player.h"
 #include "Group.h"
-#include "DungeonMasterMgr.h"
-#include "DMConfig.h"
+#include "AtlasMgr.h"
+#include "AtlasConfig.h"
 
 using namespace Acore::ChatCommands;
-using namespace DungeonMaster;
+using namespace Atlas;
 
-class dm_command_script : public CommandScript
+class atlas_command_script : public CommandScript
 {
 public:
-    dm_command_script() : CommandScript("dm_command_script") {}
+    atlas_command_script() : CommandScript("atlas_command_script") {}
 
     ChatCommandTable GetCommands() const override
     {
-        static ChatCommandTable dmTable =
+        static ChatCommandTable atlasTable =
         {
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
@@ -29,35 +29,35 @@ public:
             { "end",           HandleEnd,            SEC_ADMINISTRATOR,  Console::No  },
             { "clearcooldown", HandleClearCD,        SEC_GAMEMASTER,     Console::No  },
         };
-        static ChatCommandTable root = { { "dm", dmTable } };
+        static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
     }
 
     static bool HandleReload(ChatHandler* h)
     {
-        sDMConfig->LoadConfig(true);
+        sAtlasConfig->LoadConfig(true);
         // Dungeon list or boss count may have changed: rebuild the cached
         // entrances / spawn points too (guarded by their own mutex).
-        sDungeonMasterMgr->LoadDungeonGeometry();
-        h->SendSysMessage("DungeonMaster: Configuration and dungeon geometry reloaded.");
+        sAtlasMgr->LoadDungeonGeometry();
+        h->SendSysMessage("Atlas: Configuration and dungeon geometry reloaded.");
         return true;
     }
 
     static bool HandleStatus(ChatHandler* h)
     {
-        h->SendSysMessage("=== Dungeon Master (Keepers of Time) Status ===");
-        h->PSendSysMessage("Enabled: {}", sDMConfig->IsEnabled() ? "Yes" : "No");
+        h->SendSysMessage("=== Atlas (V0, Keepers of Time) Status ===");
+        h->PSendSysMessage("Enabled: {}", sAtlasConfig->IsEnabled() ? "Yes" : "No");
         h->PSendSysMessage("Active: {} / {}",
-            sDungeonMasterMgr->GetActiveSessionCount(), sDMConfig->GetMaxConcurrentRuns());
-        h->PSendSysMessage("Level Band: +/-{}", sDMConfig->GetLevelBand());
+            sAtlasMgr->GetActiveSessionCount(), sAtlasConfig->GetMaxConcurrentRuns());
+        h->PSendSysMessage("Level Band: +/-{}", sAtlasConfig->GetLevelBand());
         h->PSendSysMessage("Difficulties: {}  Themes: {}  Dungeons: {}",
-            sDMConfig->GetDifficulties().size(), sDMConfig->GetThemes().size(), sDMConfig->GetDungeons().size());
+            sAtlasConfig->GetDifficulties().size(), sAtlasConfig->GetThemes().size(), sAtlasConfig->GetDungeons().size());
         return true;
     }
 
     static bool HandleList(ChatHandler* h)
     {
-        h->PSendSysMessage("Active DM sessions: {}", sDungeonMasterMgr->GetActiveSessionCount());
+        h->PSendSysMessage("Active DM sessions: {}", sAtlasMgr->GetActiveSessionCount());
         return true;
     }
 
@@ -65,26 +65,26 @@ public:
     {
         if (sessionId)
         {
-            if (!sDungeonMasterMgr->GetSession(*sessionId))
+            if (!sAtlasMgr->GetSession(*sessionId))
             {
                 h->PSendSysMessage("Session {} not found.", *sessionId);
                 return false;
             }
 
-            sDungeonMasterMgr->EndSession(*sessionId, false);
+            sAtlasMgr->EndSession(*sessionId, false);
             h->PSendSysMessage("Session {} ended.", *sessionId);
             return true;
         }
 
         // Try the invoker's own session first
         Player* invoker = h->GetSession() ? h->GetSession()->GetPlayer() : nullptr;
-        Session* s = invoker ? sDungeonMasterMgr->GetSessionByPlayer(invoker->GetGUID()) : nullptr;
+        Session* s = invoker ? sAtlasMgr->GetSessionByPlayer(invoker->GetGUID()) : nullptr;
 
         // Fall back to selected player's session
         if (!s)
         {
             Player* t = h->getSelectedPlayer();
-            s = t ? sDungeonMasterMgr->GetSessionByPlayer(t->GetGUID()) : nullptr;
+            s = t ? sAtlasMgr->GetSessionByPlayer(t->GetGUID()) : nullptr;
         }
 
         if (!s)
@@ -94,7 +94,7 @@ public:
         }
 
         uint32 id = s->SessionId;
-        sDungeonMasterMgr->EndSession(id, false);
+        sAtlasMgr->EndSession(id, false);
         h->PSendSysMessage("Session {} ended (all players teleported out).", id);
         return true;
     }
@@ -116,7 +116,7 @@ public:
             {
                 if (Player* member = ref->GetSource())
                 {
-                    sDungeonMasterMgr->ClearCooldown(member->GetGUID());
+                    sAtlasMgr->ClearCooldown(member->GetGUID());
                     ++cleared;
                 }
             }
@@ -128,13 +128,13 @@ public:
         Player* t = h->getSelectedPlayer();
         if (!t)
             t = invoker;
-        sDungeonMasterMgr->ClearCooldown(t->GetGUID());
+        sAtlasMgr->ClearCooldown(t->GetGUID());
         h->PSendSysMessage("Cooldown cleared for {}.", t->GetName());
         return true;
     }
 };
 
-void AddSC_dm_command_script()
+void AddSC_atlas_command_script()
 {
-    new dm_command_script();
+    new atlas_command_script();
 }

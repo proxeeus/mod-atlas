@@ -5,7 +5,7 @@
 ########################################
 #
 # Procedural dungeon challenge system for AzerothCore.
-# Players talk to the Dungeon Master NPC, choose difficulty / theme / dungeon,
+# Players talk to Chronicler Esmadormu, choose difficulty / theme / dungeon,
 # then get teleported to an instance populated with level-appropriate themed
 # creatures.  Clear the dungeon and defeat the boss for rewards.
 #
@@ -14,35 +14,35 @@
 # CORE SETTINGS
 ###############################################################################
 
-#    DungeonMaster.Enable
+#    Atlas.Enable
 #        Master switch. While 0, nothing runs and the city NPCs are hidden.
 #        Default: 0
-DungeonMaster.Enable = 0
+Atlas.Enable = 0
 
-#    DungeonMaster.Debug
+#    Atlas.Debug
 #        Default: 0
-DungeonMaster.Debug = 0
+Atlas.Debug = 0
 
-#    DungeonMaster.NpcEntry
+#    Atlas.NpcEntry
 #        creature_template entry for the DM NPC
 #        Default: 500000
-DungeonMaster.NpcEntry = 500000
+Atlas.NpcEntry = 500000
 
 ###############################################################################
 # DIFFICULTY TIERS
 # Format: "Name,MinLevel,MaxLevel,HealthMult,DamageMult,RewardMult,MobMult"
 ###############################################################################
 
-DungeonMaster.Difficulty.1 = "Novice,10,19,0.6,0.6,1.0,0.5"
-DungeonMaster.Difficulty.2 = "Apprentice,20,29,0.8,0.8,1.5,0.7"
-DungeonMaster.Difficulty.3 = "Journeyman,30,44,1.0,1.0,2.0,0.85"
-DungeonMaster.Difficulty.4 = "Expert,45,59,1.3,1.2,3.0,1.0"
-DungeonMaster.Difficulty.5 = "Master,60,69,1.6,1.4,4.0,1.0"
-DungeonMaster.Difficulty.6 = "Grandmaster,70,80,2.0,1.6,6.0,1.2"
-DungeonMaster.Difficulty.7 = ""
-DungeonMaster.Difficulty.8 = ""
-DungeonMaster.Difficulty.9 = ""
-DungeonMaster.Difficulty.10 = ""
+Atlas.Difficulty.1 = "Novice,10,19,0.6,0.6,1.0,0.5"
+Atlas.Difficulty.2 = "Apprentice,20,29,0.8,0.8,1.5,0.7"
+Atlas.Difficulty.3 = "Journeyman,30,44,1.0,1.0,2.0,0.85"
+Atlas.Difficulty.4 = "Expert,45,59,1.3,1.2,3.0,1.0"
+Atlas.Difficulty.5 = "Master,60,69,1.6,1.4,4.0,1.0"
+Atlas.Difficulty.6 = "Grandmaster,70,80,2.0,1.6,6.0,1.2"
+Atlas.Difficulty.7 = ""
+Atlas.Difficulty.8 = ""
+Atlas.Difficulty.9 = ""
+Atlas.Difficulty.10 = ""
 
 ###############################################################################
 # SCALING
@@ -58,129 +58,129 @@ DungeonMaster.Difficulty.10 = ""
 #   Increase to 5 for more variety.  Decrease to 1-2 for strict matching.
 ###############################################################################
 
-#    DungeonMaster.Scaling.LevelBand
+#    Atlas.Scaling.LevelBand
 #        Creature selection window: effective_level ± this value
 #        Default: 3
-DungeonMaster.Scaling.LevelBand = 3
+Atlas.Scaling.LevelBand = 3
 
-#    DungeonMaster.Scaling.PerPlayerHealth
+#    Atlas.Scaling.PerPlayerHealth
 #        HP multiplier added per party member beyond the first
 #        Default: 0.25  (each extra player adds 25% HP)
-DungeonMaster.Scaling.PerPlayerHealth = 0.25
+Atlas.Scaling.PerPlayerHealth = 0.25
 
-#    DungeonMaster.Scaling.PerPlayerDamage
+#    Atlas.Scaling.PerPlayerDamage
 #        Damage multiplier added per extra party member
 #        Default: 0.1
-DungeonMaster.Scaling.PerPlayerDamage = 0.1
+Atlas.Scaling.PerPlayerDamage = 0.1
 
-#    DungeonMaster.Scaling.SoloMultiplier
+#    Atlas.Scaling.SoloMultiplier
 #        Overall difficulty reduction for solo players
 #        Default: 0.5  (creatures have 50% of normal stats)
-DungeonMaster.Scaling.SoloMultiplier = 0.5
+Atlas.Scaling.SoloMultiplier = 0.5
 
-#    DungeonMaster.Scaling.EliteHealthMult
+#    Atlas.Scaling.EliteHealthMult
 #        Health multiplier for elite trash mobs (on top of difficulty)
 #        Default: 2.0
-DungeonMaster.Scaling.EliteHealthMult = 2.0
+Atlas.Scaling.EliteHealthMult = 2.0
 
-#    DungeonMaster.Scaling.EliteDamageMult
+#    Atlas.Scaling.EliteDamageMult
 #        Damage multiplier for elite trash mobs
 #        Default: 1.5
-DungeonMaster.Scaling.EliteDamageMult = 1.5
+Atlas.Scaling.EliteDamageMult = 1.5
 
-#    DungeonMaster.Scaling.BossHealthMult
+#    Atlas.Scaling.BossHealthMult
 #        Health multiplier for bosses (on top of party scaling)
 #        Default: 8.0
-DungeonMaster.Scaling.BossHealthMult = 8.0
+Atlas.Scaling.BossHealthMult = 8.0
 
-#    DungeonMaster.Scaling.BossDamageMult
+#    Atlas.Scaling.BossDamageMult
 #        Damage multiplier for bosses (applied on top of party scaling only,
 #        NOT stacked with the difficulty tier's DamageMultiplier)
 #        Default: 1.5
-DungeonMaster.Scaling.BossDamageMult = 1.5
+Atlas.Scaling.BossDamageMult = 1.5
 
 ###############################################################################
 # VISUAL SCALE AND VARIETY
 # Keeps the full creature pool. Only visual size changes; recent entries are avoided when alternatives exist.
-DungeonMaster.VisualScale.Beast = 1.00
-DungeonMaster.VisualScale.Dragonkin = 0.85
-DungeonMaster.VisualScale.Demon = 0.95
-DungeonMaster.VisualScale.Elemental = 0.90
-DungeonMaster.VisualScale.Giant = 0.70
-DungeonMaster.VisualScale.Undead = 1.00
-DungeonMaster.VisualScale.Humanoid = 1.00
-DungeonMaster.VisualScale.Mechanical = 0.90
-DungeonMaster.Variety.RecentEntries = 12
+Atlas.VisualScale.Beast = 1.00
+Atlas.VisualScale.Dragonkin = 0.85
+Atlas.VisualScale.Demon = 0.95
+Atlas.VisualScale.Elemental = 0.90
+Atlas.VisualScale.Giant = 0.70
+Atlas.VisualScale.Undead = 1.00
+Atlas.VisualScale.Humanoid = 1.00
+Atlas.VisualScale.Mechanical = 0.90
+Atlas.Variety.RecentEntries = 12
 
 # REWARDS
 ###############################################################################
 
-#    DungeonMaster.Rewards.BaseGold    (copper)     Default: 50000 (5g)
-DungeonMaster.Rewards.BaseGold = 50000
+#    Atlas.Rewards.BaseGold    (copper)     Default: 50000 (5g)
+Atlas.Rewards.BaseGold = 50000
 
-#    DungeonMaster.Rewards.GoldPerMob  (copper)     Default: 50
-DungeonMaster.Rewards.GoldPerMob = 50
+#    Atlas.Rewards.GoldPerMob  (copper)     Default: 50
+Atlas.Rewards.GoldPerMob = 50
 
-#    DungeonMaster.Rewards.GoldPerBoss (copper)     Default: 10000 (1g)
-DungeonMaster.Rewards.GoldPerBoss = 10000
+#    Atlas.Rewards.GoldPerBoss (copper)     Default: 10000 (1g)
+Atlas.Rewards.GoldPerBoss = 10000
 
-#    DungeonMaster.Rewards.XPMultiplier             Default: 1.0
-DungeonMaster.Rewards.XPMultiplier = 1.0
+#    Atlas.Rewards.XPMultiplier             Default: 1.0
+Atlas.Rewards.XPMultiplier = 1.0
 
-#    DungeonMaster.Rewards.ItemChance  (0-100)      Default: 80
-DungeonMaster.Rewards.ItemChance = 80
+#    Atlas.Rewards.ItemChance  (0-100)      Default: 80
+Atlas.Rewards.ItemChance = 80
 
-#    DungeonMaster.Rewards.RareChance  (0-100)      Default: 40
-DungeonMaster.Rewards.RareChance = 40
+#    Atlas.Rewards.RareChance  (0-100)      Default: 40
+Atlas.Rewards.RareChance = 40
 
-#    DungeonMaster.Rewards.EpicChance  (0-100)      Default: 15
-DungeonMaster.Rewards.EpicChance = 15
+#    Atlas.Rewards.EpicChance  (0-100)      Default: 15
+Atlas.Rewards.EpicChance = 15
 
 ###############################################################################
 # DUNGEON SETTINGS
 ###############################################################################
 
-#    DungeonMaster.Dungeon.BossCount
+#    Atlas.Dungeon.BossCount
 #        Number of bosses (placed at furthest spawn points)
 #        Default: 1
-DungeonMaster.Dungeon.BossCount = 1
+Atlas.Dungeon.BossCount = 1
 
-#    DungeonMaster.Dungeon.EliteChance  (0-100)
+#    Atlas.Dungeon.EliteChance  (0-100)
 #        Chance for a trash mob to be elite (gets EliteHealthMult)
 #        Default: 20
-DungeonMaster.Dungeon.EliteChance = 20
+Atlas.Dungeon.EliteChance = 20
 
-#    DungeonMaster.Dungeon.AggroRadius
+#    Atlas.Dungeon.AggroRadius
 #        Detection radius for spawned creatures (in yards).
 #        Controls how far away a mob will detect and aggro players.
 #        Default: 15.0  (reduced from standard WoW ~20-45 range)
 #        Lower values (8-12) make dungeons feel less "swarm-y".
 #        Creatures patrol a 5 yd radius around their spawn points.
-DungeonMaster.Dungeon.AggroRadius = 15.0
+Atlas.Dungeon.AggroRadius = 15.0
 
-#    DungeonMaster.Dungeon.RareSpawnChance  (0-100)
+#    Atlas.Dungeon.RareSpawnChance  (0-100)
 #        Chance for a rare enemy to spawn per dungeon run (rolled once).
 #        Rare mobs have a silver dragon portrait and enhanced loot.
 #        Default: 5
-DungeonMaster.Dungeon.RareSpawnChance = 5
+Atlas.Dungeon.RareSpawnChance = 5
 
-#    DungeonMaster.Scaling.RareHealthMult
+#    Atlas.Scaling.RareHealthMult
 #        Health multiplier for rare spawns (between elite and boss).
 #        Default: 4.0
-DungeonMaster.Scaling.RareHealthMult = 4.0
+Atlas.Scaling.RareHealthMult = 4.0
 
-#    DungeonMaster.Scaling.RareDamageMult
+#    Atlas.Scaling.RareDamageMult
 #        Damage multiplier for rare spawns.
 #        Default: 2.0
-DungeonMaster.Scaling.RareDamageMult = 2.0
+Atlas.Scaling.RareDamageMult = 2.0
 
-#    DungeonMaster.Dungeon.Whitelist
+#    Atlas.Dungeon.Whitelist
 #        Comma-separated map IDs (empty = all allowed)
-DungeonMaster.Dungeon.Whitelist = ""
+Atlas.Dungeon.Whitelist = ""
 
-#    DungeonMaster.Dungeon.Blacklist
+#    Atlas.Dungeon.Blacklist
 #        Comma-separated map IDs to exclude
-DungeonMaster.Dungeon.Blacklist = ""
+Atlas.Dungeon.Blacklist = ""
 
 ###############################################################################
 # THEMES
@@ -190,71 +190,71 @@ DungeonMaster.Dungeon.Blacklist = ""
 ###############################################################################
 
 # Each theme is a fractured timeline: who rules the dungeon's halls there.
-DungeonMaster.Theme.1 = "A timeline where beasts reclaimed the halls,1"
-DungeonMaster.Theme.2 = "A timeline where dragonkin rule,2"
-DungeonMaster.Theme.3 = "A timeline where the Legion prevailed,3"
-DungeonMaster.Theme.4 = "A timeline torn by unbound elements,4"
-DungeonMaster.Theme.5 = "A timeline of giants,5"
-DungeonMaster.Theme.6 = "A timeline the Scourge swallowed,6"
-DungeonMaster.Theme.7 = "A timeline held by mortal warbands,7"
-DungeonMaster.Theme.8 = "A timeline of rogue machines,9"
-DungeonMaster.Theme.9 = "A shattered timeline (anything goes),-1"
-DungeonMaster.Theme.10 = ""
-DungeonMaster.Theme.11 = ""
-DungeonMaster.Theme.12 = ""
-DungeonMaster.Theme.13 = ""
-DungeonMaster.Theme.14 = ""
-DungeonMaster.Theme.15 = ""
-DungeonMaster.Theme.16 = ""
-DungeonMaster.Theme.17 = ""
-DungeonMaster.Theme.18 = ""
-DungeonMaster.Theme.19 = ""
-DungeonMaster.Theme.20 = ""
+Atlas.Theme.1 = "A timeline where beasts reclaimed the halls,1"
+Atlas.Theme.2 = "A timeline where dragonkin rule,2"
+Atlas.Theme.3 = "A timeline where the Legion prevailed,3"
+Atlas.Theme.4 = "A timeline torn by unbound elements,4"
+Atlas.Theme.5 = "A timeline of giants,5"
+Atlas.Theme.6 = "A timeline the Scourge swallowed,6"
+Atlas.Theme.7 = "A timeline held by mortal warbands,7"
+Atlas.Theme.8 = "A timeline of rogue machines,9"
+Atlas.Theme.9 = "A shattered timeline (anything goes),-1"
+Atlas.Theme.10 = ""
+Atlas.Theme.11 = ""
+Atlas.Theme.12 = ""
+Atlas.Theme.13 = ""
+Atlas.Theme.14 = ""
+Atlas.Theme.15 = ""
+Atlas.Theme.16 = ""
+Atlas.Theme.17 = ""
+Atlas.Theme.18 = ""
+Atlas.Theme.19 = ""
+Atlas.Theme.20 = ""
 
 ###############################################################################
 # TIMERS
 ###############################################################################
 
-#    DungeonMaster.Cooldown.Minutes (0 = no cooldown)
+#    Atlas.Cooldown.Minutes (0 = no cooldown)
 #        Default: 5
-DungeonMaster.Cooldown.Minutes = 5
+Atlas.Cooldown.Minutes = 5
 
-#    DungeonMaster.TimeLimit.Enable       Default: 0
-DungeonMaster.TimeLimit.Enable = 0
+#    Atlas.TimeLimit.Enable       Default: 0
+Atlas.TimeLimit.Enable = 0
 
-#    DungeonMaster.TimeLimit.Minutes      Default: 30
-DungeonMaster.TimeLimit.Minutes = 30
+#    Atlas.TimeLimit.Minutes      Default: 30
+Atlas.TimeLimit.Minutes = 30
 
-#    DungeonMaster.MaxConcurrentRuns      Default: 20
-DungeonMaster.MaxConcurrentRuns = 20
+#    Atlas.MaxConcurrentRuns      Default: 20
+Atlas.MaxConcurrentRuns = 20
 
 ###############################################################################
 # DEATH HANDLING
 ###############################################################################
 
-#    DungeonMaster.Death.RespawnAtStart
+#    Atlas.Death.RespawnAtStart
 #        Auto-rez dead players at entrance when group leaves combat
 #        Default: 1
-DungeonMaster.Death.RespawnAtStart = 1
+Atlas.Death.RespawnAtStart = 1
 
-#    DungeonMaster.Death.MaxWipes
+#    Atlas.Death.MaxWipes
 #        Full party wipes before auto-fail (0 = unlimited)
 #        Default: 0
-DungeonMaster.Death.MaxWipes = 0
+Atlas.Death.MaxWipes = 0
 
 ###############################################################################
 # COMPLETION
 ###############################################################################
 
-#    DungeonMaster.Completion.TeleportDelay
+#    Atlas.Completion.TeleportDelay
 #        Seconds after boss death before teleporting out
 #        Default: 30
-DungeonMaster.Completion.TeleportDelay = 30
+Atlas.Completion.TeleportDelay = 30
 
-#    DungeonMaster.Completion.Announcement
+#    Atlas.Completion.Announcement
 #        Announce challenge start to the player
 #        Default: 1
-DungeonMaster.Completion.Announcement = 1
+Atlas.Completion.Announcement = 1
 
 ###############################################################################
 # ROGUELIKE MODE
@@ -263,15 +263,15 @@ DungeonMaster.Completion.Announcement = 1
 # Each clear increases the tier — enemies get harder, party gets buffs.
 ###############################################################################
 
-#    DungeonMaster.Roguelike.Enable
+#    Atlas.Roguelike.Enable
 #        Master switch for Roguelike Mode.
 #        Default: 1
-DungeonMaster.Roguelike.Enable = 1
+Atlas.Roguelike.Enable = 1
 
-#    DungeonMaster.Roguelike.TransitionDelay
+#    Atlas.Roguelike.TransitionDelay
 #        Seconds between dungeon clears (loot phase / countdown).
 #        Default: 30
-DungeonMaster.Roguelike.TransitionDelay = 30
+Atlas.Roguelike.TransitionDelay = 30
 
 # --- DIFFICULTY SCALING ---
 # Per-tier multipliers. Scaling is LINEAR up to the ExponentialThreshold,
@@ -280,57 +280,57 @@ DungeonMaster.Roguelike.TransitionDelay = 30
 # Formula (tier <= threshold):  1.0 + (tier-1) * ScalingPerTier
 # Formula (tier >  threshold):  linear part + sum of ScalingPerTier * ExpFactor^(t-threshold+1)
 
-#    DungeonMaster.Roguelike.HpScalingPerTier
+#    Atlas.Roguelike.HpScalingPerTier
 #        Health multiplier increase per tier.
 #        Default: 0.10  (+10% per tier in linear zone)
-DungeonMaster.Roguelike.HpScalingPerTier = 0.10
+Atlas.Roguelike.HpScalingPerTier = 0.10
 
-#    DungeonMaster.Roguelike.DmgScalingPerTier
+#    Atlas.Roguelike.DmgScalingPerTier
 #        Damage multiplier increase per tier.
 #        Default: 0.08  (+8% per tier)
-DungeonMaster.Roguelike.DmgScalingPerTier = 0.08
+Atlas.Roguelike.DmgScalingPerTier = 0.08
 
-#    DungeonMaster.Roguelike.ArmorScalingPerTier
+#    Atlas.Roguelike.ArmorScalingPerTier
 #        Armor multiplier increase per tier (linear only).
 #        Default: 0.05  (+5% per tier)
-DungeonMaster.Roguelike.ArmorScalingPerTier = 0.05
+Atlas.Roguelike.ArmorScalingPerTier = 0.05
 
-#    DungeonMaster.Roguelike.ExponentialThreshold
+#    Atlas.Roguelike.ExponentialThreshold
 #        Tier at which scaling switches from linear to exponential.
 #        Default: 5
-DungeonMaster.Roguelike.ExponentialThreshold = 5
+Atlas.Roguelike.ExponentialThreshold = 5
 
-#    DungeonMaster.Roguelike.ExponentialFactor
+#    Atlas.Roguelike.ExponentialFactor
 #        Exponential growth base beyond the threshold.
 #        Default: 1.15
-DungeonMaster.Roguelike.ExponentialFactor = 1.15
+Atlas.Roguelike.ExponentialFactor = 1.15
 
 # --- AFFIXES (Mythic+ style modifiers) ---
 # Affixes are stat modifiers applied to entire dungeon floors at higher tiers.
 # Pool: Fortified, Tyrannical, Raging, Bolstering, Savage
 
-#    DungeonMaster.Roguelike.AffixStartTier
+#    Atlas.Roguelike.AffixStartTier
 #        First tier where an affix is applied. Set very high to disable.
 #        Default: 3
-DungeonMaster.Roguelike.AffixStartTier = 3
+Atlas.Roguelike.AffixStartTier = 3
 
-#    DungeonMaster.Roguelike.SecondAffixTier
+#    Atlas.Roguelike.SecondAffixTier
 #        Tier where a second simultaneous affix is added.
 #        Default: 7
-DungeonMaster.Roguelike.SecondAffixTier = 7
+Atlas.Roguelike.SecondAffixTier = 7
 
-#    DungeonMaster.Roguelike.ThirdAffixTier
+#    Atlas.Roguelike.ThirdAffixTier
 #        Tier where a third simultaneous affix is added.
 #        Default: 10
-DungeonMaster.Roguelike.ThirdAffixTier = 10
+Atlas.Roguelike.ThirdAffixTier = 10
 
 # --- VENDOR NPC ---
 # Spawn a friendly vendor at the dungeon entrance during roguelike runs.
 # Provides repair, reagents, food, water, and ammo.
  
-#    DungeonMaster.Roguelike.VendorEnable
+#    Atlas.Roguelike.VendorEnable
 #        Default: 1
-DungeonMaster.Roguelike.VendorEnable = 1
+Atlas.Roguelike.VendorEnable = 1
 
 # --- BUFF POOL ---
 # Each dungeon clear gives the party a random buff from this pool.
@@ -338,19 +338,19 @@ DungeonMaster.Roguelike.VendorEnable = 1
 # Higher weight = more likely to be selected.
 # If none configured, a default pool of well-known WoW buffs is used.
 
-#    DungeonMaster.Roguelike.MaxBuffs
+#    Atlas.Roguelike.MaxBuffs
 #        Maximum number of accumulated buffs per run.
 #        Default: 20
-DungeonMaster.Roguelike.MaxBuffs = 20
+Atlas.Roguelike.MaxBuffs = 20
 
 # Uncomment and customize to override the default buff pool:
-# DungeonMaster.Roguelike.Buff.1  = "15366,Songflower Serenade,100"
-# DungeonMaster.Roguelike.Buff.2  = "22888,Rallying Cry,80"
-# DungeonMaster.Roguelike.Buff.3  = "24425,Spirit of Zandalar,80"
-# DungeonMaster.Roguelike.Buff.4  = "16609,Warchief's Blessing,80"
-# DungeonMaster.Roguelike.Buff.5  = "23768,Fortune of Damage,60"
-# DungeonMaster.Roguelike.Buff.6  = "20217,Blessing of Kings,90"
-# DungeonMaster.Roguelike.Buff.7  = "48161,Power Word: Fortitude,100"
-# DungeonMaster.Roguelike.Buff.8  = "48469,Gift of the Wild,100"
-# DungeonMaster.Roguelike.Buff.9  = "19506,Trueshot Aura,70"
-# DungeonMaster.Roguelike.Buff.10 = "24932,Leader of the Pack,70"
+# Atlas.Roguelike.Buff.1  = "15366,Songflower Serenade,100"
+# Atlas.Roguelike.Buff.2  = "22888,Rallying Cry,80"
+# Atlas.Roguelike.Buff.3  = "24425,Spirit of Zandalar,80"
+# Atlas.Roguelike.Buff.4  = "16609,Warchief's Blessing,80"
+# Atlas.Roguelike.Buff.5  = "23768,Fortune of Damage,60"
+# Atlas.Roguelike.Buff.6  = "20217,Blessing of Kings,90"
+# Atlas.Roguelike.Buff.7  = "48161,Power Word: Fortitude,100"
+# Atlas.Roguelike.Buff.8  = "48469,Gift of the Wild,100"
+# Atlas.Roguelike.Buff.9  = "19506,Trueshot Aura,70"
+# Atlas.Roguelike.Buff.10 = "24932,Leader of the Pack,70"

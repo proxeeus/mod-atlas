@@ -1,5 +1,5 @@
 /*
- * mod-dungeon-master — Roguelike subsystem types
+ * mod-atlas — Roguelike subsystem types
  * Copyright (C) 2025 — AGPL v3
  */
 
@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 constexpr uint32 MAX_ROGUELIKE_BUFFS   = 30;
@@ -134,6 +134,6 @@ struct RoguelikeLeaderboardEntry
     uint8       PartySize       = 1;
 };
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
 #endif

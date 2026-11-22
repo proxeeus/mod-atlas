@@ -1,12 +1,12 @@
 /*
- * mod-dungeon-master — DungeonMasterMgr.cpp
+ * mod-atlas — AtlasMgr.cpp
  * Central session manager: creature pools, spawning, scaling, rewards, update loop.
  */
 
-#include "DungeonMasterMgr.h"
-#include "DMBossSpawnQuery.h"
+#include "AtlasMgr.h"
+#include "AtlasBossSpawnQuery.h"
 #include "RoguelikeMgr.h"
-#include "DMConfig.h"
+#include "AtlasConfig.h"
 #include "Player.h"
 #include "Group.h"
 #include "Creature.h"
@@ -45,19 +45,19 @@
 // Display IDs whose CreatureDisplayInfoExtra record has an empty BakeName: the
 // 3.3.5 client crashes (Error #132) when one of them is spawned in view. List
 // taken from upstream issue #17, not re-verified against client data here.
-#define DM_CLIENT_CRASH_DISPLAY_FILTER \
+#define ATLAS_CLIENT_CRASH_DISPLAY_FILTER \
     "AND ct.entry NOT IN (SELECT ctmx.CreatureID FROM creature_template_model ctmx " \
     "WHERE ctmx.CreatureDisplayID IN (15331,15332,15444,17116,20392,21951,23290,23296,23836,23886,29323)) "
 
 // Models with no geometry render invisible but still fight (same rule the
 // trash query already applied inline; now also used for the boss pool).
-#define DM_DEGENERATE_MODEL_FILTER \
+#define ATLAS_DEGENERATE_MODEL_FILTER \
     "AND ct.entry NOT IN (SELECT ctmd.CreatureID FROM creature_template_model ctmd " \
     "LEFT JOIN creature_model_info cmid ON cmid.DisplayID = ctmd.CreatureDisplayID " \
     "WHERE ctmd.CreatureDisplayID = 0 OR cmid.DisplayID IS NULL " \
     "OR cmid.BoundingRadius <= 0 OR cmid.CombatReach <= 0) "
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 // RNG: AC's helpers (Random.h), thread-safe. RandInt keeps the call sites'
@@ -69,10 +69,10 @@ static T RandInt(T lo, T hi)
 }
 
 // Aggressive AI for DM-spawned creatures; patrols 5 yd radius, active aggro, hooks JustDied for loot
-class DungeonMasterCreatureAI : public CreatureAI
+class AtlasCreatureAI : public CreatureAI
 {
 public:
-    explicit DungeonMasterCreatureAI(Creature* creature)
+    explicit AtlasCreatureAI(Creature* creature)
         : CreatureAI(creature), _patrolStarted(false), _aggroScanTimer(0) {}
 
     // Active aggro detection — overrides the default which has many silent skips
@@ -88,7 +88,7 @@ public:
         if (!player || !player->IsAlive() || player->IsGameMaster())
             return;
 
-        float aggroRange = sDMConfig->GetAggroRadius();
+        float aggroRange = sAtlasConfig->GetAggroRadius();
         if (me->IsWithinDistInMap(player, aggroRange)
             && me->IsHostileTo(player)
             && me->IsWithinLOSInMap(player))
@@ -117,7 +117,7 @@ public:
             if (_aggroScanTimer >= 1000 && me->IsAlive())
             {
                 _aggroScanTimer = 0;
-                float aggroRange = sDMConfig->GetAggroRadius();
+                float aggroRange = sAtlasConfig->GetAggroRadius();
 
                 Map::PlayerList const& players = me->GetMap()->GetPlayers();
                 float closest = aggroRange;
@@ -152,7 +152,7 @@ public:
         DoMeleeAttackIfReady();
     }
 
-    // Dungeon Master spawns creatures at generated points, frequently off the
+    // Atlas spawns creatures at generated points, frequently off the
     // navmesh or far from a home position the core considers reachable. The core
     // then fires EVADE_REASON_BOUNDARY / EVADE_REASON_NO_PATH mid-fight;
     // _EnterEvadeMode() drops combat and LoadCreaturesAddon(true) restores the
@@ -182,7 +182,7 @@ public:
         // and remove UNIT_DYNFLAG_LOOTABLE after we return.  Loot is filled
         // later from HandleCreatureDeath (OnUnitDeath hook) which fires
         // AFTER the core's death processing is finished.
-        sDungeonMasterMgr->OnCreatureDeathHook(me);
+        sAtlasMgr->OnCreatureDeathHook(me);
     }
 
 private:
@@ -192,7 +192,7 @@ private:
 
 // ---------------------------------------------------------------------------
 
-// Session helper implementations (declared in DMTypes.h)
+// Session helper implementations (declared in AtlasTypes.h)
 uint32 Session::GetAlivePlayerCount() const
 {
     uint32 n = 0;
@@ -219,31 +219,31 @@ bool Session::IsGroupInCombat() const
 
 static std::atomic<uint32> g_dmActiveSessionCount{0};
 
-bool DungeonMasterMgr::HasActiveSessions()
+bool AtlasMgr::HasActiveSessions()
 {
     return g_dmActiveSessionCount.load(std::memory_order_relaxed) != 0;
 }
 
 // Singleton
-DungeonMasterMgr::DungeonMasterMgr()  = default;
-DungeonMasterMgr::~DungeonMasterMgr() = default;
+AtlasMgr::AtlasMgr()  = default;
+AtlasMgr::~AtlasMgr() = default;
 
-DungeonMasterMgr* DungeonMasterMgr::Instance()
+AtlasMgr* AtlasMgr::Instance()
 {
-    static DungeonMasterMgr inst;
+    static AtlasMgr inst;
     return &inst;
 }
 
 // Initialization
-void DungeonMasterMgr::Initialize()
+void AtlasMgr::Initialize()
 {
-    LOG_INFO("module", "DungeonMaster: Initializing...");
+    LOG_INFO("module", "Atlas: Initializing...");
     LoadFromDB();
-    LOG_INFO("module", "DungeonMaster: Ready — {} creature types, {} bosses, {} dungeon bosses, {} reward items, {} loot items.",
+    LOG_INFO("module", "Atlas: Ready — {} creature types, {} bosses, {} dungeon bosses, {} reward items, {} loot items.",
         _creaturesByType.size(), _bossCreatures.size(), _dungeonBossPool.size(), _rewardItems.size(), _lootPool.size());
 }
 
-void DungeonMasterMgr::LoadFromDB()
+void AtlasMgr::LoadFromDB()
 {
     LoadCreaturePools();
     LoadDungeonBossPool();
@@ -256,7 +256,7 @@ void DungeonMasterMgr::LoadFromDB()
 }
 
 // Load creature pools from world DB, split into trash (rank 0) and boss (rank 1/2/4)
-void DungeonMasterMgr::LoadCreaturePools()
+void AtlasMgr::LoadCreaturePools()
 {
     _creaturesByType.clear();
     _bossCreatures.clear();
@@ -276,7 +276,7 @@ void DungeonMasterMgr::LoadCreaturePools()
         "AND (ct.unit_flags & 2) = 0 "                                 // no NON_ATTACKABLE
         "AND (ct.unit_flags & 33554432) = 0 "                          // no NOT_SELECTABLE (invisible attackers, upstream #17/#25)
         "AND (ct.flags_extra & 128) = 0 "                              // no TRIGGER creatures (upstream #17)
-        DM_CLIENT_CRASH_DISPLAY_FILTER
+        ATLAS_CLIENT_CRASH_DISPLAY_FILTER
         "AND (ct.subname = '' OR ct.subname IS NULL) "                 // no guild/title text under name
         "AND ct.name NOT LIKE '%[UNUSED]%' "
         "AND ct.name NOT LIKE '%[PH]%' "
@@ -313,7 +313,7 @@ void DungeonMasterMgr::LoadCreaturePools()
 
     if (!result)
     {
-        LOG_ERROR("module", "DungeonMaster: creature_template query returned NO results — check your world DB!");
+        LOG_ERROR("module", "Atlas: creature_template query returned NO results — check your world DB!");
         return;
     }
 
@@ -343,7 +343,7 @@ void DungeonMasterMgr::LoadCreaturePools()
         } while (result->NextRow());
     }
 
-    LOG_INFO("module", "DungeonMaster: Loaded {} trash creatures, {} potential bosses.",
+    LOG_INFO("module", "Atlas: Loaded {} trash creatures, {} potential bosses.",
         trashCount, bossCount);
 
     static char const* typeNames[] = {
@@ -353,27 +353,27 @@ void DungeonMasterMgr::LoadCreaturePools()
     for (auto const& [type, vec] : _creaturesByType)
     {
         char const* name = (type <= 10) ? typeNames[type] : "Unknown";
-        LOG_INFO("module", "DungeonMaster:   Trash type {} ({}): {} entries",
+        LOG_INFO("module", "Atlas:   Trash type {} ({}): {} entries",
             type, name, vec.size());
     }
     for (auto const& [type, vec] : _bossCreatures)
     {
         char const* name = (type <= 10) ? typeNames[type] : "Unknown";
-        LOG_INFO("module", "DungeonMaster:   Boss  type {} ({}): {} entries",
+        LOG_INFO("module", "Atlas:   Boss  type {} ({}): {} entries",
             type, name, vec.size());
     }
 }
 
 // Load real dungeon bosses (scripted elites from all dungeon maps)
-void DungeonMasterMgr::LoadDungeonBossPool()
+void AtlasMgr::LoadDungeonBossPool()
 {
     _dungeonBossPool.clear();
 
     // Build comma-separated list of all dungeon map IDs
-    auto const& dungeons = sDMConfig->GetDungeons();
+    auto const& dungeons = sAtlasConfig->GetDungeons();
     if (dungeons.empty())
     {
-        LOG_WARN("module", "DungeonMaster: No dungeons configured — dungeon boss pool empty.");
+        LOG_WARN("module", "Atlas: No dungeons configured — dungeon boss pool empty.");
         return;
     }
 
@@ -400,8 +400,8 @@ void DungeonMasterMgr::LoadDungeonBossPool()
         "AND (ct.unit_flags & 2) = 0 "       // not NON_ATTACKABLE
         "AND (ct.unit_flags & 33554432) = 0 " // not NOT_SELECTABLE
         "AND (ct.flags_extra & 128) = 0 "    // not a TRIGGER
-        DM_CLIENT_CRASH_DISPLAY_FILTER
-        DM_DEGENERATE_MODEL_FILTER
+        ATLAS_CLIENT_CRASH_DISPLAY_FILTER
+        ATLAS_DEGENERATE_MODEL_FILTER
         "AND ct.name NOT LIKE '%Trigger%' "
         "AND ct.name NOT LIKE '%Invisible%' "
         "AND ct.name NOT LIKE '%Dummy%' "
@@ -412,7 +412,7 @@ void DungeonMasterMgr::LoadDungeonBossPool()
 
     if (!result)
     {
-        LOG_WARN("module", "DungeonMaster: Dungeon boss pool query returned no results.");
+        LOG_WARN("module", "Atlas: Dungeon boss pool query returned no results.");
         return;
     }
 
@@ -430,11 +430,11 @@ void DungeonMasterMgr::LoadDungeonBossPool()
         _dungeonBossPool[e.Type].push_back(e);
         ++count;
 
-        LOG_DEBUG("module", "DungeonMaster: Dungeon boss: {} (entry {}, type {}, level {}-{})",
+        LOG_DEBUG("module", "Atlas: Dungeon boss: {} (entry {}, type {}, level {}-{})",
             f[1].Get<std::string>(), e.Entry, e.Type, e.MinLevel, e.MaxLevel);
     } while (result->NextRow());
 
-    LOG_INFO("module", "DungeonMaster: Loaded {} real dungeon bosses into boss pool.", count);
+    LOG_INFO("module", "Atlas: Loaded {} real dungeon bosses into boss pool.", count);
 
     static char const* typeNames[] = {
         "None", "Beast", "Dragonkin", "Demon", "Elemental",
@@ -443,13 +443,13 @@ void DungeonMasterMgr::LoadDungeonBossPool()
     for (auto const& [type, vec] : _dungeonBossPool)
     {
         char const* name = (type <= 10) ? typeNames[type] : "Unknown";
-        LOG_INFO("module", "DungeonMaster:   Dungeon boss type {} ({}): {} entries",
+        LOG_INFO("module", "Atlas:   Dungeon boss type {} ({}): {} entries",
             type, name, vec.size());
     }
 }
 
 // Cache creature_classlevelstats for force-scaling
-void DungeonMasterMgr::LoadClassLevelStats()
+void AtlasMgr::LoadClassLevelStats()
 {
     _classLevelStats.clear();
 
@@ -461,7 +461,7 @@ void DungeonMasterMgr::LoadClassLevelStats()
 
     if (!result)
     {
-        LOG_WARN("module", "DungeonMaster: creature_classlevelstats not found — "
+        LOG_WARN("module", "Atlas: creature_classlevelstats not found — "
                  "creature scaling will use template defaults.");
         return;
     }
@@ -481,11 +481,11 @@ void DungeonMasterMgr::LoadClassLevelStats()
         ++count;
     } while (result->NextRow());
 
-    LOG_INFO("module", "DungeonMaster: {} class-level stat entries cached.", count);
+    LOG_INFO("module", "Atlas: {} class-level stat entries cached.", count);
 }
 
 // Look up cached base stats
-ClassLevelStatEntry const* DungeonMasterMgr::GetBaseStatsForLevel(
+ClassLevelStatEntry const* AtlasMgr::GetBaseStatsForLevel(
     uint8 unitClass, uint8 level) const
 {
     auto it = _classLevelStats.find({unitClass, level});
@@ -501,7 +501,7 @@ ClassLevelStatEntry const* DungeonMasterMgr::GetBaseStatsForLevel(
 }
 
 // Cache equippable reward items (green/blue/purple)
-void DungeonMasterMgr::LoadRewardItems()
+void AtlasMgr::LoadRewardItems()
 {
     _rewardItems.clear();
 
@@ -544,11 +544,11 @@ void DungeonMasterMgr::LoadRewardItems()
         } while (result->NextRow());
     }
 
-    LOG_INFO("module", "DungeonMaster: {} reward items cached.", _rewardItems.size());
+    LOG_INFO("module", "Atlas: {} reward items cached.", _rewardItems.size());
 }
 
 // Cache items for mob loot drops
-void DungeonMasterMgr::LoadLootPool()
+void AtlasMgr::LoadLootPool()
 {
     _lootPool.clear();
 
@@ -595,13 +595,13 @@ void DungeonMasterMgr::LoadLootPool()
     for (auto const& li : _lootPool)
         if (li.Quality <= 4) ++counts[li.Quality];
 
-    LOG_INFO("module", "DungeonMaster: {} mob loot items cached "
+    LOG_INFO("module", "Atlas: {} mob loot items cached "
         "(grey={}, white={}, green={}, blue={}, epic={}).",
         _lootPool.size(), counts[0], counts[1], counts[2], counts[3], counts[4]);
 }
 
 // Compute group average level
-uint8 DungeonMasterMgr::ComputeEffectiveLevel(Player* leader) const
+uint8 AtlasMgr::ComputeEffectiveLevel(Player* leader) const
 {
     if (!leader)
         return 1;
@@ -630,13 +630,13 @@ uint8 DungeonMasterMgr::ComputeEffectiveLevel(Player* leader) const
 
 // SESSION LIFECYCLE
 
-Session* DungeonMasterMgr::CreateSession(Player* leader, uint32 difficultyId,
+Session* AtlasMgr::CreateSession(Player* leader, uint32 difficultyId,
                                           uint32 themeId, uint32 mapId,
                                           bool scaleToParty)
 {
-    DifficultyTier const* diff  = sDMConfig->GetDifficulty(difficultyId);
-    Theme const*          theme = sDMConfig->GetTheme(themeId);
-    DungeonInfo const*    dg    = sDMConfig->GetDungeon(mapId);
+    DifficultyTier const* diff  = sAtlasConfig->GetDifficulty(difficultyId);
+    Theme const*          theme = sAtlasConfig->GetTheme(themeId);
+    DungeonInfo const*    dg    = sAtlasConfig->GetDungeon(mapId);
     if (!diff || !theme || !dg)
         return nullptr;
 
@@ -656,8 +656,8 @@ Session* DungeonMasterMgr::CreateSession(Player* leader, uint32 difficultyId,
     s.ScaleToParty = scaleToParty;
     s.StartTime    = GameTime::GetGameTime().count();
 
-    if (sDMConfig->IsTimeLimitEnabled())
-        s.TimeLimit = sDMConfig->GetTimeLimitMinutes() * 60;
+    if (sAtlasConfig->IsTimeLimitEnabled())
+        s.TimeLimit = sAtlasConfig->GetTimeLimitMinutes() * 60;
 
     if (scaleToParty)
     {
@@ -665,7 +665,7 @@ Session* DungeonMasterMgr::CreateSession(Player* leader, uint32 difficultyId,
         // clamped to the difficulty tier's range.
         s.EffectiveLevel = ComputeEffectiveLevel(leader);
 
-        uint8 band = sDMConfig->GetLevelBand();
+        uint8 band = sAtlasConfig->GetLevelBand();
         s.LevelBandMin = (s.EffectiveLevel > band) ? (s.EffectiveLevel - band) : 1;
         s.LevelBandMax = std::min<uint8>(s.EffectiveLevel + band, 83);
 
@@ -715,21 +715,21 @@ Session* DungeonMasterMgr::CreateSession(Player* leader, uint32 difficultyId,
     for (auto const& pd : s.Players)
         _playerToSession[pd.PlayerGuid] = s.SessionId;
 
-    LOG_INFO("module", "DungeonMaster: Session {} — leader {}, party {}, diff {}, level band {}-{}, scale={}",
+    LOG_INFO("module", "Atlas: Session {} — leader {}, party {}, diff {}, level band {}-{}, scale={}",
         s.SessionId, leader->GetName(), s.Players.size(),
         diff->Name, s.LevelBandMin, s.LevelBandMax, scaleToParty ? "party" : "tier");
 
     return &_activeSessions[s.SessionId];
 }
 
-Session* DungeonMasterMgr::GetSession(uint32 id)
+Session* AtlasMgr::GetSession(uint32 id)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto it = _activeSessions.find(id);
     return it != _activeSessions.end() ? &it->second : nullptr;
 }
 
-Session* DungeonMasterMgr::GetSessionByInstance(uint32 instId)
+Session* AtlasMgr::GetSessionByInstance(uint32 instId)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto it = _instanceToSession.find(instId);
@@ -741,7 +741,7 @@ Session* DungeonMasterMgr::GetSessionByInstance(uint32 instId)
     return nullptr;
 }
 
-Session* DungeonMasterMgr::GetSessionByPlayer(ObjectGuid guid)
+Session* AtlasMgr::GetSessionByPlayer(ObjectGuid guid)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto it = _playerToSession.find(guid);
@@ -783,7 +783,7 @@ static void NotifySession(Session const* session, std::string const& msg)
 // Temporary Normal binds are released like a manual "Reset all instances";
 // a bind to an instance someone is still inside, or a permanent bind, blocks
 // the run instead.
-bool DungeonMasterMgr::ReleaseBindsBeforeRun(Session* session)
+bool AtlasMgr::ReleaseBindsBeforeRun(Session* session)
 {
     std::set<ObjectGuid> const owners = CollectBindOwners(session);
 
@@ -815,9 +815,9 @@ bool DungeonMasterMgr::ReleaseBindsBeforeRun(Session* session)
 // Startup: release instances that runs left open because the server stopped
 // mid-run (sessions are in memory only). No instance map is loaded yet, so AC
 // deletes each instance's saved state as soon as its last bind is removed.
-void DungeonMasterMgr::ReleaseInstancesLeftOpen()
+void AtlasMgr::ReleaseInstancesLeftOpen()
 {
-    QueryResult result = CharacterDatabase.Query("SELECT instance_id FROM dm_open_instance");
+    QueryResult result = CharacterDatabase.Query("SELECT instance_id FROM atlas_open_instance");
     if (!result)
         return;
 
@@ -831,22 +831,22 @@ void DungeonMasterMgr::ReleaseInstancesLeftOpen()
         }
     } while (result->NextRow());
 
-    CharacterDatabase.Execute("DELETE FROM dm_open_instance");
+    CharacterDatabase.Execute("DELETE FROM atlas_open_instance");
 
     if (released)
-        LOG_INFO("module", "DungeonMaster: Released {} dungeon instance(s) left open by runs before the last shutdown.",
+        LOG_INFO("module", "Atlas: Released {} dungeon instance(s) left open by runs before the last shutdown.",
             released);
 }
 
 // After a run: drop every bind to the instance the run used. Once the instance
 // map unloads, AC then deletes its saved state (instance row, encounter data,
 // creature/gameobject respawn rows), so the gutted instance is never reused.
-void DungeonMasterMgr::ReleaseRunInstanceBinds(Session const& session)
+void AtlasMgr::ReleaseRunInstanceBinds(Session const& session)
 {
     if (!session.InstanceId)
         return;
 
-    CharacterDatabase.Execute("DELETE FROM dm_open_instance WHERE instance_id = {}", session.InstanceId);
+    CharacterDatabase.Execute("DELETE FROM atlas_open_instance WHERE instance_id = {}", session.InstanceId);
 
     for (ObjectGuid const& guid : CollectBindOwners(&session))
     {
@@ -858,7 +858,7 @@ void DungeonMasterMgr::ReleaseRunInstanceBinds(Session const& session)
     }
 }
 
-bool DungeonMasterMgr::StartDungeon(Session* session)
+bool AtlasMgr::StartDungeon(Session* session)
 {
     if (!session) return false;
 
@@ -885,16 +885,16 @@ bool DungeonMasterMgr::StartDungeon(Session* session)
         session->EntrancePos.GetPositionY() == 0 &&
         session->EntrancePos.GetPositionZ() == 0)
     {
-        LOG_ERROR("module", "DungeonMaster: No entrance coords for map {}", session->MapId);
+        LOG_ERROR("module", "Atlas: No entrance coords for map {}", session->MapId);
         return false;
     }
     return true;
 }
 
-bool DungeonMasterMgr::TeleportPartyIn(Session* session)
+bool AtlasMgr::TeleportPartyIn(Session* session)
 {
     if (!session) return false;
-    DungeonInfo const* dg = sDMConfig->GetDungeon(session->MapId);
+    DungeonInfo const* dg = sAtlasConfig->GetDungeon(session->MapId);
     if (!dg) return false;
 
     Position ent = session->EntrancePos;
@@ -921,7 +921,7 @@ bool DungeonMasterMgr::TeleportPartyIn(Session* session)
                           ent.GetPositionZ(), ent.GetOrientation()))
         {
             ++ok;
-            LOG_INFO("module", "DungeonMaster: TeleportTo queued for {} → map {} ({:.1f}, {:.1f}, {:.1f})",
+            LOG_INFO("module", "Atlas: TeleportTo queued for {} → map {} ({:.1f}, {:.1f}, {:.1f})",
                 p->GetName(), session->MapId, ent.GetPositionX(), ent.GetPositionY(), ent.GetPositionZ());
             ChatHandler(p->GetSession()).PSendSysMessage(
                 "{} You step into an echo of |cFFFFFFFF{}|r. Defeat its master to mend it.",
@@ -933,7 +933,7 @@ bool DungeonMasterMgr::TeleportPartyIn(Session* session)
         }
         else
         {
-            LOG_ERROR("module", "DungeonMaster: TeleportTo FAILED for {} → map {} ({:.1f}, {:.1f}, {:.1f})",
+            LOG_ERROR("module", "Atlas: TeleportTo FAILED for {} → map {} ({:.1f}, {:.1f}, {:.1f})",
                 p->GetName(), session->MapId, ent.GetPositionX(), ent.GetPositionY(), ent.GetPositionZ());
             ChatHandler(p->GetSession()).PSendSysMessage(
                 "{} The timeways would not carry you. You may lack access to this dungeon.", CHAT_PREFIX);
@@ -950,7 +950,7 @@ bool DungeonMasterMgr::TeleportPartyIn(Session* session)
     return false;
 }
 
-void DungeonMasterMgr::TeleportPartyOut(Session* session)
+void AtlasMgr::TeleportPartyOut(Session* session)
 {
     if (!session) return;
     for (auto const& pd : session->Players)
@@ -966,14 +966,14 @@ void DungeonMasterMgr::TeleportPartyOut(Session* session)
 }
 
 // Entrances and spawn points come from world DB tables that don't change while
-// the server runs: load them once (startup, `.dm reload`) instead of querying
+// the server runs: load them once (startup, `.atlas reload`) instead of querying
 // the world DB every time a run starts.
-void DungeonMasterMgr::LoadDungeonGeometry()
+void AtlasMgr::LoadDungeonGeometry()
 {
     std::unordered_map<uint32, Position> entrances;
     std::unordered_map<uint32, std::vector<SpawnPoint>> spawnPoints;
 
-    for (auto const& dg : sDMConfig->GetDungeons())
+    for (auto const& dg : sAtlasConfig->GetDungeons())
     {
         entrances[dg.MapId]   = QueryDungeonEntrance(dg.MapId);
         spawnPoints[dg.MapId] = BuildSpawnPointsForMap(dg.MapId);
@@ -983,17 +983,17 @@ void DungeonMasterMgr::LoadDungeonGeometry()
     _entrances   = std::move(entrances);
     _spawnPoints = std::move(spawnPoints);
 
-    LOG_INFO("module", "DungeonMaster: Cached entrances and spawn points for {} dungeons.", _entrances.size());
+    LOG_INFO("module", "Atlas: Cached entrances and spawn points for {} dungeons.", _entrances.size());
 }
 
-Position DungeonMasterMgr::GetDungeonEntrance(uint32 mapId)
+Position AtlasMgr::GetDungeonEntrance(uint32 mapId)
 {
     std::lock_guard<std::mutex> lock(_geometryMutex);
     auto itr = _entrances.find(mapId);
     return itr != _entrances.end() ? itr->second : Position(0.0f, 0.0f, 0.0f, 0.0f);
 }
 
-std::vector<SpawnPoint> DungeonMasterMgr::GetSpawnPointsForMap(uint32 mapId)
+std::vector<SpawnPoint> AtlasMgr::GetSpawnPointsForMap(uint32 mapId)
 {
     std::lock_guard<std::mutex> lock(_geometryMutex);
     auto itr = _spawnPoints.find(mapId);
@@ -1001,7 +1001,7 @@ std::vector<SpawnPoint> DungeonMasterMgr::GetSpawnPointsForMap(uint32 mapId)
 }
 
 // Dungeon entrance lookup from areatrigger_teleport
-Position DungeonMasterMgr::QueryDungeonEntrance(uint32 mapId)
+Position AtlasMgr::QueryDungeonEntrance(uint32 mapId)
 {
     if (QueryResult r = WorldDatabase.Query(
             "SELECT target_position_x, target_position_y, target_position_z, target_orientation "
@@ -1010,12 +1010,12 @@ Position DungeonMasterMgr::QueryDungeonEntrance(uint32 mapId)
         Field* f = r->Fetch();
         return { f[0].Get<float>(), f[1].Get<float>(), f[2].Get<float>(), f[3].Get<float>() };
     }
-    LOG_WARN("module", "DungeonMaster: No areatrigger_teleport for map {}", mapId);
+    LOG_WARN("module", "Atlas: No areatrigger_teleport for map {}", mapId);
     return { 0, 0, 0, 0 };
 }
 
 // Spawn-point collection
-std::vector<SpawnPoint> DungeonMasterMgr::BuildSpawnPointsForMap(uint32 mapId)
+std::vector<SpawnPoint> AtlasMgr::BuildSpawnPointsForMap(uint32 mapId)
 {
     std::vector<SpawnPoint> pts;
 
@@ -1086,14 +1086,14 @@ std::vector<SpawnPoint> DungeonMasterMgr::BuildSpawnPointsForMap(uint32 mapId)
 
             BossCandidate const& lastBoss = bosses[0];
 
-            LOG_INFO("module", "DungeonMaster: Map {} — found {} boss candidate(s). "
+            LOG_INFO("module", "Atlas: Map {} — found {} boss candidate(s). "
                 "Last boss spawn entry {} at ({:.1f}, {:.1f}, {:.1f}), MechanicsMask={}, dist={:.1f}",
                 mapId, bosses.size(), lastBoss.entry,
                 lastBoss.x, lastBoss.y, lastBoss.z,
                 lastBoss.mechanicsMask, lastBoss.dist);
 
             // Create boss spawn point(s) at the actual boss location(s).
-            uint32 bc = sDMConfig->GetBossCount();
+            uint32 bc = sAtlasConfig->GetBossCount();
             for (uint32 i = 0; i < bc && i < bosses.size(); ++i)
             {
                 SpawnPoint bsp;
@@ -1109,7 +1109,7 @@ std::vector<SpawnPoint> DungeonMasterMgr::BuildSpawnPointsForMap(uint32 mapId)
     // Fallback: if no actual boss found in DB, use farthest spawn point(s)
     if (!bossFound)
     {
-        LOG_WARN("module", "DungeonMaster: Map {} — no boss creatures found in DB, "
+        LOG_WARN("module", "Atlas: Map {} — no boss creatures found in DB, "
             "falling back to farthest spawn points.", mapId);
 
         // Re-sort since we may have added boss points
@@ -1117,7 +1117,7 @@ std::vector<SpawnPoint> DungeonMasterMgr::BuildSpawnPointsForMap(uint32 mapId)
             [](SpawnPoint const& a, SpawnPoint const& b)
             { return a.DistanceFromEntrance < b.DistanceFromEntrance; });
 
-        uint32 bc = sDMConfig->GetBossCount();
+        uint32 bc = sAtlasConfig->GetBossCount();
         for (uint32 i = 0; i < bc && i < pts.size(); ++i)
             pts[pts.size() - 1 - i].IsBossPosition = true;
     }
@@ -1126,11 +1126,11 @@ std::vector<SpawnPoint> DungeonMasterMgr::BuildSpawnPointsForMap(uint32 mapId)
 }
 
 // Instance population
-void DungeonMasterMgr::ClearDungeonCreatures(InstanceMap* map)
+void AtlasMgr::ClearDungeonCreatures(InstanceMap* map)
 {
     if (!map) return;
 
-    uint32 npcEntry = sDMConfig->GetNpcEntry();
+    uint32 npcEntry = sAtlasConfig->GetNpcEntry();
     uint32 totalRemoved = 0;
 
     // Phase 1: despawn our tracked creatures
@@ -1203,11 +1203,11 @@ void DungeonMasterMgr::ClearDungeonCreatures(InstanceMap* map)
         break;
     }
 
-    LOG_INFO("module", "DungeonMaster: Cleared {} tracked + {} DB + {} grid creatures from map {} (inst {})",
+    LOG_INFO("module", "Atlas: Cleared {} tracked + {} DB + {} grid creatures from map {} (inst {})",
         totalRemoved, dbRemoved, gridRemoved, map->GetId(), instanceId);
 }
 
-void DungeonMasterMgr::OpenAllDoors(InstanceMap* map)
+void AtlasMgr::OpenAllDoors(InstanceMap* map)
 {
     if (!map) return;
 
@@ -1225,25 +1225,25 @@ void DungeonMasterMgr::OpenAllDoors(InstanceMap* map)
         if (go && go->IsInWorld())
             go->Delete();
 
-    LOG_DEBUG("module", "DungeonMaster: Removed {} doors from instance.", doors.size());
+    LOG_DEBUG("module", "Atlas: Removed {} doors from instance.", doors.size());
 }
 
 // Populate dungeon with themed creatures and bosses
-void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
+void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
 {
     if (!session || !map) return;
 
-    LOG_INFO("module", "DungeonMaster: PopulateDungeon ENTRY — session {} map {} instId {} mobs {} bosses {}",
+    LOG_INFO("module", "Atlas: PopulateDungeon ENTRY — session {} map {} instId {} mobs {} bosses {}",
         session->SessionId, session->MapId, map->GetInstanceId(),
         session->TotalMobs, session->TotalBosses);
 
     // Remember the instance before emptying it, so a restart mid-run can
     // release it (see ReleaseInstancesLeftOpen).
-    CharacterDatabase.Execute("REPLACE INTO dm_open_instance (instance_id, map_id) VALUES ({}, {})",
+    CharacterDatabase.Execute("REPLACE INTO atlas_open_instance (instance_id, map_id) VALUES ({}, {})",
         map->GetInstanceId(), map->GetId());
 
-    DifficultyTier const* diff  = sDMConfig->GetDifficulty(session->DifficultyId);
-    Theme const*          theme = sDMConfig->GetTheme(session->ThemeId);
+    DifficultyTier const* diff  = sAtlasConfig->GetDifficulty(session->DifficultyId);
+    Theme const*          theme = sAtlasConfig->GetTheme(session->ThemeId);
     if (!diff || !theme) return;
 
     ClearDungeonCreatures(map);
@@ -1268,7 +1268,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
             }
         }
         if (bossesNeutralized > 0)
-            LOG_INFO("module", "DungeonMaster: Neutralized {} InstanceScript boss encounter(s) in map {}",
+            LOG_INFO("module", "Atlas: Neutralized {} InstanceScript boss encounter(s) in map {}",
                 bossesNeutralized, map->GetId());
     }
 
@@ -1292,14 +1292,14 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
             p->RemoveAura(spellId);
 
         if (!toRemove.empty())
-            LOG_DEBUG("module", "DungeonMaster: Purged {} lingering debuff(s) from {}",
+            LOG_DEBUG("module", "Atlas: Purged {} lingering debuff(s) from {}",
                 toRemove.size(), p->GetName());
     }
 
     session->SpawnPoints = GetSpawnPointsForMap(session->MapId);
     if (session->SpawnPoints.empty())
     {
-        LOG_ERROR("module", "DungeonMaster: No spawn points for map {}", session->MapId);
+        LOG_ERROR("module", "Atlas: No spawn points for map {}", session->MapId);
         return;
     }
 
@@ -1314,7 +1314,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
     auto& guidList = _instanceCreatureGuids[instanceId];
     guidList.clear();
 
-    LOG_INFO("module", "DungeonMaster: Populating session {} — theme '{}', band {}-{}, target lvl {}, HP x{:.2f}, DMG x{:.2f}",
+    LOG_INFO("module", "Atlas: Populating session {} — theme '{}', band {}-{}, target lvl {}, HP x{:.2f}, DMG x{:.2f}",
         session->SessionId, theme->Name, bandMin, bandMax, targetLevel, hpMult, dmgMult);
 
     // Force-scale creature to target level
@@ -1323,8 +1323,8 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
     float bossOnlyDmgMult;
     {
         uint32 n = session->Players.size();
-        if (n <= 1) bossOnlyDmgMult = sDMConfig->GetSoloMultiplier();
-        else        bossOnlyDmgMult = 1.0f + (n - 1) * sDMConfig->GetPerPlayerDamageMult();
+        if (n <= 1) bossOnlyDmgMult = sAtlasConfig->GetSoloMultiplier();
+        else        bossOnlyDmgMult = 1.0f + (n - 1) * sAtlasConfig->GetPerPlayerDamageMult();
         if (session->RoguelikeRunId != 0)
             bossOnlyDmgMult *= sRoguelikeMgr->GetTierDamageMultiplier(session->RoguelikeRunId);
     }
@@ -1427,12 +1427,12 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         }
 
         // --- Install custom AI ---
-        // All spawned creatures (trash and bosses alike) use DungeonMasterCreatureAI,
+        // All spawned creatures (trash and bosses alike) use AtlasCreatureAI,
         // which handles aggro scanning, patrol movement, and death hooks.
         // Bosses rely on auto-attack only — no scripted spell rotations.
         // AIM_Initialize deletes the creature's previous AI; Unit::SetAI only
         // swaps the pointer, which leaked one AI object per spawned creature.
-        CreatureAI* dmAI = new DungeonMasterCreatureAI(c);
+        CreatureAI* dmAI = new AtlasCreatureAI(c);
         if (!c->AIM_Initialize(dmAI))
             delete dmAI;
 
@@ -1462,7 +1462,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         c->SetFaction(14);               // hostile to all
         c->SetReactState(REACT_AGGRESSIVE);
         float baseScale = c->GetObjectScale();
-        float typeScale = sDMConfig->GetVisualScaleForCreatureType(c->GetCreatureTemplate()->type);
+        float typeScale = sAtlasConfig->GetVisualScaleForCreatureType(c->GetCreatureTemplate()->type);
         c->SetObjectScale(std::clamp(baseScale * typeScale, 0.55f, 1.0f));
         c->SetCorpseDelay(300);          // 5 min corpse before despawn
         c->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC
@@ -1474,7 +1474,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         c->SetImmuneToNPC(false);
         c->setActive(true);             // Keep creature in grid update cycle for aggro detection
 
-        bool isElite = (RandInt<uint32>(1, 100) <= sDMConfig->GetEliteChance());
+        bool isElite = (RandInt<uint32>(1, 100) <= sAtlasConfig->GetEliteChance());
 
         // Roguelike affix multipliers for trash
         float affixHpMult = 1.0f, affixDmgMult = 1.0f, affixEliteMult = 1.0f;
@@ -1485,12 +1485,12 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
             // Savage affix: boosted elite chance
             if (affixEliteMult > 1.0f && !isElite)
             {
-                uint32 boostedChance = static_cast<uint32>(sDMConfig->GetEliteChance() * affixEliteMult);
+                uint32 boostedChance = static_cast<uint32>(sAtlasConfig->GetEliteChance() * affixEliteMult);
                 isElite = (RandInt<uint32>(1, 100) <= boostedChance);
             }
         }
 
-        float eliteHpMult  = isElite ? sDMConfig->GetEliteHealthMult() : 1.0f;
+        float eliteHpMult  = isElite ? sAtlasConfig->GetEliteHealthMult() : 1.0f;
         float eliteDmgMult = isElite ? 1.5f : 1.0f;
 
         applyLevelAndStats(c, eliteHpMult * affixHpMult, eliteDmgMult * affixDmgMult, false);
@@ -1499,7 +1499,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         sc.Guid = c->GetGUID(); sc.Entry = entry;
         sc.IsElite = isElite; sc.IsBoss = false;
         session->SpawnedCreatures.push_back(sc);
-        if (uint32 recentLimit = sDMConfig->GetRecentCreatureEntries(); recentLimit > 0)
+        if (uint32 recentLimit = sAtlasConfig->GetRecentCreatureEntries(); recentLimit > 0)
         {
             session->RecentCreatureEntries.push_back(entry);
             if (session->RecentCreatureEntries.size() > recentLimit)
@@ -1511,8 +1511,8 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
     session->TotalMobs = spawnedMobs;
 
     // --- Rare spawn (configurable chance, max 1 per run) ---
-    if (sDMConfig->GetRareSpawnChance() > 0 &&
-        RandInt<uint32>(1, 100) <= sDMConfig->GetRareSpawnChance())
+    if (sAtlasConfig->GetRareSpawnChance() > 0 &&
+        RandInt<uint32>(1, 100) <= sAtlasConfig->GetRareSpawnChance())
     {
         // Pick non-boss spawn points for rare placement (prefer middle of dungeon)
         std::vector<size_t> validRarePoints;
@@ -1551,8 +1551,8 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
                     // so they already carry an elite frame; size is the extra tell.
                     r->SetObjectScale(1.15f);
 
-                    float rareHpMult  = sDMConfig->GetRareHealthMult();
-                    float rareDmgMult = sDMConfig->GetRareDamageMult();
+                    float rareHpMult  = sAtlasConfig->GetRareHealthMult();
+                    float rareDmgMult = sAtlasConfig->GetRareDamageMult();
 
                     // Apply roguelike affix multipliers to rares
                     float affixHpM = 1.0f, affixDmgM = 1.0f, affixEliteM = 1.0f;
@@ -1576,7 +1576,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
                                     "{} Something |cFFFF8800rare|r has slipped into this echo from another timeline.",
                                     CHAT_PREFIX);
 
-                    LOG_INFO("module", "DungeonMaster: Rare creature spawned — entry {} at ({:.1f}, {:.1f}, {:.1f})",
+                    LOG_INFO("module", "Atlas: Rare creature spawned — entry {} at ({:.1f}, {:.1f}, {:.1f})",
                         rareEntry, rareSP.Pos.GetPositionX(), rareSP.Pos.GetPositionY(), rareSP.Pos.GetPositionZ());
                 }
             }
@@ -1587,11 +1587,11 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
     uint32 bossesSpawned = 0;
     for (auto& sp : session->SpawnPoints)
     {
-        if (!sp.IsBossPosition || bossesSpawned >= sDMConfig->GetBossCount())
+        if (!sp.IsBossPosition || bossesSpawned >= sAtlasConfig->GetBossCount())
             continue;
 
         uint32 entry = SelectDungeonBoss(theme);
-        if (!entry) { LOG_WARN("module", "DungeonMaster: No boss candidate."); continue; }
+        if (!entry) { LOG_WARN("module", "Atlas: No boss candidate."); continue; }
 
         Creature* b = map->SummonCreature(entry, sp.Pos);
         if (!b) continue;
@@ -1615,8 +1615,8 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
                 true, true, bossAffixHpMult, bossAffixDmgMult, _unused);
 
         applyLevelAndStats(b,
-            sDMConfig->GetBossHealthMult() * bossAffixHpMult,
-            sDMConfig->GetBossDamageMult() * bossAffixDmgMult, true);
+            sAtlasConfig->GetBossHealthMult() * bossAffixHpMult,
+            sAtlasConfig->GetBossDamageMult() * bossAffixDmgMult, true);
 
         SpawnedCreature sc;
         sc.Guid = b->GetGUID(); sc.Entry = entry;
@@ -1624,15 +1624,15 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         session->SpawnedCreatures.push_back(sc);
         ++bossesSpawned;
 
-        LOG_INFO("module", "DungeonMaster: Boss spawned — entry {}, name '{}', "
-            "AI: DungeonMasterCreatureAI (auto-attack), ReactState: {}, Level: {}",
+        LOG_INFO("module", "Atlas: Boss spawned — entry {}, name '{}', "
+            "AI: AtlasCreatureAI (auto-attack), ReactState: {}, Level: {}",
             b->GetEntry(), b->GetName(),
             static_cast<int>(b->GetReactState()),
             b->GetLevel());
     }
     session->TotalBosses = bossesSpawned;
 
-    LOG_INFO("module", "DungeonMaster: Session {} — {} mobs, {} bosses spawned.",
+    LOG_INFO("module", "Atlas: Session {} — {} mobs, {} bosses spawned.",
         session->SessionId, session->TotalMobs, session->TotalBosses);
 
     // --- Reset encounter states to NOT_STARTED so boss AIs can engage properly ---
@@ -1654,14 +1654,14 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
             }
         }
         if (encountersReset > 0)
-            LOG_INFO("module", "DungeonMaster: Reset {} encounter(s) to NOT_STARTED for boss AI activation.",
+            LOG_INFO("module", "Atlas: Reset {} encounter(s) to NOT_STARTED for boss AI activation.",
                 encountersReset);
     }
 
     // --- Spawn roguelike vendor NPC at entrance ---
-    if (session->RoguelikeRunId != 0 && sDMConfig->IsRoguelikeVendorEnabled())
+    if (session->RoguelikeRunId != 0 && sAtlasConfig->IsRoguelikeVendorEnabled())
     {
-        static constexpr uint32 DM_VENDOR_NPC_ENTRY = 500001;
+        static constexpr uint32 ATLAS_VENDOR_NPC_ENTRY = 500001;
 
         // Small offset from entrance so vendor doesn't overlap player spawn point
         float vendorX = session->EntrancePos.GetPositionX() + 3.0f;
@@ -1669,7 +1669,7 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
         float vendorZ = session->EntrancePos.GetPositionZ();
         float vendorO = session->EntrancePos.GetOrientation();
 
-        Creature* vendor = map->SummonCreature(DM_VENDOR_NPC_ENTRY,
+        Creature* vendor = map->SummonCreature(ATLAS_VENDOR_NPC_ENTRY,
             { vendorX, vendorY, vendorZ, vendorO });
         if (vendor)
         {
@@ -1686,19 +1686,19 @@ void DungeonMasterMgr::PopulateDungeon(Session* session, InstanceMap* map)
             // Track for cleanup — ClearDungeonCreatures() will despawn it
             guidList.push_back(vendor->GetGUID());
 
-            LOG_INFO("module", "DungeonMaster: Spawned roguelike vendor at ({:.1f}, {:.1f}, {:.1f}) for session {}",
+            LOG_INFO("module", "Atlas: Spawned roguelike vendor at ({:.1f}, {:.1f}, {:.1f}) for session {}",
                 vendorX, vendorY, vendorZ, session->SessionId);
         }
         else
         {
-            LOG_WARN("module", "DungeonMaster: Failed to spawn roguelike vendor for session {}",
+            LOG_WARN("module", "Atlas: Failed to spawn roguelike vendor for session {}",
                 session->SessionId);
         }
     }
 }
 
 // Select a creature matching the theme
-uint32 DungeonMasterMgr::SelectCreatureForTheme(Theme const* theme, bool isBoss, Session const* session)
+uint32 AtlasMgr::SelectCreatureForTheme(Theme const* theme, bool isBoss, Session const* session)
 {
     if (!theme) return 0;
 
@@ -1752,7 +1752,7 @@ uint32 DungeonMasterMgr::SelectCreatureForTheme(Theme const* theme, bool isBoss,
     // Fallback: any type
     if (candidates.empty() && !anyType)
     {
-        LOG_WARN("module", "DungeonMaster: No '{}' creatures found — falling back to any type.",
+        LOG_WARN("module", "Atlas: No '{}' creatures found — falling back to any type.",
             theme->Name);
 
         if (isBoss)
@@ -1771,7 +1771,7 @@ uint32 DungeonMasterMgr::SelectCreatureForTheme(Theme const* theme, bool isBoss,
     }
 
     // Avoid repeating recently selected trash entries when alternatives exist.
-    if (!isBoss && session && sDMConfig->GetRecentCreatureEntries() > 0
+    if (!isBoss && session && sAtlasConfig->GetRecentCreatureEntries() > 0
         && !session->RecentCreatureEntries.empty())
     {
         std::vector<uint32> filtered;
@@ -1786,17 +1786,17 @@ uint32 DungeonMasterMgr::SelectCreatureForTheme(Theme const* theme, bool isBoss,
 
     if (!candidates.empty())
     {
-        LOG_DEBUG("module", "DungeonMaster: {} candidates for theme '{}' (boss={})",
+        LOG_DEBUG("module", "Atlas: {} candidates for theme '{}' (boss={})",
             candidates.size(), theme->Name, isBoss);
         return candidates[RandInt<size_t>(0, candidates.size() - 1)];
     }
 
-    LOG_ERROR("module", "DungeonMaster: ZERO candidates for theme '{}' (boss={})",
+    LOG_ERROR("module", "Atlas: ZERO candidates for theme '{}' (boss={})",
         theme->Name, isBoss);
     return 0;
 }
 
-uint32 DungeonMasterMgr::SelectDungeonBoss(Theme const* theme)
+uint32 AtlasMgr::SelectDungeonBoss(Theme const* theme)
 {
     if (!theme) return 0;
 
@@ -1825,7 +1825,7 @@ uint32 DungeonMasterMgr::SelectDungeonBoss(Theme const* theme)
     // Fallback: any dungeon boss
     if (candidates.empty())
     {
-        LOG_DEBUG("module", "DungeonMaster: No themed dungeon boss for '{}' — using any dungeon boss.",
+        LOG_DEBUG("module", "Atlas: No themed dungeon boss for '{}' — using any dungeon boss.",
             theme->Name);
         for (auto const& [type, vec] : _dungeonBossPool)
             for (auto const& e : vec)
@@ -1835,23 +1835,23 @@ uint32 DungeonMasterMgr::SelectDungeonBoss(Theme const* theme)
     // Last resort: generic boss pool
     if (candidates.empty())
     {
-        LOG_WARN("module", "DungeonMaster: Dungeon boss pool empty — falling back to generic boss selection.");
+        LOG_WARN("module", "Atlas: Dungeon boss pool empty — falling back to generic boss selection.");
         return SelectCreatureForTheme(theme, true);
     }
 
     uint32 entry = candidates[RandInt<size_t>(0, candidates.size() - 1)];
-    LOG_DEBUG("module", "DungeonMaster: Selected dungeon boss entry {} from {} candidates (theme '{}')",
+    LOG_DEBUG("module", "Atlas: Selected dungeon boss entry {} from {} candidates (theme '{}')",
         entry, candidates.size(), theme->Name);
     return entry;
 }
 
 // Death handling
-void DungeonMasterMgr::HandleCreatureDeath(Creature* creature, Session* session)
+void AtlasMgr::HandleCreatureDeath(Creature* creature, Session* session)
 {
     if (!creature || !session || !session->IsActive())
         return;
 
-    LOG_INFO("module", "DungeonMaster: HandleCreatureDeath called for {} (GUID: {}) in session {}",
+    LOG_INFO("module", "Atlas: HandleCreatureDeath called for {} (GUID: {}) in session {}",
         creature->GetName(), creature->GetGUID().GetCounter(), session->SessionId);
 
     for (auto& sc : session->SpawnedCreatures)
@@ -1863,7 +1863,7 @@ void DungeonMasterMgr::HandleCreatureDeath(Creature* creature, Session* session)
             if (!sc.IsDead)
                 sc.IsDead = true;
 
-            LOG_INFO("module", "DungeonMaster: Processing death for {} (Boss: {}, Elite: {}, LootFilled: {}, KillCredited: {})",
+            LOG_INFO("module", "Atlas: Processing death for {} (Boss: {}, Elite: {}, LootFilled: {}, KillCredited: {})",
                 creature->GetName(), sc.IsBoss, sc.IsElite, sc.LootFilled, sc.KillCredited);
 
             // ---- Loot: always fill here (OnUnitDeath fires AFTER core death processing) ----
@@ -1889,7 +1889,7 @@ void DungeonMasterMgr::HandleCreatureDeath(Creature* creature, Session* session)
                     ppc.Resolved   = false;
                     session->PendingPhaseChecks.push_back(ppc);
 
-                    LOG_INFO("module", "DungeonMaster: Boss '{}' died — deferring kill count for phase check",
+                    LOG_INFO("module", "Atlas: Boss '{}' died — deferring kill count for phase check",
                         creature->GetName());
                 }
                 else
@@ -1906,7 +1906,7 @@ void DungeonMasterMgr::HandleCreatureDeath(Creature* creature, Session* session)
     // Completion is now handled by the phase check system in Update()
 }
 
-void DungeonMasterMgr::HandleBossDeath(Session* session)
+void AtlasMgr::HandleBossDeath(Session* session)
 {
     if (!session) return;
     for (auto const& pd : session->Players)
@@ -1922,11 +1922,11 @@ void DungeonMasterMgr::HandleBossDeath(Session* session)
 }
 
     // Called from JustDied hook — fills loot before corpse is opened
-void DungeonMasterMgr::OnCreatureDeathHook(Creature* creature)
+void AtlasMgr::OnCreatureDeathHook(Creature* creature)
 {
     if (!creature) return;
 
-    LOG_INFO("module", "DungeonMaster: OnCreatureDeathHook called for {} (GUID: {})",
+    LOG_INFO("module", "Atlas: OnCreatureDeathHook called for {} (GUID: {})",
         creature->GetName(), creature->GetGUID().GetCounter());
 
     std::lock_guard<std::mutex> lock(_sessionMutex);
@@ -1944,13 +1944,13 @@ void DungeonMasterMgr::OnCreatureDeathHook(Creature* creature)
             {
                 if (sc.IsDead)
                 {
-                    LOG_WARN("module", "DungeonMaster: OnCreatureDeathHook - creature {} already marked as dead",
+                    LOG_WARN("module", "Atlas: OnCreatureDeathHook - creature {} already marked as dead",
                         creature->GetGUID().GetCounter());
                     return;
                 }
 
                 sc.IsDead = true;
-                LOG_INFO("module", "DungeonMaster: OnCreatureDeathHook processing death for {} (Boss: {}, Elite: {})",
+                LOG_INFO("module", "Atlas: OnCreatureDeathHook processing death for {} (Boss: {}, Elite: {})",
                     creature->GetName(), sc.IsBoss, sc.IsElite);
 
                 // ----------------------------------------------------------
@@ -1981,7 +1981,7 @@ void DungeonMasterMgr::OnCreatureDeathHook(Creature* creature)
                         ppc.Resolved   = false;
                         session.PendingPhaseChecks.push_back(ppc);
 
-                        LOG_INFO("module", "DungeonMaster: Boss '{}' died — deferring kill count for phase check (entry {})",
+                        LOG_INFO("module", "Atlas: Boss '{}' died — deferring kill count for phase check (entry {})",
                             creature->GetName(), creature->GetEntry());
                     }
                     else
@@ -1992,7 +1992,7 @@ void DungeonMasterMgr::OnCreatureDeathHook(Creature* creature)
                     }
                 }
 
-                LOG_DEBUG("module", "DungeonMaster: Creature {} (entry {}) death handled via hook "
+                LOG_DEBUG("module", "Atlas: Creature {} (entry {}) death handled via hook "
                     "(session {}, boss={}).  Loot deferred to OnUnitDeath.",
                     creature->GetGUID().ToString(), creature->GetEntry(),
                     sid, sc.IsBoss);
@@ -2002,7 +2002,7 @@ void DungeonMasterMgr::OnCreatureDeathHook(Creature* creature)
     }
 }
 
-void DungeonMasterMgr::HandlePlayerDeath(Player* player, Session* session)
+void AtlasMgr::HandlePlayerDeath(Player* player, Session* session)
 {
     if (!player || !session) return;
 
@@ -2052,10 +2052,10 @@ void DungeonMasterMgr::HandlePlayerDeath(Player* player, Session* session)
 }
 
 // Rewards
-void DungeonMasterMgr::DistributeRewards(Session* session)
+void AtlasMgr::DistributeRewards(Session* session)
 {
     if (!session) return;
-    DifficultyTier const* diff = sDMConfig->GetDifficulty(session->DifficultyId);
+    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(session->DifficultyId);
     if (!diff) return;
 
     uint32 lvl       = session->EffectiveLevel;
@@ -2067,7 +2067,7 @@ void DungeonMasterMgr::DistributeRewards(Session* session)
 
     uint8 rewardLevel = static_cast<uint8>(std::min<uint32>(lvl, 80));
 
-    LOG_INFO("module", "DungeonMaster: DistributeRewards — EffectiveLevel={}, rewardLevel={}, "
+    LOG_INFO("module", "Atlas: DistributeRewards — EffectiveLevel={}, rewardLevel={}, "
         "rewardPool={} items, players={}",
         lvl, rewardLevel, _rewardItems.size(), session->Players.size());
 
@@ -2076,7 +2076,7 @@ void DungeonMasterMgr::DistributeRewards(Session* session)
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (!p || !p->IsInWorld())
         {
-            LOG_WARN("module", "DungeonMaster: Player {} not found/not in world for rewards", pd.PlayerGuid.GetCounter());
+            LOG_WARN("module", "Atlas: Player {} not found/not in world for rewards", pd.PlayerGuid.GetCounter());
             continue;
         }
 
@@ -2086,16 +2086,16 @@ void DungeonMasterMgr::DistributeRewards(Session* session)
         // Completion item: roll epic first, then rare, fallback green
         // Item goes directly to inventory (mail fallback if bags full)
         uint8 quality = 2;  // green baseline
-        if (RandInt<uint32>(1, 100) <= sDMConfig->GetEpicChance())
+        if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetEpicChance())
             quality = 4;
-        else if (RandInt<uint32>(1, 100) <= sDMConfig->GetRareChance())
+        else if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetRareChance())
             quality = 3;
 
         GiveItemReward(p, rewardLevel, quality);
     }
 }
 
-void DungeonMasterMgr::GiveKillXP(Session* session, bool isBoss, bool isElite)
+void AtlasMgr::GiveKillXP(Session* session, bool isBoss, bool isElite)
 {
     if (!session) return;
 
@@ -2116,7 +2116,7 @@ void DungeonMasterMgr::GiveKillXP(Session* session, bool isBoss, bool isElite)
     }
 }
 
-void DungeonMasterMgr::GiveGoldReward(Player* player, uint32 amount)
+void AtlasMgr::GiveGoldReward(Player* player, uint32 amount)
 {
     if (!player || !amount) return;
     player->ModifyMoney(amount);
@@ -2129,7 +2129,7 @@ void DungeonMasterMgr::GiveGoldReward(Player* player, uint32 amount)
     }
 }
 
-void DungeonMasterMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
+void AtlasMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
 {
     uint32 playerClass = player->getClass();
     uint32 itemEntry = SelectRewardItem(level, quality, playerClass);
@@ -2138,7 +2138,7 @@ void DungeonMasterMgr::GiveItemReward(Player* player, uint8 level, uint8 quality
     // but still maintain level appropriateness
     if (!itemEntry && quality > 2)
     {
-        LOG_WARN("module", "DungeonMaster: No quality {} items for level {}, class {}. Trying lower quality...",
+        LOG_WARN("module", "Atlas: No quality {} items for level {}, class {}. Trying lower quality...",
             quality, level, playerClass);
         for (uint8 q = quality - 1; q >= 2 && !itemEntry; --q)
             itemEntry = SelectRewardItem(level, q, playerClass);
@@ -2146,7 +2146,7 @@ void DungeonMasterMgr::GiveItemReward(Player* player, uint8 level, uint8 quality
 
     if (!itemEntry)
     {
-        LOG_ERROR("module", "DungeonMaster: No suitable reward item for player {} (level {}, class {}, quality {}). "
+        LOG_ERROR("module", "Atlas: No suitable reward item for player {} (level {}, class {}, quality {}). "
             "Reward pool has {} items total. Gold only.",
             player->GetName(), level, playerClass, quality, _rewardItems.size());
         if (player->GetSession())
@@ -2155,7 +2155,7 @@ void DungeonMasterMgr::GiveItemReward(Player* player, uint8 level, uint8 quality
         return;
     }
 
-    LOG_INFO("module", "DungeonMaster: Giving item {} to {} (level {}, quality {}, class {})",
+    LOG_INFO("module", "Atlas: Giving item {} to {} (level {}, quality {}, class {})",
         itemEntry, player->GetName(), level, quality, playerClass);
 
     ItemPosCountVec dest;
@@ -2194,13 +2194,13 @@ void DungeonMasterMgr::GiveItemReward(Player* player, uint8 level, uint8 quality
         }
         else
         {
-            LOG_ERROR("module", "DungeonMaster: Failed to create mail item {} for {}", itemEntry, player->GetName());
+            LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
         }
     }
 }
 
     // Mail a reward item to player
-void DungeonMasterMgr::MailItemReward(Player* player, uint8 level, uint8 quality,
+void AtlasMgr::MailItemReward(Player* player, uint8 level, uint8 quality,
                                        std::string const& subject, std::string const& body)
 {
     if (!player || !player->IsInWorld()) return;
@@ -2238,7 +2238,7 @@ void DungeonMasterMgr::MailItemReward(Player* player, uint8 level, uint8 quality
 
     if (!itemEntry)
     {
-        LOG_ERROR("module", "DungeonMaster: No reward item found for mail to {} (level {}, class {})",
+        LOG_ERROR("module", "Atlas: No reward item found for mail to {} (level {}, class {})",
             player->GetName(), level, playerClass);
         return;
     }
@@ -2269,11 +2269,11 @@ void DungeonMasterMgr::MailItemReward(Player* player, uint8 level, uint8 quality
     }
     else
     {
-        LOG_ERROR("module", "DungeonMaster: Failed to create mail item {} for {}", itemEntry, player->GetName());
+        LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
     }
 }
 
-void DungeonMasterMgr::DistributeRoguelikeRewards(uint32 tier, uint8 effectiveLevel,
+void AtlasMgr::DistributeRoguelikeRewards(uint32 tier, uint8 effectiveLevel,
                                                     std::vector<ObjectGuid> const& playerGuids)
 {
     uint8 rewardLevel = static_cast<uint8>(std::min<uint32>(effectiveLevel, 80));
@@ -2293,7 +2293,7 @@ void DungeonMasterMgr::DistributeRoguelikeRewards(uint32 tier, uint8 effectiveLe
     else if (tier >= 5) { blueItems = 2; }
     else if (tier >= 3) { blueItems = 1; greenItems = 1; }
 
-    LOG_INFO("module", "DungeonMaster: DistributeRoguelikeRewards — tier={}, level={}, "
+    LOG_INFO("module", "Atlas: DistributeRoguelikeRewards — tier={}, level={}, "
         "blue={}, green={}, epic={}, epicChance={}%, gold={}",
         tier, rewardLevel, blueItems, greenItems, epicItems, epicChance, tierGold);
 
@@ -2395,7 +2395,7 @@ static float ScoreItemForClass(uint32 itemEntry, uint32 playerClass)
     return primaryTotal / totalStats;
 }
 
-uint32 DungeonMasterMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass)
+uint32 AtlasMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass)
 {
     uint8  maxArmor   = GetMaxArmorSubclass(playerClass);
     uint32 classMask  = GetClassBitmask(playerClass);
@@ -2438,7 +2438,7 @@ uint32 DungeonMasterMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 pla
 
         if (!cands.empty())
         {
-            LOG_INFO("module", "DungeonMaster: SelectRewardItem(level={}, quality={}, class={}) "
+            LOG_INFO("module", "Atlas: SelectRewardItem(level={}, quality={}, class={}) "
                 "-> {} candidates in window [{}, {}]",
                 level, quality, playerClass, cands.size(), lo, hi);
 
@@ -2463,14 +2463,14 @@ uint32 DungeonMasterMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 pla
         }
     }
 
-    LOG_WARN("module", "DungeonMaster: SelectRewardItem(level={}, quality={}, class={}) "
+    LOG_WARN("module", "Atlas: SelectRewardItem(level={}, quality={}, class={}) "
         "-> NO candidates found in reward pool ({} items total)",
         level, quality, playerClass, _rewardItems.size());
 
     return 0;
 }
 
-uint32 DungeonMasterMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality,
+uint32 AtlasMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality,
                                         bool equipmentOnly, uint32 playerClass)
 {
     // Expected ItemLevel range for this level
@@ -2527,7 +2527,7 @@ uint32 DungeonMasterMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 max
 
         if (!cands.empty())
         {
-            LOG_INFO("module", "DungeonMaster: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
+            LOG_INFO("module", "Atlas: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
                 "-> {} candidates in window [{}, {}]",
                 level, minQuality, maxQuality, equipmentOnly, playerClass, cands.size(), lo, hi);
 
@@ -2551,14 +2551,14 @@ uint32 DungeonMasterMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 max
         }
     }
 
-    LOG_WARN("module", "DungeonMaster: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
+    LOG_WARN("module", "Atlas: SelectLootItem(level={}, quality={}-{}, eqOnly={}, class={}) "
         "-> NO candidates found in loot pool ({} items total)",
         level, minQuality, maxQuality, equipmentOnly, playerClass, _lootPool.size());
 
     return 0;
 }
 
-void DungeonMasterMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBoss)
+void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBoss)
 {
     if (!creature || !session) return;
 
@@ -2603,7 +2603,7 @@ void DungeonMasterMgr::FillCreatureLoot(Creature* creature, Session* session, bo
         uint32 entry = SelectLootItem(level, minQ, maxQ, eqOnly, eqOnly ? lootClass : 0);
         if (!entry)
         {
-            LOG_WARN("module", "DungeonMaster: FillCreatureLoot failed to find item (level={}, quality={}-{}, eqOnly={}, class={})",
+            LOG_WARN("module", "Atlas: FillCreatureLoot failed to find item (level={}, quality={}-{}, eqOnly={}, class={})",
                 level, minQ, maxQ, eqOnly, lootClass);
             return false;
         }
@@ -2611,7 +2611,7 @@ void DungeonMasterMgr::FillCreatureLoot(Creature* creature, Session* session, bo
         LootStoreItem storeItem(entry, 0, 100.0f, false, 1, 0, 1, 1);
         loot.AddItem(storeItem);
         ++itemsAdded;
-        LOG_INFO("module", "DungeonMaster: Added loot item {} (quality {}-{}) to {} (boss={})",
+        LOG_INFO("module", "Atlas: Added loot item {} (quality {}-{}) to {} (boss={})",
             entry, minQ, maxQ, creature->GetName(), isBoss);
         return true;
     };
@@ -2711,7 +2711,7 @@ void DungeonMasterMgr::FillCreatureLoot(Creature* creature, Session* session, bo
                 creature->SendUpdateToPlayer(p);
         }
 
-        LOG_INFO("module", "DungeonMaster: Group loot triggered for {} — {} items, "
+        LOG_INFO("module", "Atlas: Group loot triggered for {} — {} items, "
             "lootMethod={}, threshold={}, groupSize={}",
             creature->GetName(), loot.items.size(),
             static_cast<int>(group->GetLootMethod()), threshold, group->GetMembersCount());
@@ -2721,12 +2721,12 @@ void DungeonMasterMgr::FillCreatureLoot(Creature* creature, Session* session, bo
         creature->SetLootRecipient(looter);
     }
 
-    LOG_INFO("module", "DungeonMaster: FillCreatureLoot complete for {} (GUID: {}, Boss: {}, Level: {}, Gold: {}, Items: {})",
+    LOG_INFO("module", "Atlas: FillCreatureLoot complete for {} (GUID: {}, Boss: {}, Level: {}, Gold: {}, Items: {})",
         creature->GetName(), creature->GetGUID().GetCounter(), isBoss, level, loot.gold, itemsAdded);
 }
 
 // Session end / cleanup
-void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
+void AtlasMgr::EndSession(uint32 sessionId, bool success)
 {
     // Check if roguelike session
     uint32 roguelikeRunId = 0;
@@ -2740,7 +2740,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
 
         if (roguelikeRunId != 0)
         {
-            LOG_INFO("module", "DungeonMaster: EndSession {} — roguelike run {}, delegating to RoguelikeMgr.",
+            LOG_INFO("module", "Atlas: EndSession {} — roguelike run {}, delegating to RoguelikeMgr.",
                 sessionId, roguelikeRunId);
 
             // Persist stats while session is still alive
@@ -2772,7 +2772,7 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
 
     Session& s = it->second;
 
-    LOG_INFO("module", "DungeonMaster: EndSession {} — success={}, state={}, players={}",
+    LOG_INFO("module", "Atlas: EndSession {} — success={}, state={}, players={}",
         sessionId, success, static_cast<int>(s.State), s.Players.size());
 
     for (auto const& pd : s.Players)
@@ -2808,9 +2808,9 @@ void DungeonMasterMgr::EndSession(uint32 sessionId, bool success)
     g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
 }
 
-void DungeonMasterMgr::AbandonSession(uint32 id) { EndSession(id, false); }
+void AtlasMgr::AbandonSession(uint32 id) { EndSession(id, false); }
 
-void DungeonMasterMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
+void AtlasMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto it = _activeSessions.find(sessionId);
@@ -2836,11 +2836,11 @@ void DungeonMasterMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
     _activeSessions.erase(it);
     g_dmActiveSessionCount.store(static_cast<uint32>(_activeSessions.size()), std::memory_order_relaxed);
 
-    LOG_DEBUG("module", "DungeonMaster: Roguelike session {} cleaned up (success={}).",
+    LOG_DEBUG("module", "Atlas: Roguelike session {} cleaned up (success={}).",
         sessionId, success);
 }
 
-void DungeonMasterMgr::CleanupSession(Session& s)
+void AtlasMgr::CleanupSession(Session& s)
 {
     // Release level ownership before the instance id is cleared, otherwise the
     // map grows for the lifetime of the process.
@@ -2854,16 +2854,16 @@ void DungeonMasterMgr::CleanupSession(Session& s)
 // Creature level ownership
 //
 // Cheap global gate so the AllCreatureScript hooks cost nothing on a server with
-// no active Dungeon Master session.
+// no active Atlas session.
 // ---------------------------------------------------------------------------
 static std::atomic<uint32> g_dmOwnedCount{0};
 
-bool DungeonMasterMgr::HasOwnedCreatures()
+bool AtlasMgr::HasOwnedCreatures()
 {
     return g_dmOwnedCount.load(std::memory_order_relaxed) != 0;
 }
 
-void DungeonMasterMgr::RegisterOwnedCreature(ObjectGuid guid, uint8 level, uint32 maxHealth, uint32 instanceId)
+void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, uint8 level, uint32 maxHealth, uint32 instanceId)
 {
     if (!guid || !level)
         return;
@@ -2879,7 +2879,7 @@ void DungeonMasterMgr::RegisterOwnedCreature(ObjectGuid guid, uint8 level, uint3
     oc.InstanceId = instanceId;
 }
 
-bool DungeonMasterMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const
+bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const
 {
     std::lock_guard<std::mutex> lock(_ownedMutex);
 
@@ -2892,7 +2892,7 @@ bool DungeonMasterMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& m
     return true;
 }
 
-void DungeonMasterMgr::ForgetOwnedCreature(ObjectGuid guid)
+void AtlasMgr::ForgetOwnedCreature(ObjectGuid guid)
 {
     std::lock_guard<std::mutex> lock(_ownedMutex);
 
@@ -2900,7 +2900,7 @@ void DungeonMasterMgr::ForgetOwnedCreature(ObjectGuid guid)
         g_dmOwnedCount.fetch_sub(1, std::memory_order_relaxed);
 }
 
-void DungeonMasterMgr::ForgetOwnedCreaturesForInstance(uint32 instanceId)
+void AtlasMgr::ForgetOwnedCreaturesForInstance(uint32 instanceId)
 {
     if (!instanceId)
         return;
@@ -2919,11 +2919,11 @@ void DungeonMasterMgr::ForgetOwnedCreaturesForInstance(uint32 instanceId)
     }
 }
 
-// Scale an add summoned by a Dungeon Master creature. SelectCreatureForTheme()
+// Scale an add summoned by an Atlas creature. SelectCreatureForTheme()
 // matches on creature type only and no summon hook was installed, so an add
 // would otherwise enter the instance at its own template level — e.g. a level-69
 // Fel Imp inside a level-25 run, which the client marks with a skull.
-void DungeonMasterMgr::ScaleSummonedCreature(Creature* creature, Session* session)
+void AtlasMgr::ScaleSummonedCreature(Creature* creature, Session* session)
 {
     if (!creature || !session)
         return;
@@ -2977,7 +2977,7 @@ void DungeonMasterMgr::ScaleSummonedCreature(Creature* creature, Session* sessio
 }
 
 // Cooldowns
-bool DungeonMasterMgr::IsOnCooldown(ObjectGuid g) const
+bool AtlasMgr::IsOnCooldown(ObjectGuid g) const
 {
     std::lock_guard<std::mutex> lock(_cooldownMutex);
     auto it = _cooldowns.find(g);
@@ -2985,19 +2985,19 @@ bool DungeonMasterMgr::IsOnCooldown(ObjectGuid g) const
         && GameTime::GetGameTime().count() < static_cast<time_t>(it->second);
 }
 
-void DungeonMasterMgr::SetCooldown(ObjectGuid g)
+void AtlasMgr::SetCooldown(ObjectGuid g)
 {
     std::lock_guard<std::mutex> lock(_cooldownMutex);
-    _cooldowns[g] = GameTime::GetGameTime().count() + sDMConfig->GetCooldownMinutes() * 60;
+    _cooldowns[g] = GameTime::GetGameTime().count() + sAtlasConfig->GetCooldownMinutes() * 60;
 }
 
-void DungeonMasterMgr::ClearCooldown(ObjectGuid g)
+void AtlasMgr::ClearCooldown(ObjectGuid g)
 {
     std::lock_guard<std::mutex> lock(_cooldownMutex);
     _cooldowns.erase(g);
 }
 
-uint32 DungeonMasterMgr::GetRemainingCooldown(ObjectGuid g) const
+uint32 AtlasMgr::GetRemainingCooldown(ObjectGuid g) const
 {
     std::lock_guard<std::mutex> lock(_cooldownMutex);
     auto it = _cooldowns.find(g);
@@ -3007,14 +3007,14 @@ uint32 DungeonMasterMgr::GetRemainingCooldown(ObjectGuid g) const
         ? static_cast<uint32>(it->second - now) : 0;
 }
 
-bool DungeonMasterMgr::CanCreateNewSession() const
+bool AtlasMgr::CanCreateNewSession() const
 {
-    return _activeSessions.size() < sDMConfig->GetMaxConcurrentRuns();
+    return _activeSessions.size() < sAtlasConfig->GetMaxConcurrentRuns();
 }
 
 // Player Statistics & Leaderboard
 
-void DungeonMasterMgr::LoadAllPlayerStats()
+void AtlasMgr::LoadAllPlayerStats()
 {
     std::lock_guard<std::mutex> lock(_statsMutex);
     _playerStats.clear();
@@ -3022,11 +3022,11 @@ void DungeonMasterMgr::LoadAllPlayerStats()
     QueryResult result = CharacterDatabase.Query(
         "SELECT guid, total_runs, completed_runs, failed_runs, "
         "total_mobs_killed, total_bosses_killed, total_deaths, fastest_clear "
-        "FROM dm_player_stats");
+        "FROM atlas_player_stats");
 
     if (!result)
     {
-        LOG_INFO("module", "DungeonMaster: No player stats found (table may be empty or missing).");
+        LOG_INFO("module", "Atlas: No player stats found (table may be empty or missing).");
         return;
     }
 
@@ -3049,10 +3049,10 @@ void DungeonMasterMgr::LoadAllPlayerStats()
         ++count;
     } while (result->NextRow());
 
-    LOG_INFO("module", "DungeonMaster: Loaded stats for {} players.", count);
+    LOG_INFO("module", "Atlas: Loaded stats for {} players.", count);
 }
 
-PlayerStats DungeonMasterMgr::GetPlayerStats(ObjectGuid guid) const
+PlayerStats AtlasMgr::GetPlayerStats(ObjectGuid guid) const
 {
     std::lock_guard<std::mutex> lock(_statsMutex);
     uint32 guidLow = guid.GetCounter();
@@ -3062,7 +3062,7 @@ PlayerStats DungeonMasterMgr::GetPlayerStats(ObjectGuid guid) const
     return {};
 }
 
-void DungeonMasterMgr::SavePlayerStats(uint32 guidLow)
+void AtlasMgr::SavePlayerStats(uint32 guidLow)
 {
     PlayerStats ps;
     {
@@ -3073,7 +3073,7 @@ void DungeonMasterMgr::SavePlayerStats(uint32 guidLow)
     }
 
     CharacterDatabase.Execute(
-        "REPLACE INTO dm_player_stats "
+        "REPLACE INTO atlas_player_stats "
         "(guid, total_runs, completed_runs, failed_runs, "
         "total_mobs_killed, total_bosses_killed, total_deaths, fastest_clear) "
         "VALUES ({}, {}, {}, {}, {}, {}, {}, {})",
@@ -3081,7 +3081,7 @@ void DungeonMasterMgr::SavePlayerStats(uint32 guidLow)
         ps.TotalMobsKilled, ps.TotalBossesKilled, ps.TotalDeaths, ps.FastestClear);
 }
 
-void DungeonMasterMgr::UpdatePlayerStatsFromSession(Session const& session, bool success)
+void AtlasMgr::UpdatePlayerStatsFromSession(Session const& session, bool success)
 {
     uint32 clearTime = 0;
     if (session.EndTime > session.StartTime)
@@ -3115,7 +3115,7 @@ void DungeonMasterMgr::UpdatePlayerStatsFromSession(Session const& session, bool
     }
 }
 
-void DungeonMasterMgr::SaveLeaderboardEntry(Session const& session)
+void AtlasMgr::SaveLeaderboardEntry(Session const& session)
 {
     uint32 clearTime = 0;
     if (session.EndTime > session.StartTime)
@@ -3149,7 +3149,7 @@ void DungeonMasterMgr::SaveLeaderboardEntry(Session const& session)
     std::string safeName = e.CharName;
     CharacterDatabase.EscapeString(safeName);
     CharacterDatabase.Execute(
-        "INSERT INTO dm_leaderboard "
+        "INSERT INTO atlas_leaderboard "
         "(guid, char_name, map_id, difficulty_id, clear_time, party_size, scaled, "
         "effective_level, mobs_killed, bosses_killed, deaths) "
         "VALUES ({}, '{}', {}, {}, {}, {}, {}, {}, {}, {}, {})",
@@ -3163,13 +3163,13 @@ void DungeonMasterMgr::SaveLeaderboardEntry(Session const& session)
 // Leaderboards are read from the NPC menu, i.e. on a map thread: serve them
 // from memory (loaded once at startup, appended on save) instead of running a
 // synchronous characters-DB query per menu open.
-void DungeonMasterMgr::LoadLeaderboard()
+void AtlasMgr::LoadLeaderboard()
 {
     std::vector<LeaderboardEntry> rows;
 
     if (QueryResult result = CharacterDatabase.Query(
             "SELECT id, guid, char_name, map_id, difficulty_id, clear_time, party_size, "
-            "scaled, effective_level, mobs_killed, bosses_killed, deaths FROM dm_leaderboard"))
+            "scaled, effective_level, mobs_killed, bosses_killed, deaths FROM atlas_leaderboard"))
     {
         do
         {
@@ -3195,7 +3195,7 @@ void DungeonMasterMgr::LoadLeaderboard()
     _leaderboard = std::move(rows);
 }
 
-std::vector<LeaderboardEntry> DungeonMasterMgr::GetLeaderboard(
+std::vector<LeaderboardEntry> AtlasMgr::GetLeaderboard(
     uint32 mapId, uint32 difficultyId, uint32 limit) const
 {
     std::vector<LeaderboardEntry> entries;
@@ -3213,7 +3213,7 @@ std::vector<LeaderboardEntry> DungeonMasterMgr::GetLeaderboard(
     return entries;
 }
 
-std::vector<LeaderboardEntry> DungeonMasterMgr::GetOverallLeaderboard(uint32 limit) const
+std::vector<LeaderboardEntry> AtlasMgr::GetOverallLeaderboard(uint32 limit) const
 {
     std::vector<LeaderboardEntry> entries;
     {
@@ -3229,17 +3229,17 @@ std::vector<LeaderboardEntry> DungeonMasterMgr::GetOverallLeaderboard(uint32 lim
 }
 
 // Scaling multipliers
-float DungeonMasterMgr::CalculateHealthMultiplier(Session const* s) const
+float AtlasMgr::CalculateHealthMultiplier(Session const* s) const
 {
     if (!s) return 1.0f;
-    DifficultyTier const* d = sDMConfig->GetDifficulty(s->DifficultyId);
+    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s->DifficultyId);
     if (!d) return 1.0f;
 
     float base = d->HealthMultiplier;
     uint32 n   = s->Players.size();
     float mult;
-    if (n <= 1) mult = base * sDMConfig->GetSoloMultiplier();
-    else        mult = base * (1.0f + (n - 1) * sDMConfig->GetPerPlayerHealthMult());
+    if (n <= 1) mult = base * sAtlasConfig->GetSoloMultiplier();
+    else        mult = base * (1.0f + (n - 1) * sAtlasConfig->GetPerPlayerHealthMult());
 
     // Roguelike tier scaling
     if (s->RoguelikeRunId != 0)
@@ -3248,17 +3248,17 @@ float DungeonMasterMgr::CalculateHealthMultiplier(Session const* s) const
     return mult;
 }
 
-float DungeonMasterMgr::CalculateDamageMultiplier(Session const* s) const
+float AtlasMgr::CalculateDamageMultiplier(Session const* s) const
 {
     if (!s) return 1.0f;
-    DifficultyTier const* d = sDMConfig->GetDifficulty(s->DifficultyId);
+    DifficultyTier const* d = sAtlasConfig->GetDifficulty(s->DifficultyId);
     if (!d) return 1.0f;
 
     float base = d->DamageMultiplier;
     uint32 n   = s->Players.size();
     float mult;
-    if (n <= 1) mult = base * sDMConfig->GetSoloMultiplier();
-    else        mult = base * (1.0f + (n - 1) * sDMConfig->GetPerPlayerDamageMult());
+    if (n <= 1) mult = base * sAtlasConfig->GetSoloMultiplier();
+    else        mult = base * (1.0f + (n - 1) * sAtlasConfig->GetPerPlayerDamageMult());
 
     // Roguelike tier scaling
     if (s->RoguelikeRunId != 0)
@@ -3268,7 +3268,7 @@ float DungeonMasterMgr::CalculateDamageMultiplier(Session const* s) const
 }
 
 // Check if creature belongs to an active session
-bool DungeonMasterMgr::IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creatureGuid)
+bool AtlasMgr::IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creatureGuid)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto pit = _playerToSession.find(playerGuid);
@@ -3283,7 +3283,7 @@ bool DungeonMasterMgr::IsSessionCreature(ObjectGuid playerGuid, ObjectGuid creat
 }
 
 // Check if creature is a session boss
-bool DungeonMasterMgr::IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureGuid)
+bool AtlasMgr::IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureGuid)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto pit = _playerToSession.find(playerGuid);
@@ -3304,7 +3304,7 @@ bool DungeonMasterMgr::IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureG
 // Compute damage scale for a session creature attacking a session player.
 // Spell/ability damage is hard-coded in DBC at the boss's original design level.
 // This returns a multiplier to bring that damage in line with the session's level.
-float DungeonMasterMgr::GetSessionCreatureDamageScale(
+float AtlasMgr::GetSessionCreatureDamageScale(
     ObjectGuid playerGuid, ObjectGuid creatureGuid)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
@@ -3360,7 +3360,7 @@ float DungeonMasterMgr::GetSessionCreatureDamageScale(
 // level-scaled melee on creation, but their spells keep template damage. Scale
 // those like a boss's. Returns a negative value if the creature is not owned,
 // so the caller falls back to the environmental cap.
-float DungeonMasterMgr::GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature)
+float AtlasMgr::GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature)
 {
     uint8  ownedLevel = 0;
     uint32 ownedHp    = 0;
@@ -3381,7 +3381,7 @@ float DungeonMasterMgr::GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creat
 
 // Template-level spell damage → session-level damage, from the
 // creature_classlevelstats base damage ratio. Clamped to [0.03, 1].
-float DungeonMasterMgr::ComputeLevelDamageScale(Session const& session, Creature const* creature) const
+float AtlasMgr::ComputeLevelDamageScale(Session const& session, Creature const* creature) const
 {
     uint8 targetLevel   = session.EffectiveLevel;
     uint8 templateLevel = creature->GetCreatureTemplate()->maxlevel;
@@ -3410,12 +3410,12 @@ float DungeonMasterMgr::ComputeLevelDamageScale(Session const& session, Creature
     // Apply solo/party multiplier so boss spells feel consistent with melee
     uint32 n = session.Players.size();
     if (n <= 1)
-        scale *= sDMConfig->GetSoloMultiplier();
+        scale *= sAtlasConfig->GetSoloMultiplier();
 
     // Clamp: never fully negate, never amplify
     scale = std::max(0.03f, std::min(1.0f, scale));
 
-    LOG_DEBUG("module", "DungeonMaster: Boss spell damage scale for session {} — "
+    LOG_DEBUG("module", "Atlas: Boss spell damage scale for session {} — "
         "targetLvl={}, templateLvl={}, scale={:.3f}",
         session.SessionId, targetLevel, templateLevel, scale);
 
@@ -3423,7 +3423,7 @@ float DungeonMasterMgr::ComputeLevelDamageScale(Session const& session, Creature
 }
 
 // Scale environmental damage to party level
-float DungeonMasterMgr::GetEnvironmentalDamageScale(ObjectGuid playerGuid)
+float AtlasMgr::GetEnvironmentalDamageScale(ObjectGuid playerGuid)
 {
     std::lock_guard<std::mutex> lock(_sessionMutex);
     auto pit = _playerToSession.find(playerGuid);
@@ -3439,7 +3439,7 @@ float DungeonMasterMgr::GetEnvironmentalDamageScale(ObjectGuid playerGuid)
     if (!session.ScaleToParty)
         return 1.0f;
 
-    DungeonInfo const* dg = sDMConfig->GetDungeon(session.MapId);
+    DungeonInfo const* dg = sAtlasConfig->GetDungeon(session.MapId);
     if (!dg)
         return 1.0f;
 
@@ -3458,7 +3458,7 @@ float DungeonMasterMgr::GetEnvironmentalDamageScale(ObjectGuid playerGuid)
 }
 
 // Main update tick (1s interval)
-void DungeonMasterMgr::Update(uint32 diff)
+void AtlasMgr::Update(uint32 diff)
 {
     _updateTimer += diff;
     if (_updateTimer < UPDATE_INTERVAL)
@@ -3519,7 +3519,7 @@ void DungeonMasterMgr::Update(uint32 diff)
 
                                 PopulateDungeon(&session, inst);
 
-                                LOG_INFO("module", "DungeonMaster: Session {} — populated (map {}, mobs={}, bosses={})",
+                                LOG_INFO("module", "Atlas: Session {} — populated (map {}, mobs={}, bosses={})",
                                     session.SessionId, session.MapId,
                                     session.TotalMobs, session.TotalBosses);
 
@@ -3605,7 +3605,7 @@ void DungeonMasterMgr::Update(uint32 diff)
                             {
                                 if (!nc || !nc->IsAlive() || nc->IsPet() || nc->IsGuardian())
                                     continue;
-                                if (nc->GetEntry() == sDMConfig->GetNpcEntry())
+                                if (nc->GetEntry() == sAtlasConfig->GetNpcEntry())
                                     continue;
                                 if (ourGuids.count(nc->GetGUID()) > 0)
                                     continue;  // Already tracked
@@ -3624,7 +3624,7 @@ void DungeonMasterMgr::Update(uint32 diff)
                                     continue;
 
                                 // Promote to boss creature
-                                LOG_INFO("module", "DungeonMaster: Phase creature detected! '{}' (entry {}) "
+                                LOG_INFO("module", "Atlas: Phase creature detected! '{}' (entry {}) "
                                     "spawned {:.1f} yds from boss death location — promoting to boss",
                                     nc->GetName(), nc->GetEntry(), dist);
 
@@ -3665,7 +3665,7 @@ void DungeonMasterMgr::Update(uint32 diff)
                             for (auto& pd : session.Players)
                                 ++pd.BossesKilled;
 
-                            LOG_INFO("module", "DungeonMaster: Boss kill confirmed (entry {}) — progress: {}/{}",
+                            LOG_INFO("module", "Atlas: Boss kill confirmed (entry {}) — progress: {}/{}",
                                 ppc.OrigEntry, session.BossesKilled, session.TotalBosses);
                             HandleBossDeath(&session);
 
@@ -3677,8 +3677,8 @@ void DungeonMasterMgr::Update(uint32 diff)
                                 session.EndTime = GameTime::GetGameTime().count();
 
                                 uint32 delay = (session.RoguelikeRunId != 0)
-                                    ? sDMConfig->GetRoguelikeTransitionDelay()
-                                    : sDMConfig->GetCompletionTeleportDelay();
+                                    ? sAtlasConfig->GetRoguelikeTransitionDelay()
+                                    : sAtlasConfig->GetCompletionTeleportDelay();
 
                                 for (auto const& pd2 : session.Players)
                                     if (Player* p = ObjectAccessor::FindPlayer(pd2.PlayerGuid))
@@ -3707,7 +3707,7 @@ void DungeonMasterMgr::Update(uint32 diff)
                     Map* m = ref->GetMap();
                     if (m && m->IsDungeon())
                     {
-                        uint32 npcEntry = sDMConfig->GetNpcEntry();
+                        uint32 npcEntry = sAtlasConfig->GetNpcEntry();
 
                         // Collect matches first: DespawnOrUnsummon() mutates the map's
                         // creature-by-spawnId container, so we must not call it while
@@ -3778,8 +3778,8 @@ void DungeonMasterMgr::Update(uint32 diff)
             if (session.State == SessionState::Completed)
             {
                 uint32 delay = (session.RoguelikeRunId != 0)
-                    ? sDMConfig->GetRoguelikeTransitionDelay()
-                    : sDMConfig->GetCompletionTeleportDelay();
+                    ? sAtlasConfig->GetRoguelikeTransitionDelay()
+                    : sAtlasConfig->GetCompletionTeleportDelay();
                 uint64 elapsed = GameTime::GetGameTime().count() - session.EndTime;
 
                 // ---- Roguelike countdown announcements ----
@@ -3841,7 +3841,7 @@ void DungeonMasterMgr::Update(uint32 diff)
                 }
                 if (!anyone)
                 {
-                    LOG_INFO("module", "DungeonMaster: Session {} abandoned — no players on map {} after grace period",
+                    LOG_INFO("module", "Atlas: Session {} abandoned — no players on map {} after grace period",
                         sid, session.MapId);
                     session.State = SessionState::Abandoned;
                     toEnd.emplace_back(sid, false);
@@ -3865,7 +3865,7 @@ void DungeonMasterMgr::Update(uint32 diff)
     }
 }
 
-std::string DungeonMasterMgr::GetSessionStatusString(Session const* s) const
+std::string AtlasMgr::GetSessionStatusString(Session const* s) const
 {
     if (!s) return "No session";
     static char const* names[] = { "None","Preparing","InProgress","BossPhase","Completed","Failed","Abandoned" };
@@ -3875,4 +3875,4 @@ std::string DungeonMasterMgr::GetSessionStatusString(Session const* s) const
         s->LevelBandMin, s->LevelBandMax);
 }
 
-} // namespace DungeonMaster
+} // namespace Atlas

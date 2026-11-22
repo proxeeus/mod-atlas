@@ -1,5 +1,5 @@
 /*
- * mod-dungeon-master — Roguelike run manager
+ * mod-atlas — Roguelike run manager
  * Copyright (C) 2025 — AGPL v3
  */
 
@@ -13,7 +13,7 @@
 class Player;
 class Group;
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 class RoguelikeMgr
@@ -59,7 +59,7 @@ public:
     // Removes the run buff from a player. Safe for players outside any run.
     static void StripRunBuff(Player* player);
 
-    // Module-owned passive aura defined in dm_setup.sql (spell_dbc).
+    // Module-owned passive aura defined in atlas_world_setup.sql (spell_dbc).
     // IDs 91000-91099 are reserved for this module.
     static constexpr uint32 BUFF_SPELL_ID = 91001;
     static constexpr float BUFF_PCT_PER_STACK = 10.0f;
@@ -106,8 +106,8 @@ private:
     static constexpr uint32 UPDATE_INTERVAL = 1000;
 };
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
-#define sRoguelikeMgr DungeonMaster::RoguelikeMgr::Instance()
+#define sRoguelikeMgr Atlas::RoguelikeMgr::Instance()
 
 #endif

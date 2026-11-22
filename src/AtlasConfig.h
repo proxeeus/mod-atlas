@@ -1,28 +1,28 @@
 /*
- * mod-dungeon-master — Config singleton
- * Reads settings from mod_dungeon_master.conf.dist. Thread-safe (loaded on world thread).
+ * mod-atlas — Config singleton
+ * Reads settings from mod_atlas.conf.dist. Thread-safe (loaded on world thread).
  * AGPL v3
  */
 
-#ifndef DM_CONFIG_H
-#define DM_CONFIG_H
+#ifndef ATLAS_CONFIG_H
+#define ATLAS_CONFIG_H
 
-#include "DMTypes.h"
+#include "AtlasTypes.h"
 #include "RoguelikeTypes.h"
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
 
-namespace DungeonMaster
+namespace Atlas
 {
 
-class DMConfig
+class AtlasConfig
 {
-    DMConfig() = default;
-    ~DMConfig() = default;
+    AtlasConfig() = default;
+    ~AtlasConfig() = default;
 
 public:
-    static DMConfig* Instance();
+    static AtlasConfig* Instance();
 
     void LoadConfig(bool reload = false);
 
@@ -189,8 +189,8 @@ private:
     std::vector<RoguelikeBuff> _roguelikeBuffPool;
 };
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
-#define sDMConfig DungeonMaster::DMConfig::Instance()
+#define sAtlasConfig Atlas::AtlasConfig::Instance()
 
-#endif // DM_CONFIG_H
+#endif // ATLAS_CONFIG_H

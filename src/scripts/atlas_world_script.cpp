@@ -1,37 +1,37 @@
 /*
- * mod-dungeon-master — dm_world_script.cpp
+ * mod-atlas — atlas_world_script.cpp
  * Server lifecycle hooks: config load, startup, update tick, shutdown.
  */
 
 #include "ScriptMgr.h"
-#include "DungeonMasterMgr.h"
+#include "AtlasMgr.h"
 #include "RoguelikeMgr.h"
-#include "DMConfig.h"
+#include "AtlasConfig.h"
 #include "SpellMgr.h"
 #include "SpellInfo.h"
 #include "Log.h"
 
-using namespace DungeonMaster;
+using namespace Atlas;
 
-class dm_world_script : public WorldScript
+class atlas_world_script : public WorldScript
 {
 public:
-    dm_world_script() : WorldScript("dm_world_script") {}
+    atlas_world_script() : WorldScript("atlas_world_script") {}
 
     void OnAfterConfigLoad(bool reload) override
     {
-        sDMConfig->LoadConfig(reload);
+        sAtlasConfig->LoadConfig(reload);
     }
 
     void OnStartup() override
     {
         // Even when disabled: a run interrupted by the last shutdown must not
         // leave anyone saved to an emptied dungeon instance.
-        sDungeonMasterMgr->ReleaseInstancesLeftOpen();
+        sAtlasMgr->ReleaseInstancesLeftOpen();
 
-        if (!sDMConfig->IsEnabled())
+        if (!sAtlasConfig->IsEnabled())
         {
-            LOG_INFO("module", "DungeonMaster: Disabled in configuration.");
+            LOG_INFO("module", "Atlas: Disabled in configuration.");
             return;
         }
 
@@ -40,42 +40,42 @@ public:
         // server, which let every paladin (bots included) stack +10% stats per
         // recast (upstream #23). It now uses the module's own spell.
         if (!sSpellMgr->GetSpellInfo(RoguelikeMgr::BUFF_SPELL_ID))
-            LOG_ERROR("module", "DungeonMaster: roguelike buff spell {} is missing from spell_dbc "
-                "(dm_setup.sql not applied?) - floors will grant no stat buff.",
+            LOG_ERROR("module", "Atlas: roguelike buff spell {} is missing from spell_dbc "
+                "(atlas_world_setup.sql not applied?) - floors will grant no stat buff.",
                 RoguelikeMgr::BUFF_SPELL_ID);
 
-        sDungeonMasterMgr->Initialize();
+        sAtlasMgr->Initialize();
         sRoguelikeMgr->Initialize();
 
         LOG_INFO("module", "===============================================");
-        LOG_INFO("module", " Dungeon Master Module — Ready");
+        LOG_INFO("module", " mod-atlas (V0) — Ready");
         LOG_INFO("module", " {} difficulties | {} themes | {} dungeons",
-            sDMConfig->GetDifficulties().size(),
-            sDMConfig->GetThemes().size(),
-            sDMConfig->GetDungeons().size());
+            sAtlasConfig->GetDifficulties().size(),
+            sAtlasConfig->GetThemes().size(),
+            sAtlasConfig->GetDungeons().size());
         LOG_INFO("module", " Level band: +/-{} | Max concurrent: {}",
-            sDMConfig->GetLevelBand(), sDMConfig->GetMaxConcurrentRuns());
+            sAtlasConfig->GetLevelBand(), sAtlasConfig->GetMaxConcurrentRuns());
         LOG_INFO("module", "===============================================");
     }
 
     void OnShutdown() override
     {
-        if (!sDMConfig->IsEnabled()) return;
-        LOG_INFO("module", "DungeonMaster: Shutdown — {} sessions active.",
-            sDungeonMasterMgr->GetActiveSessionCount());
+        if (!sAtlasConfig->IsEnabled()) return;
+        LOG_INFO("module", "Atlas: Shutdown — {} sessions active.",
+            sAtlasMgr->GetActiveSessionCount());
     }
 
     void OnUpdate(uint32 diff) override
     {
-        if (sDMConfig->IsEnabled())
+        if (sAtlasConfig->IsEnabled())
         {
-            sDungeonMasterMgr->Update(diff);
+            sAtlasMgr->Update(diff);
             sRoguelikeMgr->Update(diff);
         }
     }
 };
 
-void AddSC_dm_world_script()
+void AddSC_atlas_world_script()
 {
-    new dm_world_script();
+    new atlas_world_script();
 }

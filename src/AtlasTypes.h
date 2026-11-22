@@ -1,10 +1,10 @@
 /*
- * mod-dungeon-master — Shared data structures
+ * mod-atlas — Shared data structures
  * AGPL v3
  */
 
-#ifndef DM_TYPES_H
-#define DM_TYPES_H
+#ifndef ATLAS_TYPES_H
+#define ATLAS_TYPES_H
 
 #include "Define.h"
 #include "ObjectGuid.h"
@@ -17,7 +17,7 @@ class Creature;
 class Map;
 class InstanceMap;
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 constexpr uint32 MAX_DIFFICULTIES      = 10;
@@ -253,6 +253,6 @@ struct LeaderboardEntry
     uint32      Deaths        = 0;
 };
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
-#endif // DM_TYPES_H
+#endif // ATLAS_TYPES_H

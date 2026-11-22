@@ -1,15 +1,15 @@
 /*
- * mod-dungeon-master — DMConfig.cpp
+ * mod-atlas — AtlasConfig.cpp
  * Configuration loader.
  */
 
-#include "DMConfig.h"
+#include "AtlasConfig.h"
 #include "Config.h"
 #include "Log.h"
 #include <sstream>
 #include <algorithm>
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 static std::vector<std::string> SplitString(std::string const& str, char delim)
@@ -38,13 +38,13 @@ static std::string StripQuotes(std::string const& s)
 }
 
 // Singleton
-DMConfig* DMConfig::Instance()
+AtlasConfig* AtlasConfig::Instance()
 {
-    static DMConfig instance;
+    static AtlasConfig instance;
     return &instance;
 }
 
-float DMConfig::GetVisualScaleForCreatureType(uint32 type) const
+float AtlasConfig::GetVisualScaleForCreatureType(uint32 type) const
 {
     switch (type)
     {
@@ -61,86 +61,86 @@ float DMConfig::GetVisualScaleForCreatureType(uint32 type) const
 }
 
 // Load all config values
-void DMConfig::LoadConfig(bool reload)
+void AtlasConfig::LoadConfig(bool reload)
 {
     if (reload)
-        LOG_INFO("module", "DungeonMaster: Reloading configuration...");
+        LOG_INFO("module", "Atlas: Reloading configuration...");
 
     // Off unless explicitly enabled: a server that compiles the module in must
     // not start running it just because no config file was copied yet.
-    _enabled  = sConfigMgr->GetOption<bool>  ("DungeonMaster.Enable", false);
-    _debug    = sConfigMgr->GetOption<bool>  ("DungeonMaster.Debug",  false);
-    _npcEntry = sConfigMgr->GetOption<uint32>("DungeonMaster.NpcEntry", 500000);
+    _enabled  = sConfigMgr->GetOption<bool>  ("Atlas.Enable", false);
+    _debug    = sConfigMgr->GetOption<bool>  ("Atlas.Debug",  false);
+    _npcEntry = sConfigMgr->GetOption<uint32>("Atlas.NpcEntry", 500000);
 
     // Scaling
-    _levelBand       = sConfigMgr->GetOption<uint8> ("DungeonMaster.Scaling.LevelBand",        3);
-    _perPlayerHealth = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.PerPlayerHealth",   0.25f);
-    _perPlayerDamage = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.PerPlayerDamage",   0.10f);
-    _soloMultiplier  = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.SoloMultiplier",    0.50f);
-    _eliteHealthMult = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.EliteHealthMult",   2.0f);
-    _eliteDamageMult = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.EliteDamageMult",   1.5f);
-    _bossHealthMult  = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.BossHealthMult",    8.0f);
-    _bossDamageMult  = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.BossDamageMult",    1.5f);
+    _levelBand       = sConfigMgr->GetOption<uint8> ("Atlas.Scaling.LevelBand",        3);
+    _perPlayerHealth = sConfigMgr->GetOption<float> ("Atlas.Scaling.PerPlayerHealth",   0.25f);
+    _perPlayerDamage = sConfigMgr->GetOption<float> ("Atlas.Scaling.PerPlayerDamage",   0.10f);
+    _soloMultiplier  = sConfigMgr->GetOption<float> ("Atlas.Scaling.SoloMultiplier",    0.50f);
+    _eliteHealthMult = sConfigMgr->GetOption<float> ("Atlas.Scaling.EliteHealthMult",   2.0f);
+    _eliteDamageMult = sConfigMgr->GetOption<float> ("Atlas.Scaling.EliteDamageMult",   1.5f);
+    _bossHealthMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.BossHealthMult",    8.0f);
+    _bossDamageMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.BossDamageMult",    1.5f);
 
     // Rewards
-    _baseGold     = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.BaseGold",    50000);
-    _goldPerMob   = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.GoldPerMob",  50);
-    _goldPerBoss  = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.GoldPerBoss", 10000);
-    _xpMultiplier = sConfigMgr->GetOption<float> ("DungeonMaster.Rewards.XPMultiplier", 1.0f);
-    _itemChance   = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.ItemChance",  80);
-    _rareChance   = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.RareChance",  40);
-    _epicChance   = sConfigMgr->GetOption<uint32>("DungeonMaster.Rewards.EpicChance",  15);
+    _baseGold     = sConfigMgr->GetOption<uint32>("Atlas.Rewards.BaseGold",    50000);
+    _goldPerMob   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerMob",  50);
+    _goldPerBoss  = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerBoss", 10000);
+    _xpMultiplier = sConfigMgr->GetOption<float> ("Atlas.Rewards.XPMultiplier", 1.0f);
+    _itemChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.ItemChance",  80);
+    _rareChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.RareChance",  40);
+    _epicChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.EpicChance",  15);
 
     // Dungeon settings
-    _bossCount       = sConfigMgr->GetOption<uint32>("DungeonMaster.Dungeon.BossCount",      1);
-    _eliteChance     = sConfigMgr->GetOption<uint32>("DungeonMaster.Dungeon.EliteChance",    20);
-    _aggroRadius     = sConfigMgr->GetOption<float> ("DungeonMaster.Dungeon.AggroRadius",    15.0f);
-    _rareSpawnChance = sConfigMgr->GetOption<uint32>("DungeonMaster.Dungeon.RareSpawnChance", 5);
-    _rareHealthMult  = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.RareHealthMult",  4.0f);
-    _rareDamageMult  = sConfigMgr->GetOption<float> ("DungeonMaster.Scaling.RareDamageMult",  2.0f);
-    _recentCreatureEntries = sConfigMgr->GetOption<uint32>("DungeonMaster.Variety.RecentEntries", 12);
-    _visualScaleBeast = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Beast", 1.0f), 0.55f, 1.0f);
-    _visualScaleDragonkin = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Dragonkin", 0.85f), 0.55f, 1.0f);
-    _visualScaleDemon = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Demon", 0.95f), 0.55f, 1.0f);
-    _visualScaleElemental = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Elemental", 0.90f), 0.55f, 1.0f);
-    _visualScaleGiant = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Giant", 0.70f), 0.55f, 1.0f);
-    _visualScaleUndead = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Undead", 1.0f), 0.55f, 1.0f);
-    _visualScaleHumanoid = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Humanoid", 1.0f), 0.55f, 1.0f);
-    _visualScaleMechanical = std::clamp(sConfigMgr->GetOption<float>("DungeonMaster.VisualScale.Mechanical", 0.90f), 0.55f, 1.0f);
+    _bossCount       = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.BossCount",      1);
+    _eliteChance     = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.EliteChance",    20);
+    _aggroRadius     = sConfigMgr->GetOption<float> ("Atlas.Dungeon.AggroRadius",    15.0f);
+    _rareSpawnChance = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.RareSpawnChance", 5);
+    _rareHealthMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.RareHealthMult",  4.0f);
+    _rareDamageMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.RareDamageMult",  2.0f);
+    _recentCreatureEntries = sConfigMgr->GetOption<uint32>("Atlas.Variety.RecentEntries", 12);
+    _visualScaleBeast = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Beast", 1.0f), 0.55f, 1.0f);
+    _visualScaleDragonkin = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Dragonkin", 0.85f), 0.55f, 1.0f);
+    _visualScaleDemon = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Demon", 0.95f), 0.55f, 1.0f);
+    _visualScaleElemental = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Elemental", 0.90f), 0.55f, 1.0f);
+    _visualScaleGiant = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Giant", 0.70f), 0.55f, 1.0f);
+    _visualScaleUndead = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Undead", 1.0f), 0.55f, 1.0f);
+    _visualScaleHumanoid = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Humanoid", 1.0f), 0.55f, 1.0f);
+    _visualScaleMechanical = std::clamp(sConfigMgr->GetOption<float>("Atlas.VisualScale.Mechanical", 0.90f), 0.55f, 1.0f);
 
     // Timers
-    _cooldownMinutes   = sConfigMgr->GetOption<uint32>("DungeonMaster.Cooldown.Minutes",     5);
-    _timeLimitEnabled  = sConfigMgr->GetOption<bool>  ("DungeonMaster.TimeLimit.Enable",     false);
-    _timeLimitMinutes  = sConfigMgr->GetOption<uint32>("DungeonMaster.TimeLimit.Minutes",    30);
-    _maxConcurrentRuns = sConfigMgr->GetOption<uint32>("DungeonMaster.MaxConcurrentRuns",    20);
+    _cooldownMinutes   = sConfigMgr->GetOption<uint32>("Atlas.Cooldown.Minutes",     5);
+    _timeLimitEnabled  = sConfigMgr->GetOption<bool>  ("Atlas.TimeLimit.Enable",     false);
+    _timeLimitMinutes  = sConfigMgr->GetOption<uint32>("Atlas.TimeLimit.Minutes",    30);
+    _maxConcurrentRuns = sConfigMgr->GetOption<uint32>("Atlas.MaxConcurrentRuns",    20);
 
     // Death
-    _respawnAtStart = sConfigMgr->GetOption<bool>  ("DungeonMaster.Death.RespawnAtStart",   true);
-    _maxWipes       = sConfigMgr->GetOption<uint32>("DungeonMaster.Death.MaxWipes",         0);
+    _respawnAtStart = sConfigMgr->GetOption<bool>  ("Atlas.Death.RespawnAtStart",   true);
+    _maxWipes       = sConfigMgr->GetOption<uint32>("Atlas.Death.MaxWipes",         0);
 
     // Completion
-    _completionTeleportDelay = sConfigMgr->GetOption<uint32>("DungeonMaster.Completion.TeleportDelay", 30);
-    _announceCompletion      = sConfigMgr->GetOption<bool>  ("DungeonMaster.Completion.Announcement",  true);
+    _completionTeleportDelay = sConfigMgr->GetOption<uint32>("Atlas.Completion.TeleportDelay", 30);
+    _announceCompletion      = sConfigMgr->GetOption<bool>  ("Atlas.Completion.Announcement",  true);
 
     // Roguelike
-    _roguelikeEnabled         = sConfigMgr->GetOption<bool>  ("DungeonMaster.Roguelike.Enable",            true);
-    _roguelikeTransitionDelay = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.TransitionDelay",   30);
-    _roguelikeHpScaling       = sConfigMgr->GetOption<float> ("DungeonMaster.Roguelike.HpScalingPerTier",  0.10f);
-    _roguelikeDmgScaling      = sConfigMgr->GetOption<float> ("DungeonMaster.Roguelike.DmgScalingPerTier", 0.08f);
-    _roguelikeArmorScaling    = sConfigMgr->GetOption<float> ("DungeonMaster.Roguelike.ArmorScalingPerTier", 0.05f);
-    _roguelikeExpThreshold    = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.ExponentialThreshold", 5);
-    _roguelikeExpFactor       = sConfigMgr->GetOption<float> ("DungeonMaster.Roguelike.ExponentialFactor",   1.15f);
-    _roguelikeAffixStartTier  = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.AffixStartTier",     3);
-    _roguelikeSecondAffixTier = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.SecondAffixTier",     7);
-    _roguelikeThirdAffixTier  = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.ThirdAffixTier",     10);
-    _roguelikeMaxBuffs        = sConfigMgr->GetOption<uint32>("DungeonMaster.Roguelike.MaxBuffs",            20);
-    _roguelikeVendorEnabled = sConfigMgr->GetOption<bool>("DungeonMaster.Roguelike.VendorEnable", true);
+    _roguelikeEnabled         = sConfigMgr->GetOption<bool>  ("Atlas.Roguelike.Enable",            true);
+    _roguelikeTransitionDelay = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.TransitionDelay",   30);
+    _roguelikeHpScaling       = sConfigMgr->GetOption<float> ("Atlas.Roguelike.HpScalingPerTier",  0.10f);
+    _roguelikeDmgScaling      = sConfigMgr->GetOption<float> ("Atlas.Roguelike.DmgScalingPerTier", 0.08f);
+    _roguelikeArmorScaling    = sConfigMgr->GetOption<float> ("Atlas.Roguelike.ArmorScalingPerTier", 0.05f);
+    _roguelikeExpThreshold    = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.ExponentialThreshold", 5);
+    _roguelikeExpFactor       = sConfigMgr->GetOption<float> ("Atlas.Roguelike.ExponentialFactor",   1.15f);
+    _roguelikeAffixStartTier  = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.AffixStartTier",     3);
+    _roguelikeSecondAffixTier = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.SecondAffixTier",     7);
+    _roguelikeThirdAffixTier  = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.ThirdAffixTier",     10);
+    _roguelikeMaxBuffs        = sConfigMgr->GetOption<uint32>("Atlas.Roguelike.MaxBuffs",            20);
+    _roguelikeVendorEnabled = sConfigMgr->GetOption<bool>("Atlas.Roguelike.VendorEnable", true);
 
     // White / black lists
     _dungeonWhitelist.clear();
     _dungeonBlacklist.clear();
-    ParseStringList(sConfigMgr->GetOption<std::string>("DungeonMaster.Dungeon.Whitelist", ""), _dungeonWhitelist);
-    ParseStringList(sConfigMgr->GetOption<std::string>("DungeonMaster.Dungeon.Blacklist", ""), _dungeonBlacklist);
+    ParseStringList(sConfigMgr->GetOption<std::string>("Atlas.Dungeon.Whitelist", ""), _dungeonWhitelist);
+    ParseStringList(sConfigMgr->GetOption<std::string>("Atlas.Dungeon.Blacklist", ""), _dungeonBlacklist);
 
     // Populate sub-tables
     LoadDifficulties();
@@ -148,19 +148,19 @@ void DMConfig::LoadConfig(bool reload)
     LoadDungeons();
     LoadRoguelikeBuffPool();
 
-    LOG_INFO("module", "DungeonMaster: Config loaded — {} difficulties, {} themes, {} dungeons, {} roguelike buffs.",
+    LOG_INFO("module", "Atlas: Config loaded — {} difficulties, {} themes, {} dungeons, {} roguelike buffs.",
         _difficulties.size(), _themes.size(), _dungeons.size(), _roguelikeBuffPool.size());
 }
 
 // Load difficulty tiers from config
-void DMConfig::LoadDifficulties()
+void AtlasConfig::LoadDifficulties()
 {
     _difficulties.clear();
 
     for (uint32 i = 1; i <= MAX_DIFFICULTIES; ++i)
     {
         std::string val = sConfigMgr->GetOption<std::string>(
-            "DungeonMaster.Difficulty." + std::to_string(i), "");
+            "Atlas.Difficulty." + std::to_string(i), "");
         if (val.empty())
             break;
 
@@ -178,7 +178,7 @@ void DMConfig::LoadDifficulties()
             t.RewardMultiplier = std::stof(parts[5]);
             t.MobCountMultiplier = std::stof(parts[6]);
         } catch (...) {
-            LOG_ERROR("module", "DungeonMaster: Bad difficulty entry #{}", i);
+            LOG_ERROR("module", "Atlas: Bad difficulty entry #{}", i);
             continue;
         }
         _difficulties.push_back(t);
@@ -189,19 +189,19 @@ void DMConfig::LoadDifficulties()
         DifficultyTier def;
         def.Id = 1; def.Name = "Normal";
         _difficulties.push_back(def);
-        LOG_WARN("module", "DungeonMaster: No difficulties configured, using default.");
+        LOG_WARN("module", "Atlas: No difficulties configured, using default.");
     }
 }
 
 // Load themes from config
-void DMConfig::LoadThemes()
+void AtlasConfig::LoadThemes()
 {
     _themes.clear();
 
     for (uint32 i = 1; i <= MAX_THEMES; ++i)
     {
         std::string val = sConfigMgr->GetOption<std::string>(
-            "DungeonMaster.Theme." + std::to_string(i), "");
+            "Atlas.Theme." + std::to_string(i), "");
         if (val.empty())
             break;
 
@@ -227,12 +227,12 @@ void DMConfig::LoadThemes()
         Theme def;
         def.Id = 1; def.Name = "Random"; def.CreatureTypes.push_back(uint32(-1));
         _themes.push_back(def);
-        LOG_WARN("module", "DungeonMaster: No themes configured, using Random.");
+        LOG_WARN("module", "Atlas: No themes configured, using Random.");
     }
 }
 
     // hard-coded list of WotLK 5-man instances with level ranges
-void DMConfig::LoadDungeons()
+void AtlasConfig::LoadDungeons()
 {
     _dungeons.clear();
 
@@ -307,7 +307,7 @@ void DMConfig::LoadDungeons()
 }
 
 // Utility
-void DMConfig::ParseStringList(std::string const& str, std::unordered_set<uint32>& outSet)
+void AtlasConfig::ParseStringList(std::string const& str, std::unordered_set<uint32>& outSet)
 {
     if (str.empty()) return;
     for (auto const& tok : SplitString(str, ','))
@@ -317,14 +317,14 @@ void DMConfig::ParseStringList(std::string const& str, std::unordered_set<uint32
     }
 }
 
-DifficultyTier const* DMConfig::GetDifficulty(uint32 id) const
+DifficultyTier const* AtlasConfig::GetDifficulty(uint32 id) const
 {
     for (auto const& d : _difficulties)
         if (d.Id == id) return &d;
     return nullptr;
 }
 
-std::vector<DifficultyTier const*> DMConfig::GetDifficultiesForLevel(uint8 level) const
+std::vector<DifficultyTier const*> AtlasConfig::GetDifficultiesForLevel(uint8 level) const
 {
     std::vector<DifficultyTier const*> out;
     for (auto const& d : _difficulties)
@@ -333,21 +333,21 @@ std::vector<DifficultyTier const*> DMConfig::GetDifficultiesForLevel(uint8 level
     return out;
 }
 
-Theme const* DMConfig::GetTheme(uint32 id) const
+Theme const* AtlasConfig::GetTheme(uint32 id) const
 {
     for (auto const& t : _themes)
         if (t.Id == id) return &t;
     return nullptr;
 }
 
-DungeonInfo const* DMConfig::GetDungeon(uint32 mapId) const
+DungeonInfo const* AtlasConfig::GetDungeon(uint32 mapId) const
 {
     for (auto const& d : _dungeons)
         if (d.MapId == mapId) return &d;
     return nullptr;
 }
 
-std::vector<DungeonInfo const*> DMConfig::GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const
+std::vector<DungeonInfo const*> AtlasConfig::GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const
 {
     std::vector<DungeonInfo const*> out;
     for (auto const& d : _dungeons)
@@ -356,15 +356,15 @@ std::vector<DungeonInfo const*> DMConfig::GetDungeonsForLevel(uint8 minLevel, ui
     return out;
 }
 
-bool DMConfig::IsDungeonAllowed(uint32 mapId) const
+bool AtlasConfig::IsDungeonAllowed(uint32 mapId) const
 {
     if (_dungeonBlacklist.count(mapId)) return false;
     if (!_dungeonWhitelist.empty() && !_dungeonWhitelist.count(mapId)) return false;
     return true;
 }
 
-    // sequential entries from DungeonMaster
-void DMConfig::LoadRoguelikeBuffPool()
+    // sequential entries from Atlas
+void AtlasConfig::LoadRoguelikeBuffPool()
 {
     _roguelikeBuffPool.clear();
 
@@ -372,7 +372,7 @@ void DMConfig::LoadRoguelikeBuffPool()
     {
         // Optional keys: don't log "missing property" for each absent slot.
         std::string val = sConfigMgr->GetOption<std::string>(
-            "DungeonMaster.Roguelike.Buff." + std::to_string(i), "", false);
+            "Atlas.Roguelike.Buff." + std::to_string(i), "", false);
         if (val.empty())
             break;
 
@@ -402,7 +402,7 @@ void DMConfig::LoadRoguelikeBuffPool()
             b.Name    = parts[1];
             b.Weight  = static_cast<uint32>(std::stoul(parts[2]));
         } catch (...) {
-            LOG_ERROR("module", "DungeonMaster: Bad roguelike buff entry #{}", i);
+            LOG_ERROR("module", "Atlas: Bad roguelike buff entry #{}", i);
             continue;
         }
         _roguelikeBuffPool.push_back(b);
@@ -411,7 +411,7 @@ void DMConfig::LoadRoguelikeBuffPool()
     // Default pool if none configured
     if (_roguelikeBuffPool.empty())
     {
-        LOG_INFO("module", "DungeonMaster: No roguelike buffs configured — using defaults.");
+        LOG_INFO("module", "Atlas: No roguelike buffs configured — using defaults.");
 
         // World buffs (Classic — stack with everything, universally applicable)
         _roguelikeBuffPool.push_back({1, 15366, "Songflower Serenade",   100});  // +15 stats, +5% crit
@@ -429,4 +429,4 @@ void DMConfig::LoadRoguelikeBuffPool()
     }
 }
 
-} // namespace DungeonMaster
+} // namespace Atlas

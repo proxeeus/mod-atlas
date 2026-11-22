@@ -1,9 +1,9 @@
 -- =============================================
--- Dungeon Master Module - World DB Setup
+-- mod-atlas (V0) - World DB Setup
 -- =============================================
 -- Lore frame: the Keepers of Time (bronze dragonflight) open "echoes" of
 -- dungeons from fractured timelines. Player-facing names follow that frame;
--- internal names (ScriptName, config keys) keep "dungeon master".
+-- code identifiers use "atlas" (npc_atlas_chronicler, Atlas.* config keys).
 --
 -- This script creates:
 --   1. creature_template         - Chronicler Esmadormu (entry 500000)
@@ -27,8 +27,8 @@
 DELETE FROM `creature` WHERE `guid` BETWEEN 8000001 AND 8000011 AND `id` = 500000;
 DELETE FROM `creature_template_model` WHERE `CreatureID` = 500000
     AND EXISTS (SELECT 1 FROM `creature_template` ct
-                WHERE ct.`entry` = 500000 AND ct.`ScriptName` = 'npc_dungeon_master');
-DELETE FROM `creature_template` WHERE `entry` = 500000 AND `ScriptName` = 'npc_dungeon_master';
+                WHERE ct.`entry` = 500000 AND ct.`ScriptName` = 'npc_atlas_chronicler');
+DELETE FROM `creature_template` WHERE `entry` = 500000 AND `ScriptName` = 'npc_atlas_chronicler';
 DELETE FROM `npc_text` WHERE `ID` = 500000 AND `text0_0` LIKE 'Time is fracturing%';
 
 -- -----------------------------------------------
@@ -62,7 +62,7 @@ INSERT INTO `creature_template` (
     0,
     2,     -- dragonkin
     2,     -- CIVILIAN
-    'npc_dungeon_master'
+    'npc_atlas_chronicler'
 );
 
 -- -----------------------------------------------
@@ -77,7 +77,7 @@ INSERT INTO `creature_template_model` (
 );
 
 -- -----------------------------------------------
--- Step 4: Greeting (gossip text shown by npc_dungeon_master)
+-- Step 4: Greeting (gossip text shown by npc_atlas_chronicler)
 -- -----------------------------------------------
 INSERT INTO `npc_text` (`ID`, `text0_0`, `text0_1`, `Probability0`) VALUES
 (500000,

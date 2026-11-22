@@ -1,6 +1,10 @@
-# mod-dungeon-master
+# mod-atlas — V0
 
-A procedural dungeon challenge system for **AzerothCore** (WotLK 3.3.5a).
+The **V0 backbone of Atlas**, a level-80 endgame loop for **AzerothCore** (WotLK 3.3.5a, playerbots-friendly).
+
+V0 runs inside stock dungeon instances (no client patch needed). Later versions move runs to cloned map IDs with map items, affixes and tiers; see the Atlas design notes in the server repo (`.agents/plans/atlas-endgame/`).
+
+**Origin:** V0 is derived from [mod-dungeon-master](https://github.com/trauntrow/mod-dungeon-master) by trauntrow and contributors (AGPL-3.0), reworked for safety, performance, AzerothCore code style and a Keepers of Time lore frame. It stays under AGPL-3.0.
 
 **In game:** Chronicler Esmadormu of the **Keepers of Time** (bronze dragonflight) opens *echoes* of known dungeons from fractured timelines, where the halls belong to other masters: beasts, demons, the restless dead. Players pick a difficulty, a timeline (creature theme) and a dungeon, then walk the echo: an emptied instance repopulated with level-scaled themed enemies and a master (boss). Mending the echo earns rewards. **The Endless Timeways** (roguelike mode) chains echoes with escalating difficulty, instabilities (affixes) and a growing stat buff, Timeways Resonance, until the party falls.
 
@@ -25,7 +29,7 @@ A procedural dungeon challenge system for **AzerothCore** (WotLK 3.3.5a).
 - **Cooldown system** — Configurable per-character cooldown between runs
 - **Persistent stats** — Tracks runs, kills, deaths, fastest clear times per character
 - **Statistics & Leaderboards** — Separate tracking for normal runs and roguelike mode. Normal stats track win rate, kills, deaths, K/D ratio, and fastest clear. Roguelike stats track highest tier, most floors, total floors cleared, and longest run. Leaderboards include Normal Fastest Clears, Roguelike Highest Tier, and Roguelike Most Floors — with your own entries highlighted
-- **GM commands** — `.dm reload`, `.dm status`, `.dm list`, `.dm end`, `.dm clearcooldown`
+- **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`
 
 ### The Endless Timeways (roguelike mode)
 - **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
@@ -44,27 +48,27 @@ A procedural dungeon challenge system for **AzerothCore** (WotLK 3.3.5a).
 1. **Clone into modules:**
    ```bash
    cd azerothcore-wotlk/modules
-   git clone https://github.com/your-username/mod-dungeon-master.git
+   git clone https://github.com/proxeeus/mod-atlas.git
    ```
 
 2. **Re-run CMake and rebuild** the server.
 
 3. **Run the world database SQL:**
    ```sql
-   SOURCE data/sql/db-world/base/dm_setup.sql
+   SOURCE data/sql/db-world/base/atlas_world_setup.sql
    ```
 
 4. **Run the characters database SQL:**
    ```sql
-   SOURCE data/sql/db-characters/base/dm_characters_setup.sql
+   SOURCE data/sql/db-characters/base/atlas_characters_setup.sql
    ```
 
 5. **Copy the config:**
    ```bash
-   cp modules/mod-dungeon-master/conf/mod_dungeon_master.conf.dist etc/mod_dungeon_master.conf
+   cp modules/mod-atlas/conf/mod_atlas.conf.dist etc/mod_atlas.conf
    ```
 
-6. **Enable it:** set `DungeonMaster.Enable = 1` (the default is 0, also when no config file exists).
+6. **Enable it:** set `Atlas.Enable = 1` (the default is 0, also when no config file exists).
 
 7. **Restart the server.** Chronicler Esmadormu appears in the major cities and at the Caverns of Time (she stays hidden while the module is disabled).
 
@@ -127,7 +131,7 @@ Creatures are force-scaled to the session's target level regardless of their ori
 
 ## Configuration
 
-All settings live in `mod_dungeon_master.conf`. Key options:
+All settings live in `mod_atlas.conf`. Key options:
 
 ### Scaling
 
@@ -174,7 +178,7 @@ All settings live in `mod_dungeon_master.conf`. Key options:
 | `Rewards.RareChance` | 40 | % chance reward is rare quality |
 | `Rewards.EpicChance` | 15 | % chance reward is epic quality |
 
-See `mod_dungeon_master.conf.dist` for the full list with descriptions.
+See `mod_atlas.conf.dist` for the full list with descriptions.
 
 ---
 
@@ -198,11 +202,11 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 
 | Command | Access | Description |
 |---------|--------|-------------|
-| `.dm status` | GM | Show module status and active session count |
-| `.dm list` | GM | List all active sessions with details |
-| `.dm end [id]` | Admin | Force-end a session (defaults to your own) |
-| `.dm clearcooldown` | GM | Clear cooldown for target's whole group |
-| `.dm reload` | Admin | Hot-reload configuration |
+| `.atlas status` | GM | Show module status and active session count |
+| `.atlas list` | GM | List all active sessions with details |
+| `.atlas end [id]` | Admin | Force-end a session (defaults to your own) |
+| `.atlas clearcooldown` | GM | Clear cooldown for target's whole group |
+| `.atlas reload` | Admin | Hot-reload configuration |
 
 ---
 
@@ -212,11 +216,11 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 - **Thread safety** — Session maps and cooldowns are mutex-guarded for multi-player safety.
 - **Async teleport handling** — 30-second grace period after teleports to prevent false "abandoned" detection.
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
-- **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `dm_open_instance` so a restart mid-run releases them at startup.
+- **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `atlas_open_instance` so a restart mid-run releases them at startup.
 - **Hot-path gating** — Damage, death and creature-add hooks check a lock-free "any run active?" flag and the map type before touching the session mutex.
-- **Cached lookups** — Dungeon entrances, spawn points and leaderboards are loaded once (startup, `.dm reload`) instead of queried during play.
+- **Cached lookups** — Dungeon entrances, spawn points and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
-- **Custom creature AI** — Trash creatures use `DungeonMasterCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
+- **Custom creature AI** — Trash creatures use `AtlasCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
 - **Boss spell damage scaling** — Boss abilities have hard-coded damage values designed for their original level range. The unit script intercepts all incoming damage from session bosses (spells, periodic ticks, and melee) and scales it using `creature_classlevelstats` base damage ratios between the boss's template level and the session's effective level. This ensures a level-70 boss spell deals proportionally correct damage to a level-25 party.
 - **Multi-phase boss detection** — When a boss dies, the system waits 5 seconds and scans for new elite/boss creatures near the death location. If a phase-2 creature is detected, it is automatically promoted to boss status and the original death does not count as a kill.
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.
@@ -229,38 +233,37 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 ## File Structure
 
 ```
-mod-dungeon-master/
+mod-atlas/
 ├── CMakeLists.txt
 ├── conf/
-│   └── mod_dungeon_master.conf.dist
+│   └── mod_atlas.conf.dist
 ├── data/sql/
-│   ├── db-world/base/dm_setup.sql
-│   └── db-characters/base/dm_characters_setup.sql
+│   ├── db-world/base/atlas_world_setup.sql
+│   └── db-characters/base/atlas_characters_setup.sql
 └── src/
-    ├── DMConfig.cpp / .h          # Config loader
-    ├── DMTypes.h                   # Shared data structures
-    ├── DungeonMasterMgr.cpp / .h   # Core session manager
-    ├── RoguelikeMgr.cpp / .h       # Roguelike run manager
-    ├── RoguelikeTypes.h            # Roguelike data structures
-    ├── DungeonMaster_loader.cpp    # Module entry point
+    ├── AtlasConfig.cpp / .h          # Config loader
+    ├── AtlasTypes.h                  # Shared data structures, chat prefixes
+    ├── AtlasMgr.cpp / .h             # Core run (session) manager
+    ├── AtlasBossSpawnQuery.h         # Boss spawn-point query
+    ├── RoguelikeMgr.cpp / .h         # Endless Timeways run manager
+    ├── RoguelikeTypes.h              # Endless Timeways data structures
+    ├── mod_atlas_loader.cpp          # Module entry point
     └── scripts/
-        ├── npc_dungeon_master.cpp  # NPC gossip menus
-        ├── dm_allmap_script.cpp    # Map entry trigger
-        ├── dm_command_script.cpp   # GM commands
-        ├── dm_player_script.cpp    # Player death handling
-        ├── dm_unit_script.cpp      # Environmental damage scaling
-        └── dm_world_script.cpp     # Server lifecycle hooks
+        ├── npc_atlas_chronicler.cpp  # Chronicler Esmadormu gossip menus
+        ├── atlas_allcreature_script.cpp  # Creature level ownership, add scaling, NPC hiding
+        ├── atlas_allmap_script.cpp   # Map entry trigger
+        ├── atlas_command_script.cpp  # GM commands (.atlas)
+        ├── atlas_player_script.cpp   # Player death handling
+        ├── atlas_unit_script.cpp     # Damage scaling
+        └── atlas_world_script.cpp    # Server lifecycle hooks
 ```
 
 ---
 
 ## Credits
 
+- **[mod-dungeon-master](https://github.com/trauntrow/mod-dungeon-master)** — the module V0 is derived from, by trauntrow and its contributors. Support the original author: https://ko-fi.com/trauntrow
 - **[AzerothCore](https://github.com/azerothcore/azerothcore-wotlk)** — Open-source WoW 3.3.5a server emulator
-
-## Tips
-
-https://ko-fi.com/trauntrow
 
 ## License
 

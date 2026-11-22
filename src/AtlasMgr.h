@@ -1,13 +1,13 @@
 /*
- * mod-dungeon-master — DungeonMasterMgr.h
+ * mod-atlas — AtlasMgr.h
  * Central session manager singleton.
  */
 
-#ifndef DUNGEON_MASTER_MGR_H
-#define DUNGEON_MASTER_MGR_H
+#ifndef ATLAS_MGR_H
+#define ATLAS_MGR_H
 
-#include "DMTypes.h"
-#include "DMConfig.h"
+#include "AtlasTypes.h"
+#include "AtlasConfig.h"
 #include <mutex>
 #include <map>
 #include <unordered_map>
@@ -18,20 +18,20 @@ class Creature;
 class Map;
 class InstanceMap;
 
-namespace DungeonMaster
+namespace Atlas
 {
 
-class DungeonMasterMgr
+class AtlasMgr
 {
-    DungeonMasterMgr();
-    ~DungeonMasterMgr();
+    AtlasMgr();
+    ~AtlasMgr();
 
 public:
-    static DungeonMasterMgr* Instance();
+    static AtlasMgr* Instance();
 
     void Initialize();
     void LoadFromDB();
-    void LoadDungeonGeometry();   // also used by `.dm reload`
+    void LoadDungeonGeometry();   // also used by `.atlas reload`
 
     // Session lifecycle
     Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true);
@@ -106,7 +106,7 @@ public:
     // Creature level ownership.
     //
     // Anything that re-runs Creature::SelectLevel() (respawn, UpdateEntry) or
-    // calls SetLevel() from another module reverts a Dungeon Master creature to
+    // calls SetLevel() from another module reverts an Atlas creature to
     // its creature_template level, undoing the level band for the run. We record
     // what was assigned so it can be re-asserted. Deliberately independent of
     // which module caused the drift.
@@ -117,7 +117,7 @@ public:
     void ForgetOwnedCreaturesForInstance(uint32 instanceId);
     static bool HasOwnedCreatures();
 
-    // Level + stat scaling for a creature summoned by a Dungeon Master mob.
+    // Level + stat scaling for a creature summoned by an Atlas mob.
     void ScaleSummonedCreature(Creature* creature, Session* session);
 
 private:
@@ -191,8 +191,8 @@ private:
     static constexpr uint32 UPDATE_INTERVAL = 1000;
 };
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
-#define sDungeonMasterMgr DungeonMaster::DungeonMasterMgr::Instance()
+#define sAtlasMgr Atlas::AtlasMgr::Instance()
 
 #endif

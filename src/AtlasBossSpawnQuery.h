@@ -1,15 +1,15 @@
 /*
- * mod-dungeon-master — Boss spawn-point SQL helpers.
+ * mod-atlas — Boss spawn-point SQL helpers.
  */
 
-#ifndef DM_BOSS_SPAWN_QUERY_H
-#define DM_BOSS_SPAWN_QUERY_H
+#ifndef ATLAS_BOSS_SPAWN_QUERY_H
+#define ATLAS_BOSS_SPAWN_QUERY_H
 
 #include "Define.h"
 
 #include <string>
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 inline std::string BuildBossSpawnPointQuery(uint32 mapId)
@@ -26,6 +26,6 @@ inline std::string BuildBossSpawnPointQuery(uint32 mapId)
         "ORDER BY COALESCE(ci.MechanicsMask, 0) DESC";
 }
 
-} // namespace DungeonMaster
+} // namespace Atlas
 
-#endif // DM_BOSS_SPAWN_QUERY_H
+#endif // ATLAS_BOSS_SPAWN_QUERY_H

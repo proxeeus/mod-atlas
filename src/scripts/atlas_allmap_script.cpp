@@ -1,41 +1,41 @@
 /*
- * mod-dungeon-master — dm_allmap_script.cpp
+ * mod-atlas — atlas_allmap_script.cpp
  * Triggers dungeon population when a player enters the instance map.
  */
 
 #include "ScriptMgr.h"
 #include "Map.h"
 #include "Player.h"
-#include "DungeonMasterMgr.h"
-#include "DMConfig.h"
+#include "AtlasMgr.h"
+#include "AtlasConfig.h"
 #include "Chat.h"
 #include "Log.h"
 
-using namespace DungeonMaster;
+using namespace Atlas;
 
-class dm_allmap_script : public AllMapScript
+class atlas_allmap_script : public AllMapScript
 {
 public:
-    dm_allmap_script() : AllMapScript("dm_allmap_script") {}
+    atlas_allmap_script() : AllMapScript("atlas_allmap_script") {}
 
     void OnPlayerEnterAll(Map* map, Player* player) override
     {
-        if (!sDMConfig->IsEnabled() || !map || !player)
+        if (!sAtlasConfig->IsEnabled() || !map || !player)
             return;
 
         // Only care about dungeon maps
         if (!map->IsDungeon())
             return;
 
-        Session* session = sDungeonMasterMgr->GetSessionByPlayer(player->GetGUID());
+        Session* session = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
         if (!session)
         {
-            LOG_DEBUG("module", "DungeonMaster: OnPlayerEnterAll — {} entered map {} but has no session",
+            LOG_DEBUG("module", "Atlas: OnPlayerEnterAll — {} entered map {} but has no session",
                 player->GetName(), map->GetId());
             return;
         }
 
-        LOG_INFO("module", "DungeonMaster: OnPlayerEnterAll — {} entered map {} (session {} state {} mapId {} mobs {} bosses {})",
+        LOG_INFO("module", "Atlas: OnPlayerEnterAll — {} entered map {} (session {} state {} mapId {} mobs {} bosses {})",
             player->GetName(), map->GetId(), session->SessionId,
             static_cast<int>(session->State), session->MapId,
             session->TotalMobs, session->TotalBosses);
@@ -60,9 +60,9 @@ public:
         ChatHandler(player->GetSession()).PSendSysMessage(
             "{} The echo takes shape around you...", CHAT_PREFIX);
 
-        sDungeonMasterMgr->PopulateDungeon(session, instance);
+        sAtlasMgr->PopulateDungeon(session, instance);
 
-        LOG_INFO("module", "DungeonMaster: Session {} — populated via OnPlayerEnterAll (player {}, map {}, mobs {}, bosses {})",
+        LOG_INFO("module", "Atlas: Session {} — populated via OnPlayerEnterAll (player {}, map {}, mobs {}, bosses {})",
             session->SessionId, player->GetName(), map->GetId(),
             session->TotalMobs, session->TotalBosses);
 
@@ -73,7 +73,7 @@ public:
     }
 };
 
-void AddSC_dm_allmap_script()
+void AddSC_atlas_allmap_script()
 {
-    new dm_allmap_script();
+    new atlas_allmap_script();
 }

@@ -1,11 +1,11 @@
 /*
- * mod-dungeon-master — RoguelikeMgr.cpp
+ * mod-atlas — RoguelikeMgr.cpp
  * Roguelike run manager: multi-dungeon progression, buffs, affixes, transitions.
  */
 
 #include "RoguelikeMgr.h"
-#include "DungeonMasterMgr.h"
-#include "DMConfig.h"
+#include "AtlasMgr.h"
+#include "AtlasConfig.h"
 #include "Player.h"
 #include "Group.h"
 #include "Creature.h"
@@ -20,7 +20,7 @@
 #include "StringFormat.h"
 #include <algorithm>
 
-namespace DungeonMaster
+namespace Atlas
 {
 
 // RNG: AC's helpers (Random.h), thread-safe. RandInt keeps the call sites'
@@ -48,7 +48,7 @@ void RoguelikeMgr::Initialize()
     LoadAllRoguelikePlayerStats();
     LoadRoguelikeLeaderboard();
     LOG_INFO("module", "RoguelikeMgr: Initialized — {} affix definitions, {} buff pool entries.",
-        _affixDefs.size(), sDMConfig->GetRoguelikeBuffPool().size());
+        _affixDefs.size(), sAtlasConfig->GetRoguelikeBuffPool().size());
 }
 
 void RoguelikeMgr::BuildAffixPool()
@@ -120,7 +120,7 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     if (!leader)
         return false;
 
-    if (!sDMConfig->IsRoguelikeEnabled())
+    if (!sAtlasConfig->IsRoguelikeEnabled())
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} The Endless Timeways are sealed for now.", CHAT_PREFIX_ENDLESS);
@@ -135,8 +135,8 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
         return false;
     }
 
-    // Check: player not in a DM session
-    if (sDungeonMasterMgr->GetSessionByPlayer(leader->GetGUID()))
+    // Check: player not in a Atlas session
+    if (sAtlasMgr->GetSessionByPlayer(leader->GetGUID()))
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} You are already walking an echo.", CHAT_PREFIX_ENDLESS);
@@ -144,9 +144,9 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     }
 
     // Check: cooldown
-    if (sDungeonMasterMgr->IsOnCooldown(leader->GetGUID()))
+    if (sAtlasMgr->IsOnCooldown(leader->GetGUID()))
     {
-        uint32 rem = sDungeonMasterMgr->GetRemainingCooldown(leader->GetGUID());
+        uint32 rem = sAtlasMgr->GetRemainingCooldown(leader->GetGUID());
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} The timeways need |cFFFFFFFF{}|r min |cFFFFFFFF{}|r sec to settle first.",
             CHAT_PREFIX_ENDLESS, rem / 60, rem % 60);
@@ -154,7 +154,7 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     }
 
     // Check: can create a session
-    if (!sDungeonMasterMgr->CanCreateNewSession())
+    if (!sAtlasMgr->CanCreateNewSession())
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} Too many echoes are open at once. Return shortly.", CHAT_PREFIX_ENDLESS);
@@ -176,10 +176,10 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
 
     // Use the difficulty selected by the player (or fall back to first available)
     run.BaseDifficultyId = difficultyId;
-    DifficultyTier const* diff = sDMConfig->GetDifficulty(difficultyId);
+    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(difficultyId);
     if (!diff)
     {
-        auto const& diffs = sDMConfig->GetDifficulties();
+        auto const& diffs = sAtlasConfig->GetDifficulties();
         run.BaseDifficultyId = diffs.empty() ? 1 : diffs[0].Id;
     }
 
@@ -201,7 +201,7 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
                 // Check: group member not in another run
                 if (IsPlayerInRun(m->GetGUID()))
                     continue;
-                if (sDungeonMasterMgr->GetSessionByPlayer(m->GetGUID()))
+                if (sAtlasMgr->GetSessionByPlayer(m->GetGUID()))
                     continue;
 
                 RoguelikePlayerData md;
@@ -225,10 +225,10 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
 
     // Clear cooldowns for all party members so they can enter
     for (auto const& pd : run.Players)
-        sDungeonMasterMgr->ClearCooldown(pd.PlayerGuid);
+        sAtlasMgr->ClearCooldown(pd.PlayerGuid);
 
-    // Create the DM session with the player's scaling choice
-    Session* session = sDungeonMasterMgr->CreateSession(
+    // Create the Atlas session with the player's scaling choice
+    Session* session = sAtlasMgr->CreateSession(
         leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty);
     if (!session)
     {
@@ -242,19 +242,19 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     run.CurrentSessionId    = session->SessionId;
 
     // Start the dungeon
-    if (!sDungeonMasterMgr->StartDungeon(session))
+    if (!sAtlasMgr->StartDungeon(session))
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} The first echo could not be opened.", CHAT_PREFIX_ENDLESS);
-        sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
         return false;
     }
 
-    if (!sDungeonMasterMgr->TeleportPartyIn(session))
+    if (!sAtlasMgr->TeleportPartyIn(session))
     {
         ChatHandler(leader->GetSession()).PSendSysMessage(
             "{} The timeways would not carry you.", CHAT_PREFIX_ENDLESS);
-        sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
         return false;
     }
 
@@ -277,7 +277,7 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     }
 
     // Announce
-    Theme const* theme = sDMConfig->GetTheme(themeId);
+    Theme const* theme = sAtlasConfig->GetTheme(themeId);
     AnnounceToRun(run, Acore::StringFormat(
         "{} |cFFFFD700{}|r leads the descent into the Endless Timeways. Timeline: |cFF00FF00{}|r. "
         "How deep can you go?",
@@ -321,7 +321,7 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
     uint32 sessionDeaths       = 0;
     uint32 sessionMapId        = 0;
     {
-        Session* session = sDungeonMasterMgr->GetSession(sessionId);
+        Session* session = sAtlasMgr->GetSession(sessionId);
         if (session)
         {
             sessionMobsKilled   = session->MobsKilled;
@@ -331,7 +331,7 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
                 sessionDeaths += pd.Deaths;
 
             // Distribute per-floor rewards while session pointer is still valid
-            sDungeonMasterMgr->DistributeRewards(session);
+            sAtlasMgr->DistributeRewards(session);
         }
     }
 
@@ -343,8 +343,8 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
     ++run->DungeonsCleared;
     run->PreviousMapId = sessionMapId;
 
-    // Clean up the DM session (no teleport, no cooldown)
-    sDungeonMasterMgr->CleanupRoguelikeSession(sessionId, true);
+    // Clean up the Atlas session (no teleport, no cooldown)
+    sAtlasMgr->CleanupRoguelikeSession(sessionId, true);
 
     // Remove old session mapping
     {
@@ -412,7 +412,7 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
     }
 
     // Accumulate stats from the final session
-    Session* session = sDungeonMasterMgr->GetSession(run->CurrentSessionId);
+    Session* session = sAtlasMgr->GetSession(run->CurrentSessionId);
     if (session)
     {
         run->TotalMobsKilled   += session->MobsKilled;
@@ -464,16 +464,16 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
             RemoveBuffStacks(p, run->RunId);
     }
 
-    // Clean up the DM session
+    // Clean up the Atlas session
     if (run->CurrentSessionId != 0)
-        sDungeonMasterMgr->CleanupRoguelikeSession(run->CurrentSessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(run->CurrentSessionId, false);
 
     // Teleport everyone back to their original positions
     TeleportRunPlayersOut(*run);
 
     // Set cooldowns
     for (auto const& pd : run->Players)
-        sDungeonMasterMgr->SetCooldown(pd.PlayerGuid);
+        sAtlasMgr->SetCooldown(pd.PlayerGuid);
 
     // Save before erase invalidates the pointer
     uint32 savedTier    = run->CurrentTier;
@@ -557,20 +557,20 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
         for (auto const& pd : run->Players)
             guids.push_back(pd.PlayerGuid);
 
-        sDungeonMasterMgr->DistributeRoguelikeRewards(
+        sAtlasMgr->DistributeRoguelikeRewards(
             run->CurrentTier, effectiveLevel, guids);
     }
 
-    // Clean up DM session if one is active
+    // Clean up Atlas session if one is active
     if (run->CurrentSessionId != 0)
-        sDungeonMasterMgr->CleanupRoguelikeSession(run->CurrentSessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(run->CurrentSessionId, false);
 
     // Teleport out
     TeleportRunPlayersOut(*run);
 
     // Set cooldowns
     for (auto const& pd : run->Players)
-        sDungeonMasterMgr->SetCooldown(pd.PlayerGuid);
+        sAtlasMgr->SetCooldown(pd.PlayerGuid);
 
     // Save before erase invalidates the pointer
     uint32 savedTier    = run->CurrentTier;
@@ -671,9 +671,9 @@ float RoguelikeMgr::GetTierHealthMultiplier(uint32 runId) const
     uint32 tier = it->second.CurrentTier;
     if (tier <= 1) return 1.0f;
 
-    float baseScale = sDMConfig->GetRoguelikeHpScaling();
-    uint32 expThresh = sDMConfig->GetRoguelikeExpThreshold();
-    float  expFactor = sDMConfig->GetRoguelikeExpFactor();
+    float baseScale = sAtlasConfig->GetRoguelikeHpScaling();
+    uint32 expThresh = sAtlasConfig->GetRoguelikeExpThreshold();
+    float  expFactor = sAtlasConfig->GetRoguelikeExpFactor();
 
     if (tier <= expThresh)
         return 1.0f + (tier - 1) * baseScale;
@@ -696,9 +696,9 @@ float RoguelikeMgr::GetTierDamageMultiplier(uint32 runId) const
     uint32 tier = it->second.CurrentTier;
     if (tier <= 1) return 1.0f;
 
-    float baseScale = sDMConfig->GetRoguelikeDmgScaling();
-    uint32 expThresh = sDMConfig->GetRoguelikeExpThreshold();
-    float  expFactor = sDMConfig->GetRoguelikeExpFactor();
+    float baseScale = sAtlasConfig->GetRoguelikeDmgScaling();
+    uint32 expThresh = sAtlasConfig->GetRoguelikeExpThreshold();
+    float  expFactor = sAtlasConfig->GetRoguelikeExpFactor();
 
     if (tier <= expThresh)
         return 1.0f + (tier - 1) * baseScale;
@@ -720,7 +720,7 @@ float RoguelikeMgr::GetTierArmorMultiplier(uint32 runId) const
     uint32 tier = it->second.CurrentTier;
     if (tier <= 1) return 1.0f;
 
-    float baseScale = sDMConfig->GetRoguelikeArmorScaling();
+    float baseScale = sAtlasConfig->GetRoguelikeArmorScaling();
     return 1.0f + (tier - 1) * baseScale;   // Armor scales linearly only
 }
 
@@ -791,7 +791,7 @@ std::string RoguelikeMgr::GetActiveAffixNames(uint32 runId) const
 // Buff system: +10% all stats per cleared floor, carried by the module's own
 // stacking aura (see ApplyBuffAura).
 
-// The module's own passive aura (spell_dbc row in dm_setup.sql): +10% all
+// The module's own passive aura (spell_dbc row in atlas_world_setup.sql): +10% all
 // stats per stack, up to 255 stacks. It replaces Greater Blessing of Kings,
 // which had to be patched server-wide to stack and so let every paladin stack
 // it too (upstream #23). Being passive, it is never sent to clients and never
@@ -867,9 +867,9 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 {
     run.ActiveAffixes.clear();
 
-    uint32 affixStart  = sDMConfig->GetRoguelikeAffixStartTier();
-    uint32 secondAffix = sDMConfig->GetRoguelikeSecondAffixTier();
-    uint32 thirdAffix  = sDMConfig->GetRoguelikeThirdAffixTier();
+    uint32 affixStart  = sAtlasConfig->GetRoguelikeAffixStartTier();
+    uint32 secondAffix = sAtlasConfig->GetRoguelikeSecondAffixTier();
+    uint32 thirdAffix  = sAtlasConfig->GetRoguelikeThirdAffixTier();
 
     if (run.CurrentTier < affixStart || _affixDefs.empty())
         return;
@@ -895,16 +895,16 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 
 uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run) const
 {
-    DifficultyTier const* diff = sDMConfig->GetDifficulty(run.BaseDifficultyId);
+    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(run.BaseDifficultyId);
     if (!diff)
     {
         // Fallback: use broadest range
-        auto dgs = sDMConfig->GetDungeonsForLevel(1, 80);
+        auto dgs = sAtlasConfig->GetDungeonsForLevel(1, 80);
         if (dgs.empty()) return 0;
         return dgs[RandInt<size_t>(0, dgs.size() - 1)]->MapId;
     }
 
-    auto dgs = sDMConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
+    auto dgs = sAtlasConfig->GetDungeonsForLevel(diff->MinLevel, diff->MaxLevel);
     if (dgs.empty()) return 0;
 
     // Try to avoid repeating the same dungeon
@@ -953,19 +953,19 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
 
     // Clear cooldowns (EndSession might have set them)
     for (auto const& pd : run.Players)
-        sDungeonMasterMgr->ClearCooldown(pd.PlayerGuid);
+        sAtlasMgr->ClearCooldown(pd.PlayerGuid);
 
     // Select theme: run-locked theme or random
     uint32 themeId = run.ThemeId;
     if (themeId == 0)
     {
-        auto const& themes = sDMConfig->GetThemes();
+        auto const& themes = sAtlasConfig->GetThemes();
         if (!themes.empty())
             themeId = themes[RandInt<size_t>(0, themes.size() - 1)].Id;
     }
 
-    // Create the new DM session
-    Session* session = sDungeonMasterMgr->CreateSession(
+    // Create the new Atlas session
+    Session* session = sAtlasMgr->CreateSession(
         leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty);
     if (!session)
     {
@@ -985,10 +985,10 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
     }
 
     // Start and teleport
-    if (!sDungeonMasterMgr->StartDungeon(session))
+    if (!sAtlasMgr->StartDungeon(session))
     {
         LOG_ERROR("module", "RoguelikeMgr: StartDungeon failed for run {}", run.RunId);
-        sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
         {
             std::lock_guard<std::mutex> lock2(_runMutex);
             _sessionToRun.erase(session->SessionId);
@@ -996,10 +996,10 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
         return false;
     }
 
-    if (!sDungeonMasterMgr->TeleportPartyIn(session))
+    if (!sAtlasMgr->TeleportPartyIn(session))
     {
         LOG_ERROR("module", "RoguelikeMgr: Teleport failed for run {}", run.RunId);
-        sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
+        sAtlasMgr->CleanupRoguelikeSession(session->SessionId, false);
         {
             std::lock_guard<std::mutex> lock2(_runMutex);
             _sessionToRun.erase(session->SessionId);
@@ -1009,7 +1009,7 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
 
     run.State = RoguelikeRunState::Active;
 
-    DungeonInfo const* dg = sDMConfig->GetDungeon(mapId);
+    DungeonInfo const* dg = sAtlasConfig->GetDungeon(mapId);
     AnnounceToRun(run, Acore::StringFormat("{} An echo of |cFFFFFFFF{}|r forms — |cFFFF0000depth {}|r.",
         CHAT_PREFIX_ENDLESS, dg ? dg->Name : "an unknown place", run.CurrentTier));
 
@@ -1144,7 +1144,7 @@ void RoguelikeMgr::SaveRoguelikeLeaderboard(RoguelikeRun const& run)
     std::string safeName = e.CharName;
     CharacterDatabase.EscapeString(safeName);
     CharacterDatabase.Execute(
-        "INSERT INTO dm_roguelike_leaderboard "
+        "INSERT INTO atlas_roguelike_leaderboard "
         "(guid, char_name, tier_reached, dungeons_cleared, total_kills, "
         "total_bosses, total_deaths, run_duration, party_size) "
         "VALUES ({}, '{}', {}, {}, {}, {}, {}, {}, {})",
@@ -1169,7 +1169,7 @@ void RoguelikeMgr::LoadRoguelikeLeaderboard()
     if (QueryResult result = CharacterDatabase.Query(
             "SELECT id, guid, char_name, tier_reached, dungeons_cleared, "
             "total_kills, total_bosses, total_deaths, run_duration, party_size "
-            "FROM dm_roguelike_leaderboard"))
+            "FROM atlas_roguelike_leaderboard"))
     {
         do
         {
@@ -1236,7 +1236,7 @@ void RoguelikeMgr::LoadAllRoguelikePlayerStats()
         "SELECT guid, total_runs, highest_tier, most_floors_cleared, "
         "total_floors_cleared, total_mobs_killed, total_bosses_killed, "
         "total_deaths, longest_run_time "
-        "FROM dm_roguelike_player_stats");
+        "FROM atlas_roguelike_player_stats");
 
     if (!result)
     {
@@ -1311,7 +1311,7 @@ void RoguelikeMgr::UpdateRoguelikePlayerStats(RoguelikeRun const& run)
         }
 
         CharacterDatabase.Execute(
-            "REPLACE INTO dm_roguelike_player_stats "
+            "REPLACE INTO atlas_roguelike_player_stats "
             "(guid, total_runs, highest_tier, most_floors_cleared, "
             "total_floors_cleared, total_mobs_killed, total_bosses_killed, "
             "total_deaths, longest_run_time) "
@@ -1322,4 +1322,4 @@ void RoguelikeMgr::UpdateRoguelikePlayerStats(RoguelikeRun const& run)
     }
 }
 
-} // namespace DungeonMaster
+} // namespace Atlas
