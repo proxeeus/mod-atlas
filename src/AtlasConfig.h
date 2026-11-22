@@ -101,6 +101,20 @@ public:
     // Themes from the database (atlas_theme), merged into the list by sort order.
     void   SetDatabaseThemes(std::vector<Theme> themes);
 
+    // --- Maps: Echo Sigils and the Timeways Lens (PLAN 1.4) ---
+    bool   IsMapsEnabled()            const { return _mapsEnabled; }
+    uint8  GetMapMinLevel()           const { return _mapMinLevel; }
+    uint32 GetMapPortals()            const { return _mapPortals; }
+    // 0 = the hardest difficulty; its reward multipliers apply to map runs.
+    uint32 GetMapDifficultyId()       const;
+    uint32 GetMapEmptyTimeoutSec()    const { return _mapEmptyTimeoutMin * 60; }
+    uint32 GetMapCompletedTimeoutSec() const { return _mapCompletedTimeoutMin * 60; }
+    uint32 GetMapStarterCount()       const { return _mapStarterCount; }
+    bool   IsMapSourceExcluded(uint32 mapId) const;
+    uint32 GetMapExtraDropChance()    const { return _mapExtraDropChance; }
+    uint32 GetMapHigherTierChance()   const { return _mapHigherTierChance; }
+    std::array<uint32, 3> const& GetMapRarityWeights() const { return _mapRarityWeights; }
+
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
     float  GetVisualScaleForCreatureType(uint32 type) const;
@@ -186,6 +200,17 @@ private:
     std::vector<Theme> _configThemes;
     std::vector<Theme> _databaseThemes;
     bool   _affixBotSafeOnly = true;
+    bool   _mapsEnabled      = true;
+    uint8  _mapMinLevel      = 80;
+    uint32 _mapPortals       = 6;
+    uint32 _mapDifficultyId  = 0;
+    uint32 _mapEmptyTimeoutMin = 20;
+    uint32 _mapCompletedTimeoutMin = 10;
+    uint32 _mapStarterCount  = 3;
+    std::vector<uint32> _mapExcludedSources;
+    uint32 _mapExtraDropChance  = 35;
+    uint32 _mapHigherTierChance = 20;
+    std::array<uint32, 3> _mapRarityWeights{ { 60, 30, 10 } };
     uint32 _eliteChance     = 20;
     float  _aggroRadius     = 15.0f;
     uint32 _rareSpawnChance = 5;

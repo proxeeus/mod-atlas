@@ -71,6 +71,7 @@ enum AtlasGossipActions
     GOSSIP_ACTION_BOARD_RL_TIER       = 10312,  // Timeways — deepest
     GOSSIP_ACTION_BOARD_RL_FLOORS     = 10313,  // Timeways — most echoes
     GOSSIP_ACTION_OPEN_CHRONICLE      = 10320,  // Chronicle window (client addon)
+    GOSSIP_ACTION_STARTER_SIGILS      = 10330,  // starter Echo Sigils (PLAN 1.4)
 };
 
 namespace
@@ -306,6 +307,18 @@ public:
             ShowRoguelikeLeaderboard(player, creature, false);
         else if (action == GOSSIP_ACTION_BOARD_RL_FLOORS)
             ShowRoguelikeLeaderboard(player, creature, true);
+        else if (action == GOSSIP_ACTION_STARTER_SIGILS)
+        {
+            player->PlayerTalkClass->SendCloseGossip();
+            if (player->GetLevel() >= sAtlasConfig->GetMapMinLevel()
+                && !sAtlasMgr->HasStarterSigils(player->GetGUID()))
+            {
+                sAtlasMgr->GrantStarterSigils(player);
+                chat.PSendSysMessage("{} Esmadormu presses {} sigils into your hand: echoes she sealed for you. "
+                    "Place them in the Timeways Lens beside her in Dalaran, and walk them well.", CHAT_PREFIX,
+                    sAtlasConfig->GetMapStarterCount());
+            }
+        }
 
         return true;
     }
@@ -325,6 +338,11 @@ private:
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_MAIN_INFO);
         AddGossipItemFor(player, GOSSIP_ICON_TABARD, "Show me the chronicles.",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_MENU);
+        if (sAtlasConfig->IsMapsEnabled() && sAtlasConfig->GetMapStarterCount()
+            && player->GetLevel() >= sAtlasConfig->GetMapMinLevel()
+            && !sAtlasMgr->HasStarterSigils(player->GetGUID()))
+            AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1, "Have you sealed any echoes for me?",
+                GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STARTER_SIGILS);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
 

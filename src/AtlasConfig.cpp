@@ -149,6 +149,48 @@ void AtlasConfig::LoadConfig(bool reload)
         }
     }
     _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
+
+    // Maps (PLAN 1.4)
+    _mapsEnabled      = sConfigMgr->GetOption<bool>  ("Atlas.Map.Enable",             true);
+    _mapMinLevel      = static_cast<uint8>(std::clamp<uint32>(
+        sConfigMgr->GetOption<uint32>("Atlas.Map.MinLevel", 80), 1, 80));
+    _mapPortals       = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.Portals", 6), 1, 20);
+    _mapDifficultyId  = sConfigMgr->GetOption<uint32>("Atlas.Map.Difficulty",         0);
+    _mapEmptyTimeoutMin = std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.EmptyTimeout", 20), 1, 25);
+    _mapCompletedTimeoutMin =
+        std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.CompletedTimeout", 10), 1, 25);
+    _mapStarterCount  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.StarterSigils", 3), 10);
+    _mapExtraDropChance  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.ExtraDropChance", 35), 100);
+    _mapHigherTierChance = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.HigherTierChance", 20), 100);
+    _mapExcludedSources.clear();
+    for (std::string const& id : SplitString(StripQuotes(sConfigMgr->GetOption<std::string>(
+        "Atlas.Map.ExcludeSources", "632,658,668")), ','))
+    {
+        try
+        {
+            if (!id.empty())
+                _mapExcludedSources.push_back(static_cast<uint32>(std::stoul(id)));
+        }
+        catch (...)
+        {
+            LOG_ERROR("module", "Atlas: Bad map id '{}' in Atlas.Map.ExcludeSources.", id);
+        }
+    }
+    _mapRarityWeights = { 60, 30, 10 };
+    {
+        auto parts = SplitString(StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Map.RarityWeights",
+            "60,30,10")), ',');
+        try
+        {
+            if (parts.size() == 3)
+                _mapRarityWeights = { static_cast<uint32>(std::stoul(parts[0])),
+                    static_cast<uint32>(std::stoul(parts[1])), static_cast<uint32>(std::stoul(parts[2])) };
+        }
+        catch (...)
+        {
+            LOG_ERROR("module", "Atlas: Bad Atlas.Map.RarityWeights; using 60,30,10.");
+        }
+    }
     _eliteChance     = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.EliteChance",    20);
     _aggroRadius     = sConfigMgr->GetOption<float> ("Atlas.Dungeon.AggroRadius",    15.0f);
     _rareSpawnChance = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.RareSpawnChance", 5);
@@ -509,6 +551,18 @@ void AtlasConfig::LoadRoguelikeBuffPool()
         _roguelikeBuffPool.push_back({9, 19506, "Trueshot Aura",         70});   // +10% AP
         _roguelikeBuffPool.push_back({10, 24932, "Leader of the Pack",   70});   // +5% crit
     }
+}
+
+uint32 AtlasConfig::GetMapDifficultyId() const
+{
+    if (_mapDifficultyId && GetDifficulty(_mapDifficultyId))
+        return _mapDifficultyId;
+    return _difficulties.empty() ? 0 : _difficulties.back().Id;
+}
+
+bool AtlasConfig::IsMapSourceExcluded(uint32 mapId) const
+{
+    return std::find(_mapExcludedSources.begin(), _mapExcludedSources.end(), mapId) != _mapExcludedSources.end();
 }
 
 } // namespace Atlas

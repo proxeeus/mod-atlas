@@ -111,6 +111,7 @@ void AtlasMgr::LoadFromDB()
     LoadAllPlayerStats();
     LoadLeaderboard();
     LoadDungeonGeometry();
+    LoadMapItems();
 }
 
 // Compute group average level
@@ -492,6 +493,8 @@ void AtlasMgr::TeleportPartyOut(Session* session)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (!p || !p->IsInWorld()) continue;
+        // A map run's members may already be back at the Lens.
+        if (session->IsMapRun && p->GetMapId() != session->MapId) continue;
         p->RemoveFlag(PLAYER_FIELD_BYTES, PLAYER_FIELD_BYTE_NO_RELEASE_WINDOW);
         if (!p->IsAlive()) { p->ResurrectPlayer(1.0f); p->SpawnCorpseBones(); }
         p->TeleportTo(pd.ReturnMapId, pd.ReturnPosition.GetPositionX(),
@@ -669,7 +672,32 @@ void AtlasMgr::HandlePlayerDeath(Player* player, Session* session)
     player->SetFlag(PLAYER_FIELD_BYTES, PLAYER_FIELD_BYTE_NO_RELEASE_WINDOW);
     player->RemoveFlag(PLAYER_FIELD_BYTES, PLAYER_FIELD_BYTE_RELEASE_TIMER);
 
-    if (session->IsPartyWiped())
+    // A map run counts only those inside: members waiting at the Lens don't
+    // keep it alive, and the dead inside can be pulled back while rifts last.
+    bool wiped = session->IsPartyWiped();
+    if (session->IsMapRun)
+    {
+        wiped = true;
+        for (auto const& psd : session->Players)
+            if (Player* p = ObjectAccessor::FindPlayer(psd.PlayerGuid))
+                if (p->IsAlive() && p->GetMapId() == session->MapId)
+                    wiped = false;
+    }
+
+    if (wiped && session->IsMapRun && session->PortalsLeft > 0)
+    {
+        ++session->Wipes;
+        --session->PortalsLeft;
+        std::string const text = Acore::StringFormat("{} The echo has claimed you all. The Keepers pull you back "
+            "to its entrance at the cost of a rift: |cFFFFFFFF{}|r left.", CHAT_PREFIX, session->PortalsLeft);
+        for (auto const& psd : session->Players)
+            if (Player* p = ObjectAccessor::FindPlayer(psd.PlayerGuid))
+                if (p->GetSession() && p->GetMapId() == session->MapId)
+                    ChatHandler(p->GetSession()).SendSysMessage(text);
+        return;
+    }
+
+    if (wiped)
     {
         ++session->Wipes;
 
@@ -759,18 +787,34 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
     LOG_INFO("module", "Atlas: EndSession {} — success={}, state={}, players={}",
         sessionId, success, static_cast<int>(s.State), s.Players.size());
 
+    bool const mapRun = s.IsMapRun;
+    bool const mended = success && s.State == SessionState::Completed;
+    char const* farewell = mended
+        ? (mapRun ? "The echo closes behind you, mended." : "The echo is mended. The Keepers of Time thank you.")
+        : (!mapRun ? "The echo fades unmended. There is no reward this time."
+            : s.Entered.empty() ? "The rift closes before anyone crosses."
+            : "The echo is lost, and the sigil with it.");
     for (auto const& pd : s.Players)
         if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
             if (p->GetSession())
-                ChatHandler(p->GetSession()).PSendSysMessage("{} {}", CHAT_PREFIX,
-                    success ? "The echo is mended. The Keepers of Time thank you."
-                            : "The echo fades unmended. There is no reward this time.");
+                ChatHandler(p->GetSession()).PSendSysMessage("{} {}", CHAT_PREFIX, farewell);
 
-    if (success && s.State == SessionState::Completed)
+    if (mended && mapRun)
+    {
+        // Shares left in the cache follow their players (queued, by mail at logout).
+        for (auto const& pd : s.Players)
+            if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                if (IsRealPlayer(p) && !Session::Contains(s.CacheClaimed, pd.PlayerGuid))
+                {
+                    s.CacheClaimed.push_back(pd.PlayerGuid);
+                    GiveMapCompletionReward(s, p);
+                }
+    }
+    else if (mended)
         DistributeRewards(&s);
 
     UpdatePlayerStatsFromSession(s, success);
-    if (success && s.State == SessionState::Completed)
+    if (mended && !mapRun)
         SaveLeaderboardEntry(s);
 
     LogRun(s, success);
@@ -782,8 +826,21 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
     uint32 savedInstanceId = s.InstanceId;
     CleanupSession(s);
 
-    for (auto const& pd : s.Players)
-        SetCooldown(pd.PlayerGuid);
+    // Maps cost a sigil; only echoes have a cooldown.
+    if (!mapRun)
+        for (auto const& pd : s.Players)
+            SetCooldown(pd.PlayerGuid);
+
+    if (mapRun && savedInstanceId)
+    {
+        std::lock_guard<std::mutex> spawnLock(_mapSpawnMutex);
+        auto sit = _mapSpawns.find(savedInstanceId);
+        if (sit != _mapSpawns.end())
+        {
+            _mapSpawnCount.fetch_sub(static_cast<uint32>(sit->second.size()), std::memory_order_relaxed);
+            _mapSpawns.erase(sit);
+        }
+    }
 
     if (savedInstanceId != 0)
         _instanceToSession.erase(savedInstanceId);
@@ -1195,6 +1252,13 @@ void AtlasMgr::Update(uint32 diff)
                             HandleBossDeath(&session);
 
                             // Check completion
+                            if (session.IsMapRun && session.IsActive() && session.TotalBosses > 0
+                                && session.BossesKilled >= session.TotalBosses)
+                            {
+                                CompleteMapRun(session, ppc.DeathPos);
+                                break;
+                            }
+
                             if (session.IsActive() && session.TotalBosses > 0
                                 && session.BossesKilled >= session.TotalBosses)
                             {
@@ -1303,6 +1367,53 @@ void AtlasMgr::Update(uint32 diff)
                 }
             }
 
+            // ---- Map run: occupancy, rifts, the end once mended ----
+            if (session.IsMapRun)
+            {
+                uint64 const now = GameTime::GetGameTime().count();
+                bool anyone = false;
+                bool anyoneReal = false;
+                for (auto const& pd : session.Players)
+                    if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                        if (p->GetMapId() == session.MapId)
+                        {
+                            anyone = true;
+                            anyoneReal = anyoneReal || IsRealPlayer(p);
+                        }
+                if (anyone)
+                    session.LastOccupied = now;
+
+                if (session.State == SessionState::Completed)
+                {
+                    // Closes once every player has left (bots go with it), or
+                    // after Atlas.Map.CompletedTimeout.
+                    if (!anyoneReal || now - session.EndTime >= sAtlasConfig->GetMapCompletedTimeoutSec())
+                        toEnd.emplace_back(sid, true);
+                    continue;
+                }
+
+                if (session.IsActive() && !anyone)
+                {
+                    std::string reason;
+                    if (!session.PortalsLeft && !session.Entered.empty())
+                        reason = "The last rift has closed behind you.";
+                    else if (now - session.LastOccupied >= sAtlasConfig->GetMapEmptyTimeoutSec())
+                        reason = "Left unwatched, the echo drifts away.";
+                    if (!reason.empty())
+                    {
+                        LOG_INFO("module", "Atlas: Map run {} lost — {} (rifts left {}).", sid, reason,
+                            session.PortalsLeft);
+                        for (auto const& pd : session.Players)
+                            if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                                if (p->GetSession())
+                                    ChatHandler(p->GetSession()).PSendSysMessage("{} {}", CHAT_PREFIX, reason);
+                        session.State = SessionState::Abandoned;
+                        toEnd.emplace_back(sid, false);
+                        continue;
+                    }
+                }
+            }
+
             // ---- Completed → teleport delay ----
             if (session.State == SessionState::Completed)
             {
@@ -1358,8 +1469,8 @@ void AtlasMgr::Update(uint32 diff)
                 }
             }
 
-            // ---- Abandoned detection ----
-            if (session.IsActive()
+            // ---- Abandoned detection (map runs: above) ----
+            if (session.IsActive() && !session.IsMapRun
                 && (GameTime::GetGameTime().count() - session.StartTime) >= 15)
             {
                 bool anyone = false;

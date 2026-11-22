@@ -33,7 +33,14 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Statistics & Leaderboards** — Separate tracking for normal runs and roguelike mode. Normal stats track win rate, kills, deaths, K/D ratio, and fastest clear. Roguelike stats track highest tier, most floors, total floors cleared, and longest run. Leaderboards include Normal Fastest Clears, Roguelike Highest Tier, and Roguelike Most Floors — with your own entries highlighted
 - **The Chronicle of Echoes** — With the `AtlasChronicle` client addon, the records open in a window styled as the Keepers of Time's chronicle: the swiftest mendings (filterable by dungeon), the deepest Endless descents, and your own thread. Without the addon, the Chronicler reads the records out in chat
 - **Level brackets** — A tier opens once everyone in the party reaches it and stays open afterwards; no dungeon may start above the party's lowest level
-- **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`, `.atlas run`, `.atlas seed`, `.atlas affix`, `.atlas curate`, `.atlas scaling`
+- **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`, `.atlas run`, `.atlas seed`, `.atlas affix`, `.atlas curate`, `.atlas map`, `.atlas scaling`
+
+### Maps: Echo Sigils and the Timeways Lens
+- **Echo Sigils** — map items of tiers 1 to 16, normal (white), magic (green, 1-2 instabilities) or rare (blue, 3-4); each holds one echo: a dungeon, a timeline, a seed and its instabilities
+- **The Timeways Lens** — the Keepers' hourglass beside the Chronicler in Dalaran; place a sigil and a Rift in Time opens beside it
+- **Rifts** — each member's first crossing is free, and bots cross with the player who uses the rift; every later crossing, and every wipe, spends one of the run's 6 rifts. With none left and nobody inside, the echo is lost
+- **Cache of the Keepers** — where the master falls: each player's share of gold and gear, and new sigils (the run's tier, sometimes higher); bots are paid at the kill
+- **Starter sigils** — the Chronicler gives three tier-1 sigils once to each level-80 character
 
 ### The Endless Timeways (roguelike mode)
 - **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
@@ -118,6 +125,19 @@ On this server, eight of them stand 3 yards to the left of **Chronomancer Noriol
 **Brackets.** Tiers and dungeons follow the lowest level in the party. A tier opens at its minimum level, or at the first dungeon it can roll if that starts higher (Novice opens at 13 with Ragefire Chasm), and stays open afterwards. A dungeon is only offered when it doesn't start above the party's lowest level, and only when everyone meets its own entry requirements (attunement quests, item level). The menu lists only those dungeons.
 
 Echoes run on **Normal** dungeon difficulty only (a heroic run could lock the group out of the real heroic). Each run starts in a fresh instance: a temporary Normal save to that dungeon is reset first, and the run is refused if someone is still inside that saved instance.
+
+### Walking a map
+
+1. At level 80, ask the Chronicler **Have you sealed any echoes for me?** (once per character): three tier-1 Echo Sigils
+2. Take a sigil to the **Timeways Lens** beside her in Dalaran and place it (the sigil is spent)
+3. Step through the **Rift in Time** beside the Lens; your bots cross with you
+4. Inside, a **Rift to Dalaran** stands at the entrance: leave to sell or repair and come back through the Lens's rift (that crossing spends one rift)
+5. A wipe pulls the party back to the entrance at the cost of a rift; with no rift left the echo is lost
+6. Slay its master: open the **Cache of the Keepers** where it fell for your share and new sigils, then take the rift home beside it. The echo closes once every player has left, or after 10 minutes; a share left in the cache follows its player
+
+Maps cost a sigil instead of a cooldown. Their tier sets the creatures' strength (tier growth), the corruption of the packs and the tier of the sigils they drop. Sigils open tiers 1-5 in Classic dungeons, 6-10 in The Burning Crusade, 11-16 in Wrath of the Lich King (the Frozen Halls excepted). Same sigil, same echo: the seed is stored with it.
+
+Sigil tooltips need the AtlasChronicle addon (an item link carries only the tier and rarity); the Lens lists every sigil's echo in its menu. An unpatched client also shows sigils with a question-mark icon; the addon puts their rune on the bag button.
 
 ### The Endless Timeways
 
@@ -278,6 +298,8 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas affix next <codes>\|clear` | GM | The target's (or your) next run carries these affixes, e.g. `M01 P02 A02` (an echo, or every depth of a descent) |
 | `.atlas curate <entry> [allowed\|blocked\|untested] [note]` | GM | Shows a creature's curation, AI and pools, or sets it (stored in `atlas_creature_curation`) |
 | `.atlas curate spawn <entry> [role]` | GM | Spawns a sample at your level as a run would (role stats, AI policy), to test a creature; role trash, elite (default), rare, miniboss, boss or add |
+| `.atlas map give <tier> [normal\|magic\|rare] [codes]` | GM | An Echo Sigil for the target (or you); with affix codes, exactly those |
+| `.atlas map list` | GM | The target's (or your) sigils and open map run |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
@@ -292,6 +314,7 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 - **Async teleport handling** — 30-second grace period after teleports to prevent false "abandoned" detection.
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
 - **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `atlas_open_instance` so a restart mid-run releases them at startup.
+- **Map-run gameobjects** — rifts and the cache inside a run are summoned from that map's own update (`OnMapUpdate`), never from the world thread, and despawn by themselves once their run is gone. Sigil data lives in `atlas_map_item` (characters DB), keyed by item guid; rows whose item no longer exists are pruned at startup.
 - **Hot-path gating** — Damage, death and creature-add hooks check a lock-free "any run active?" flag and the map type before touching the session mutex.
 - **Cached lookups** — Dungeon entrances, layouts (packs, arenas), themes, pools and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
@@ -300,7 +323,7 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 - **Multi-phase boss detection** — When a boss dies, the system waits 5 seconds and scans for new elite/boss creatures near the death location. If a phase-2 creature is detected, it is automatically promoted to boss status and the original death does not count as a kill.
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.
 - **Standard AzerothCore** — All queries use standard AzerothCore column names. No fork-specific dependencies.
-- **Reserved IDs** — creature entries 500000–500001, creature guids 8000001–8000011, npc_text 500000, spells 91000–91099 (91001 = Timeways Resonance). The world SQL only deletes rows it created; a clash fails the install loudly.
+- **Reserved IDs** — creature entries 500000–500001, creature guids 8000001–8000011, npc_text 500000–500003, spells 91000–91099 (91001 = Timeways Resonance), items 90001–90216 (Echo Sigils), gameobjects 900000–900003 (Lens, rifts, cache), gameobject guid 8000101 (the Lens). The world SQL only deletes rows it created; a clash fails the install loudly.
 
 ---
 
@@ -310,14 +333,16 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 mod-atlas/
 ├── CMakeLists.txt
 ├── client_addon/
-│   └── AtlasChronicle/               # The Chronicle window (copy to Interface/AddOns)
+│   └── AtlasChronicle/               # The Chronicle window and sigil tooltips (copy to Interface/AddOns)
 ├── conf/
 │   └── mod_atlas.conf.dist
 ├── data/sql/
 │   ├── db-world/base/atlas_world_setup.sql
 │   ├── db-world/base/atlas_affixes.sql   # Affix table and the player affixes' passive spells
 │   ├── db-world/base/atlas_themes.sql    # Themes, the Scourge pool, creature curation
-│   └── db-characters/base/atlas_characters_setup.sql
+│   ├── db-world/base/atlas_maps.sql      # Echo Sigils, the Lens, rifts, the cache
+│   ├── db-characters/base/atlas_characters_setup.sql
+│   └── db-characters/base/atlas_maps_characters.sql  # Sigil data, starter grants
 ├── tests/                            # Unit tests (AC unit_tests target)
 └── src/
     ├── AtlasConfig.cpp / .h          # Config loader
@@ -332,6 +357,8 @@ mod-atlas/
     ├── StockLayoutProvider.cpp / .h  # Layouts of the stock dungeons echoes run in
     ├── RunRng.h                      # Seeded, reproducible RNG for run layout choices
     ├── AtlasTheme.h                  # Packs, corruption and spawn clustering (pure)
+    ├── AtlasMapItem.h                # Echo Sigils: entries, rarity, drops (pure)
+    ├── AtlasMaps.cpp                 # AtlasMgr: sigils, the Lens, rifts, the cache
     ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
     ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras
     ├── AtlasAffixEffects.cpp         # AtlasMgr: affixes in play (shields, death effects, waves, zones)
@@ -342,8 +369,9 @@ mod-atlas/
     ├── mod_atlas_loader.cpp          # Module entry point
     └── scripts/
         ├── npc_atlas_chronicler.cpp  # Chronicler Esmadormu gossip menus
+        ├── go_atlas_lens.cpp         # The Timeways Lens, rifts, the cache
         ├── atlas_allcreature_script.cpp  # Creature level ownership, add scaling, NPC hiding
-        ├── atlas_allmap_script.cpp   # Map entry trigger
+        ├── atlas_allmap_script.cpp   # Map entry trigger, in-map spawns
         ├── atlas_chronicle_script.cpp  # Chronicle addon protocol
         ├── atlas_command_script.cpp  # GM commands (.atlas)
         ├── atlas_player_script.cpp   # Player death handling

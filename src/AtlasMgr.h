@@ -9,12 +9,16 @@
 #include "AtlasTypes.h"
 #include "AtlasConfig.h"
 #include "StockLayoutProvider.h"
+#include "AtlasMapItem.h"
+#include <atomic>
+#include <memory>
 #include <mutex>
 #include <array>
 #include <map>
 #include <string_view>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 class Player;
@@ -24,6 +28,8 @@ class Unit;
 struct CreatureTemplate;
 class Map;
 class InstanceMap;
+class Item;
+class GameObject;
 
 namespace Atlas
 {
@@ -255,6 +261,46 @@ public:
     Creature*      SpawnCurationSample(Player* gm, uint32 entry, CreatureRole role);
 
     // -----------------------------------------------------------------------
+    // Maps: Echo Sigils, the Timeways Lens, its rifts and the Keepers' cache
+    // (AtlasMaps.cpp, PLAN 1.4, DESIGN §7 and §11).
+    // -----------------------------------------------------------------------
+    // atlas_map_item (pruned of sigils that no longer exist) and atlas_map_grant.
+    void        LoadMapItems();
+    // A sigil's data; one without a row (lost to a crash) gets a plain echo
+    // from its entry and guid.
+    MapItemData GetMapItemData(Item const* item) const;
+    static std::vector<Item*> FindMapItems(Player* player);
+    MapItemData RollMapItem(uint8 tier, MapRarity rarity, RunRng& rng) const;
+    // Queued like every reward (DeliverPendingRewards).
+    void        GiveMapItem(Player* player, MapItemData data);
+    // "Tier 3 Gundrak, a timeline held by mortal warbands: Brutal, of Grief".
+    // plain: no colour codes, for gossip options on the parchment frame.
+    std::string DescribeMapItem(MapItemData const& data, bool withAffixText, bool plain = false) const;
+    bool        HasStarterSigils(ObjectGuid guid) const;
+    void        GrantStarterSigils(Player* player);
+
+    // The Lens: places a sigil, opens the run and its rift. False with a
+    // reason for the player when it can't; the sigil is kept then.
+    bool        OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid, std::string& error);
+    // The open run of this player's, for the Lens ("" when none).
+    std::string DescribeMapRun(ObjectGuid playerGuid) const;
+    void        CloseMapRun(Player* player);
+    // Calls the rift back beside the Lens when it is gone (a temporary
+    // gameobject does not survive its grid unloading while everyone is inside).
+    void        EnsureRift(Player* player, GameObject* lens);
+    void        UseEntryRift(Player* player, GameObject* rift);
+    void        UseExitRift(Player* player);
+    void        UseCache(Player* player, GameObject* cache);
+    // Rifts and caches despawn once their run is gone (their AI asks).
+    bool        IsMapObjectLive(GameObject const* go) const;
+    // Gameobjects inside a run's instance are summoned from that map's own
+    // update (OnMapUpdate), never from the world thread.
+    void        RequestMapSpawn(uint32 instanceId, uint32 goEntry, Position const& pos, uint32 lifetimeSec);
+    void        ProcessMapSpawns(Map* map);
+    // Has a client: bots have no socket ("headless" sessions).
+    static bool IsRealPlayer(Player const* player);
+
+    // -----------------------------------------------------------------------
     // Affixes in play (AtlasAffixEffects.cpp).
     // -----------------------------------------------------------------------
     void SetSessionAffixes(Session* session, std::vector<ActiveAffix> affixes);
@@ -314,7 +360,23 @@ public:
     void   DeliverPendingRewards(ObjectGuid guid);
     void   MailPendingRewards(Player* player);
 private:
-    void   StoreOrMailRewardItem(Player* player, uint32 itemEntry);
+    struct PendingReward
+    {
+        uint32 Entry = 0;
+        std::shared_ptr<MapItemData> Map;   // a sigil's data, stored with the item
+    };
+    void   QueueReward(Player* player, PendingReward reward);
+    void   StoreOrMailRewardItem(Player* player, PendingReward const& reward);
+    void   PersistMapItem(MapItemData const& data);
+    void   ForgetMapItem(uint32 itemGuid);
+
+    // Map runs: a player's share of the run's gold and gear, and its sigils.
+    void   GiveRunReward(Session const& session, Player* player);
+    void   GiveMapCompletionReward(Session const& session, Player* player);
+    // A map run's master fell: the cache and a rift home where it fell, bots
+    // paid at once.
+    void   CompleteMapRun(Session& session, Position const& bossPos);
+    uint32 PickMapSource(uint8 tier, RunRng& rng) const;
     void   MailItemReward(Player* player, uint8 level, uint8 quality,
                           std::string const& subject, std::string const& body);
     void   GiveKillXP(Session* session, bool isBoss, bool isElite);
@@ -364,8 +426,22 @@ private:
     std::unordered_map<ObjectGuid, OwnedCreature> _ownedCreatures;
     mutable std::mutex _ownedMutex;
 
-    std::unordered_map<ObjectGuid, std::vector<uint32>> _pendingRewards;
+    std::unordered_map<ObjectGuid, std::vector<PendingReward>> _pendingRewards;
     std::mutex _pendingRewardsMutex;
+
+    std::unordered_map<uint32, MapItemData> _mapItems;   // by item guid
+    std::unordered_set<uint32>              _mapGrants;  // character guids
+    mutable std::mutex                      _mapItemsMutex;
+
+    struct MapSpawnRequest
+    {
+        uint32   Entry       = 0;
+        Position Pos;
+        uint32   LifetimeSec = 0;
+    };
+    std::unordered_map<uint32, std::vector<MapSpawnRequest>> _mapSpawns;   // by instance id
+    std::mutex            _mapSpawnMutex;
+    std::atomic<uint32>   _mapSpawnCount{ 0 };
 
     std::vector<RewardItem> _rewardItems;
     std::vector<LootPoolItem> _lootPool;

@@ -14,16 +14,22 @@
  *           -> RN:<req>:walked,mended,lost,slain,masters,fallen,fastest
  *              RE:<req>:descents,deepest,mostEchoes,echoes,slain,masters,fallen,longest
  *              RZ:<req>:<echo rank>:<descent rank>   (0 = not chronicled)
+ *   client  M:<req>:<bag>:<slot> an Echo Sigil in the bags (client bag ids:
+ *                               0 backpack, 1-4 bags, -1 bank, 5-11 bank bags)
+ *           -> MH:<req>:bag,slot,entry,tier,rarity,dungeon,theme   (only for a sigil)
+ *              MA:<req>:affix;affix;...   MZ:<req>
  *   server  O                   open the window (sent by the Chronicler)
  *           OFF                 the module is disabled
  * Text fields escape , ; : | % as %XX.
  */
 
 #include "AtlasChronicle.h"
+#include "AtlasAffixes.h"
 #include "AtlasConfig.h"
 #include "AtlasMgr.h"
 #include "Chat.h"
 #include "DBCStores.h"
+#include "Item.h"
 #include "Player.h"
 #include "RoguelikeMgr.h"
 #include "ScriptMgr.h"
@@ -230,6 +236,69 @@ namespace
         Send(player, Acore::StringFormat("RZ:{}:{}:{}", req, echoRank, descentRank));
     }
 
+    bool ParseInt(std::string_view text, int32& out)
+    {
+        if (text.empty())
+            return false;
+        auto const result = std::from_chars(text.data(), text.data() + text.size(), out, 10);
+        return result.ec == std::errc{} && result.ptr == text.data() + text.size();
+    }
+
+    // Client bag and slot (1-based) to the server's position, false if out of range.
+    bool ToServerPosition(int32 bag, int32 slot, uint8& outBag, uint8& outSlot)
+    {
+        if (slot < 1 || slot > 36)
+            return false;
+        if (bag == 0 && slot <= INVENTORY_SLOT_ITEM_END - INVENTORY_SLOT_ITEM_START)
+        {
+            outBag = INVENTORY_SLOT_BAG_0;
+            outSlot = static_cast<uint8>(INVENTORY_SLOT_ITEM_START + slot - 1);
+            return true;
+        }
+        if (bag == -1 && slot <= BANK_SLOT_ITEM_END - BANK_SLOT_ITEM_START)
+        {
+            outBag = INVENTORY_SLOT_BAG_0;
+            outSlot = static_cast<uint8>(BANK_SLOT_ITEM_START + slot - 1);
+            return true;
+        }
+        if (bag >= 1 && bag <= 4)
+        {
+            outBag = static_cast<uint8>(INVENTORY_SLOT_BAG_START + bag - 1);
+            outSlot = static_cast<uint8>(slot - 1);
+            return true;
+        }
+        if (bag >= 5 && bag <= 11)
+        {
+            outBag = static_cast<uint8>(BANK_SLOT_BAG_START + bag - 5);
+            outSlot = static_cast<uint8>(slot - 1);
+            return true;
+        }
+        return false;
+    }
+
+    void HandleSigil(Player* player, std::string const& req, int32 bag, int32 slot)
+    {
+        uint8 serverBag = 0;
+        uint8 serverSlot = 0;
+        Item* item = ToServerPosition(bag, slot, serverBag, serverSlot)
+            ? player->GetItemByPos(serverBag, serverSlot) : nullptr;
+        if (item && IsMapItemEntry(item->GetEntry()))
+        {
+            MapItemData const data = sAtlasMgr->GetMapItemData(item);
+            DungeonInfo const* dg = sAtlasConfig->GetDungeon(data.SourceMap);
+            Theme const* theme = sAtlasConfig->GetTheme(data.ThemeId);
+            Send(player, Acore::StringFormat("MH:{}:{},{},{},{},{},{},{}", req, bag, slot, item->GetEntry(),
+                data.Tier, static_cast<uint32>(data.Rarity), Escape(dg ? dg->Name : "an unknown place"),
+                Escape(theme ? theme->Name : "")));
+
+            std::vector<std::string> affixes;
+            for (ActiveAffix const& a : data.Affixes)
+                affixes.push_back(Escape(sAtlasAffixes->Describe({ a }, true)));
+            SendRows(player, "MA:" + req, affixes);
+        }
+        Send(player, "MZ:" + req);
+    }
+
     void Dispatch(Player* player, std::string_view message)
     {
         std::vector<std::string_view> const args = Split(message, ':');
@@ -252,6 +321,13 @@ namespace
             HandleDescents(player, req, args.size() > 2 && args[2] == "F");
         else if (command == "R")
             HandleRecord(player, req);
+        else if (command == "M" && args.size() > 3)
+        {
+            int32 bag = 0;
+            int32 slot = 0;
+            if (ParseInt(args[2], bag) && ParseInt(args[3], slot))
+                HandleSigil(player, req, bag, slot);
+        }
     }
 }
 

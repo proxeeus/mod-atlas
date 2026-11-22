@@ -11,6 +11,7 @@
 #include "ChatCommand.h"
 #include "Player.h"
 #include "Group.h"
+#include "Item.h"
 #include "ObjectMgr.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
@@ -35,6 +36,11 @@ public:
             { "list",          HandleAffixList,      SEC_GAMEMASTER,     Console::Yes },
             { "next",          HandleAffixNext,      SEC_GAMEMASTER,     Console::No  },
         };
+        static ChatCommandTable mapTable =
+        {
+            { "give",          HandleMapGive,        SEC_GAMEMASTER,     Console::No  },
+            { "list",          HandleMapList,        SEC_GAMEMASTER,     Console::No  },
+        };
         static ChatCommandTable curateTable =
         {
             { "spawn",         HandleCurateSpawn,    SEC_GAMEMASTER,     Console::No  },
@@ -44,6 +50,7 @@ public:
         {
             { "affix",         affixTable },
             { "curate",        curateTable },
+            { "map",           mapTable },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -328,6 +335,69 @@ public:
         }
         h->PSendSysMessage("Atlas: {} spawned as {} at level {}, {} health, {} AI.", c->GetName(), RoleName(parsed),
             c->GetLevel(), c->GetMaxHealth(), AtlasMgr::KeepsStockAI(c) ? "its own" : "Atlas");
+        return true;
+    }
+
+    // .atlas map give <tier> [normal|magic|rare] [affix codes]: an Echo Sigil
+    // for the target (or you). Without codes, a magic or rare one rolls its own.
+    static bool HandleMapGive(ChatHandler* h, uint32 tier, Optional<std::string> rarity, Tail codes)
+    {
+        Player* target = TargetOrSelf(h);
+        if (!target)
+            return false;
+        if (tier < 1 || tier > MAP_MAX_TIER)
+        {
+            h->PSendSysMessage("Atlas: the tier is 1 to {}.", MAP_MAX_TIER);
+            return false;
+        }
+
+        MapRarity r = MapRarity::Normal;
+        if (rarity)
+        {
+            r = ParseMapRarity(*rarity);
+            if (r == MapRarity::Count)
+            {
+                h->SendSysMessage("Atlas: the rarity is normal, magic or rare.");
+                return false;
+            }
+        }
+
+        RunRng rng(RunRng::MakeSeed());
+        MapItemData data = sAtlasMgr->RollMapItem(static_cast<uint8>(tier), r, rng);
+        std::string_view const text = codes;
+        if (!text.empty())
+        {
+            std::string unknown;
+            data.Affixes = sAtlasAffixes->Parse(text, tier, unknown);
+            if (!unknown.empty())
+            {
+                h->PSendSysMessage("Atlas: unknown affix code(s): {} (see .atlas affix list).", unknown);
+                return false;
+            }
+            if (r == MapRarity::Normal && !data.Affixes.empty())
+                data.Rarity = data.Affixes.size() > 2 ? MapRarity::Rare : MapRarity::Magic;
+        }
+
+        std::string const described = sAtlasMgr->DescribeMapItem(data, false);
+        sAtlasMgr->GiveMapItem(target, std::move(data));
+        h->PSendSysMessage("Atlas: {} receives an Echo Sigil: {}.", target->GetName(), described);
+        return true;
+    }
+
+    // .atlas map list: the target's (or your) sigils.
+    static bool HandleMapList(ChatHandler* h)
+    {
+        Player* target = TargetOrSelf(h);
+        if (!target)
+            return false;
+
+        std::vector<Item*> const items = AtlasMgr::FindMapItems(target);
+        h->PSendSysMessage("Atlas: {} carries {} Echo Sigil{}{}", target->GetName(), items.size(),
+            items.size() != 1 ? "s" : "", items.empty() ? "." : ":");
+        for (Item const* item : items)
+            h->PSendSysMessage("  {}", sAtlasMgr->DescribeMapItem(sAtlasMgr->GetMapItemData(item), true));
+        if (std::string const run = sAtlasMgr->DescribeMapRun(target->GetGUID()); !run.empty())
+            h->PSendSysMessage("Atlas: open map run — {}", run);
         return true;
     }
 

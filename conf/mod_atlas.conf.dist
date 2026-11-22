@@ -349,6 +349,73 @@ Atlas.Corruption.TouchedAffix = "M04"
 Atlas.Corruption.Shares = ""
 
 ###############################################################################
+# MAPS: ECHO SIGILS AND THE TIMEWAYS LENS (PLAN 1.4)
+#   A level-80 character gets starter sigils from the Chronicler (once), and
+#   places a sigil in the Timeways Lens beside her in Dalaran. A Rift in Time
+#   opens beside the Lens: each member's first crossing is free (bots cross
+#   with the player who uses the rift), every later crossing and every wipe
+#   spends one of the run's rifts. Its master slain, a Cache of the Keepers
+#   gives each player their share and new sigils.
+#   GM: .atlas map give <tier> [normal|magic|rare] [codes], .atlas map list
+###############################################################################
+
+#    Atlas.Map.Enable
+#        Default: 1
+Atlas.Map.Enable = 1
+
+#    Atlas.Map.MinLevel
+#        Every party member must be this level to open a sigil.
+#        Default: 80
+Atlas.Map.MinLevel = 80
+
+#    Atlas.Map.Portals
+#        Crossings a run allows after each member's first (and wipes it
+#        survives).
+#        Default: 6
+Atlas.Map.Portals = 6
+
+#    Atlas.Map.Difficulty
+#        Difficulty id whose reward multipliers apply to map runs (0 = the
+#        hardest). Creature strength comes from the tier and the role table.
+#        Default: 0
+Atlas.Map.Difficulty = 0
+
+#    Atlas.Map.EmptyTimeout
+#        Minutes a run may stand empty before it is lost (1-25; instances
+#        unload after 30).
+#        Default: 20
+Atlas.Map.EmptyTimeout = 20
+
+#    Atlas.Map.CompletedTimeout
+#        Minutes a mended run stays open for its cache (it closes sooner once
+#        every player has left).
+#        Default: 10
+Atlas.Map.CompletedTimeout = 10
+
+#    Atlas.Map.StarterSigils
+#        Tier-1 sigils the Chronicler gives each level-80 character once.
+#        Default: 3
+Atlas.Map.StarterSigils = 3
+
+#    Atlas.Map.ExcludeSources
+#        Dungeons a sigil never holds (map ids). By default the Frozen Halls,
+#        which ask for quests and an item level.
+#        Default: "632,658,668"
+Atlas.Map.ExcludeSources = "632,658,668"
+
+#    Atlas.Map.ExtraDropChance / Atlas.Map.HigherTierChance
+#        A mended run's cache holds one sigil, a second at ExtraDropChance %;
+#        each is a tier higher at HigherTierChance %.
+#        Default: 35 / 20
+Atlas.Map.ExtraDropChance = 35
+Atlas.Map.HigherTierChance = 20
+
+#    Atlas.Map.RarityWeights
+#        Normal, magic (1-2 affixes) and rare (3-4) weights for dropped sigils.
+#        Default: "60,30,10"
+Atlas.Map.RarityWeights = "60,30,10"
+
+###############################################################################
 # AFFIXES (DESIGN section 10)
 #   The affixes themselves are data: world table atlas_affix (module SQL
 #   atlas_affixes.sql). `.atlas affix list` shows them, `.atlas affix next`

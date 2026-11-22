@@ -876,6 +876,16 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     }
     session->TotalBosses = bossesSpawned;
 
+    // A map run's way home stands at its entrance (summoned from this map's
+    // own update, see ProcessMapSpawns).
+    if (session->IsMapRun)
+    {
+        Position const& e = session->EntrancePos;
+        float const back = e.GetOrientation() + float(M_PI);
+        RequestMapSpawn(instanceId, GO_ATLAS_RIFT_HOME, { e.GetPositionX() + std::cos(back) * 3.0f,
+            e.GetPositionY() + std::sin(back) * 3.0f, e.GetPositionZ(), e.GetOrientation() }, 4 * 3600);
+    }
+
     LOG_INFO("module", "Atlas: Session {} — {} mobs, {} bosses spawned.",
         session->SessionId, session->TotalMobs, session->TotalBosses);
 

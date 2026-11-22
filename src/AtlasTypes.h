@@ -12,6 +12,7 @@
 #include "RunRng.h"
 #include "AtlasAffix.h"
 #include <string>
+#include <algorithm>
 #include <vector>
 
 class Player;
@@ -169,6 +170,22 @@ struct Session
     uint32  Wipes       = 0;
 
     Position EntrancePos;
+
+    // Map runs (PLAN 1.4): opened by placing an Echo Sigil in the Timeways
+    // Lens. Entering through its rift is free the first time for each member;
+    // every later entry (and every wipe) spends one of PortalsLeft.
+    bool        IsMapRun     = false;
+    uint8       MapRarity    = 0;
+    uint32      PortalsLeft  = 0;
+    ObjectGuid  RiftGuid;                   // the entry rift beside the Lens
+    uint64      LastOccupied = 0;           // last time someone was inside
+    std::vector<ObjectGuid> Entered;        // went in at least once
+    std::vector<ObjectGuid> CacheClaimed;   // rewarded: opened the cache, or a bot paid at the kill
+
+    static bool Contains(std::vector<ObjectGuid> const& list, ObjectGuid guid)
+    {
+        return std::find(list.begin(), list.end(), guid) != list.end();
+    }
 
     bool IsSessionCreature(ObjectGuid guid) const
     {

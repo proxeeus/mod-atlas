@@ -1,6 +1,7 @@
 /*
  * mod-atlas — atlas_allmap_script.cpp
- * Triggers dungeon population when a player enters the instance map.
+ * Triggers dungeon population when a player enters the instance map, and
+ * summons a map run's rifts and cache from that map's own update.
  */
 
 #include "ScriptMgr.h"
@@ -17,6 +18,12 @@ class atlas_allmap_script : public AllMapScript
 {
 public:
     atlas_allmap_script() : AllMapScript("atlas_allmap_script") {}
+
+    // Cheap for every other map: an atomic count says whether anything waits.
+    void OnMapUpdate(Map* map, uint32 /*diff*/) override
+    {
+        sAtlasMgr->ProcessMapSpawns(map);
+    }
 
     void OnPlayerEnterAll(Map* map, Player* player) override
     {

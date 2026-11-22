@@ -152,21 +152,9 @@ void AtlasMgr::LoadLootPool()
 void AtlasMgr::DistributeRewards(Session* session)
 {
     if (!session) return;
-    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(session->DifficultyId);
-    if (!diff) return;
 
-    uint8  lvl       = session->EffectiveLevel;
-    uint32 baseGold  = AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetBaseGold(), lvl);
-    uint32 mobGold   = session->MobsKilled   * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerMob(), lvl);
-    uint32 bossGold  = session->BossesKilled * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerBoss(), lvl);
-    uint32 total     = static_cast<uint32>((baseGold + mobGold + bossGold) * diff->RewardMultiplier);
-    uint32 perPlayer = total / std::max<uint32>(1, session->Players.size());
-
-    uint8 rewardLevel = std::min<uint8>(lvl, 80);
-
-    LOG_INFO("module", "Atlas: DistributeRewards — EffectiveLevel={}, rewardLevel={}, "
-        "rewardPool={} items, players={}",
-        lvl, rewardLevel, _rewardItems.size(), session->Players.size());
+    LOG_INFO("module", "Atlas: DistributeRewards — EffectiveLevel={}, rewardPool={} items, players={}",
+        session->EffectiveLevel, _rewardItems.size(), session->Players.size());
 
     for (auto const& pd : session->Players)
     {
@@ -176,23 +164,40 @@ void AtlasMgr::DistributeRewards(Session* session)
             LOG_WARN("module", "Atlas: Player {} not found/not in world for rewards", pd.PlayerGuid.GetCounter());
             continue;
         }
-
-        // Gold goes directly to wallet
-        GiveGoldReward(p, perPlayer);
-
-        // Completion item (Atlas.Rewards.ItemChance): roll epic first, then
-        // rare, fallback green. Goes to the bags, by mail if they are full.
-        if (RandInt<uint32>(1, 100) > sAtlasConfig->GetItemChance())
-            continue;
-
-        uint8 quality = 2;  // green baseline
-        if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetEpicChance())
-            quality = 4;
-        else if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetRareChance())
-            quality = 3;
-
-        GiveItemReward(p, rewardLevel, quality);
+        GiveRunReward(*session, p);
     }
+}
+
+void AtlasMgr::GiveRunReward(Session const& session, Player* player)
+{
+    DifficultyTier const* diff = sAtlasConfig->GetDifficulty(session.DifficultyId);
+    if (!diff || !player)
+        return;
+
+    uint8  lvl       = session.EffectiveLevel;
+    uint32 baseGold  = AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetBaseGold(), lvl);
+    uint32 mobGold   = session.MobsKilled   * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerMob(), lvl);
+    uint32 bossGold  = session.BossesKilled * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerBoss(), lvl);
+    uint32 total     = static_cast<uint32>((baseGold + mobGold + bossGold) * diff->RewardMultiplier);
+    uint32 perPlayer = total / std::max<uint32>(1, session.Players.size());
+
+    uint8 rewardLevel = std::min<uint8>(lvl, 80);
+
+    // Gold goes directly to wallet
+    GiveGoldReward(player, perPlayer);
+
+    // Completion item (Atlas.Rewards.ItemChance): roll epic first, then
+    // rare, fallback green. Goes to the bags, by mail if they are full.
+    if (RandInt<uint32>(1, 100) > sAtlasConfig->GetItemChance())
+        return;
+
+    uint8 quality = 2;  // green baseline
+    if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetEpicChance())
+        quality = 4;
+    else if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetRareChance())
+        quality = 3;
+
+    GiveItemReward(player, rewardLevel, quality);
 }
 
 void AtlasMgr::GiveKillXP(Session* session, bool isBoss, bool isElite)
@@ -258,12 +263,22 @@ void AtlasMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
     LOG_DEBUG("module", "Atlas: Giving item {} to {} (level {}, quality {}, class {})",
         itemEntry, player->GetName(), level, quality, playerClass);
 
+    PendingReward reward;
+    reward.Entry = itemEntry;
+    QueueReward(player, std::move(reward));
+}
+
+void AtlasMgr::QueueReward(Player* player, PendingReward reward)
+{
+    if (!player)
+        return;
+
     bool firstPending = false;
     {
         std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
-        std::vector<uint32>& pending = _pendingRewards[player->GetGUID()];
+        std::vector<PendingReward>& pending = _pendingRewards[player->GetGUID()];
         firstPending = pending.empty();
-        pending.push_back(itemEntry);
+        pending.push_back(std::move(reward));
     }
 
     // Player events only run while the player is updated on a map, so this
@@ -287,7 +302,7 @@ void AtlasMgr::DeliverPendingRewards(ObjectGuid guid)
         return;
     }
 
-    std::vector<uint32> items;
+    std::vector<PendingReward> items;
     {
         std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
         auto it = _pendingRewards.find(guid);
@@ -297,8 +312,8 @@ void AtlasMgr::DeliverPendingRewards(ObjectGuid guid)
         _pendingRewards.erase(it);
     }
 
-    for (uint32 itemEntry : items)
-        StoreOrMailRewardItem(player, itemEntry);
+    for (PendingReward const& reward : items)
+        StoreOrMailRewardItem(player, reward);
 }
 
 void AtlasMgr::MailPendingRewards(Player* player)
@@ -306,7 +321,7 @@ void AtlasMgr::MailPendingRewards(Player* player)
     if (!player)
         return;
 
-    std::vector<uint32> items;
+    std::vector<PendingReward> items;
     {
         std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
         auto it = _pendingRewards.find(player->GetGUID());
@@ -317,15 +332,22 @@ void AtlasMgr::MailPendingRewards(Player* player)
     }
 
     CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-    for (uint32 itemEntry : items)
+    for (PendingReward const& reward : items)
     {
-        Item* mailItem = Item::CreateItem(itemEntry, 1, player);
+        Item* mailItem = Item::CreateItem(reward.Entry, 1, player);
         if (!mailItem)
         {
-            LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
+            LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", reward.Entry, player->GetName());
             continue;
         }
         mailItem->SaveToDB(trans);       // see StoreOrMailRewardItem
+        if (reward.Map)
+        {
+            MapItemData data = *reward.Map;
+            data.ItemGuid = mailItem->GetGUID().GetCounter();
+            data.OwnerGuid = player->GetGUID().GetCounter();
+            PersistMapItem(data);
+        }
         MailDraft("A reward from the Keepers of Time",
             "You left before we could hand it to you. The timeways thank you.")
             .AddItem(mailItem)
@@ -337,50 +359,62 @@ void AtlasMgr::MailPendingRewards(Player* player)
         items.size());
 }
 
-void AtlasMgr::StoreOrMailRewardItem(Player* player, uint32 itemEntry)
+void AtlasMgr::StoreOrMailRewardItem(Player* player, PendingReward const& reward)
 {
+    uint32 const itemEntry = reward.Entry;
+    ItemTemplate const* t = sObjectMgr->GetItemTemplate(itemEntry);
+
+    // A sigil's data goes with the item it was made into.
+    auto persist = [&](Item const* item)
+    {
+        if (!reward.Map || !item)
+            return;
+        MapItemData data = *reward.Map;
+        data.ItemGuid = item->GetGUID().GetCounter();
+        data.OwnerGuid = player->GetGUID().GetCounter();
+        PersistMapItem(data);
+    };
+
     ItemPosCountVec dest;
     if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemEntry, 1) == EQUIP_ERR_OK)
     {
         if (Item* item = player->StoreNewItem(dest, itemEntry, true))
         {
+            persist(item);
             player->SendNewItem(item, 1, true, false);
-            if (ItemTemplate const* t = sObjectMgr->GetItemTemplate(itemEntry))
+            if (t && player->GetSession())
             {
-                if (player->GetSession())
-                {
-                    ChatHandler(player->GetSession()).PSendSysMessage(
-                        "{} The Keepers of Time reward you: |cFFFFFFFF{}|r", CHAT_PREFIX, t->Name1);
-                }
+                std::string const what = reward.Map ? DescribeMapItem(*reward.Map, false) : t->Name1;
+                ChatHandler(player->GetSession()).PSendSysMessage(
+                    "{} The Keepers of Time reward you: |cFFFFFFFF{}|r", CHAT_PREFIX, what);
             }
         }
+        return;
     }
-    else
+
+    // Bags full — mail the item instead.
+    Item* mailItem = Item::CreateItem(itemEntry, 1, player);
+    if (!mailItem)
     {
-        // Bags full — mail the item instead.
-        Item* mailItem = Item::CreateItem(itemEntry, 1, player);
-        if (mailItem)
-        {
-            CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
-            // The mail only links the item: save it first, or the core finds
-            // no item behind the mail when it loads and deletes it.
-            mailItem->SaveToDB(trans);
-            MailDraft("A reward from the Keepers of Time",
-                "Your bags were full, so we sent it this way. The timeways thank you.")
-                .AddItem(mailItem)
-                .SendMailTo(trans,
-                    MailReceiver(player, player->GetGUID().GetCounter()),
-                    MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
-            CharacterDatabase.CommitTransaction(trans);
-            if (player->GetSession())
-                ChatHandler(player->GetSession()).PSendSysMessage(
-                    "{} Your bags are full; your reward was sent by mail.", CHAT_PREFIX);
-        }
-        else
-        {
-            LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
-        }
+        LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
+        return;
     }
+
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+    // The mail only links the item: save it first, or the core finds no item
+    // behind the mail when it loads and deletes it.
+    mailItem->SaveToDB(trans);
+    persist(mailItem);
+    MailDraft("A reward from the Keepers of Time",
+        "Your bags were full, so we sent it this way. The timeways thank you.")
+        .AddItem(mailItem)
+        .SendMailTo(trans,
+            MailReceiver(player, player->GetGUID().GetCounter()),
+            MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+    CharacterDatabase.CommitTransaction(trans);
+    if (player->GetSession())
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "{} Your bags are full; your reward was sent by mail.", CHAT_PREFIX);
 }
 
     // Mail a reward item to player
