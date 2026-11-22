@@ -306,6 +306,15 @@ private:
 
     void   GiveGoldReward(Player* player, uint32 amount);
     void   GiveItemReward(Player* player, uint8 rewardLevel, uint8 quality);
+public:
+    // Reward items wait until their player stands in the world, not in a
+    // teleport: rewards come just before the party is sent out (or deeper),
+    // and an item stored in that tick only showed in the bags after a relog.
+    // Whatever is still waiting at logout goes by mail.
+    void   DeliverPendingRewards(ObjectGuid guid);
+    void   MailPendingRewards(Player* player);
+private:
+    void   StoreOrMailRewardItem(Player* player, uint32 itemEntry);
     void   MailItemReward(Player* player, uint8 level, uint8 quality,
                           std::string const& subject, std::string const& body);
     void   GiveKillXP(Session* session, bool isBoss, bool isElite);
@@ -354,6 +363,9 @@ private:
     };
     std::unordered_map<ObjectGuid, OwnedCreature> _ownedCreatures;
     mutable std::mutex _ownedMutex;
+
+    std::unordered_map<ObjectGuid, std::vector<uint32>> _pendingRewards;
+    std::mutex _pendingRewardsMutex;
 
     std::vector<RewardItem> _rewardItems;
     std::vector<LootPoolItem> _lootPool;

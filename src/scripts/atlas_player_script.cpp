@@ -1,6 +1,7 @@
 /*
  * mod-atlas — atlas_player_script.cpp
- * Player death handling: blocks spirit release, checks for wipe.
+ * Player death handling: blocks spirit release, checks for wipe. Reward items
+ * still waiting for their player at logout go by mail.
  */
 
 #include "ScriptMgr.h"
@@ -29,6 +30,11 @@ public:
             return;
 
         sAtlasMgr->HandlePlayerDeath(player, session);
+    }
+
+    void OnPlayerLogout(Player* player) override
+    {
+        sAtlasMgr->MailPendingRewards(player);
     }
 };
 

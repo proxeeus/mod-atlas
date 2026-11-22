@@ -258,6 +258,87 @@ void AtlasMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
     LOG_DEBUG("module", "Atlas: Giving item {} to {} (level {}, quality {}, class {})",
         itemEntry, player->GetName(), level, quality, playerClass);
 
+    bool firstPending = false;
+    {
+        std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
+        std::vector<uint32>& pending = _pendingRewards[player->GetGUID()];
+        firstPending = pending.empty();
+        pending.push_back(itemEntry);
+    }
+
+    // Player events only run while the player is updated on a map, so this
+    // fires after any teleport that follows the reward has landed.
+    if (firstPending)
+    {
+        ObjectGuid const guid = player->GetGUID();
+        player->m_Events.AddEventAtOffset([guid]() { sAtlasMgr->DeliverPendingRewards(guid); }, 2s);
+    }
+}
+
+void AtlasMgr::DeliverPendingRewards(ObjectGuid guid)
+{
+    Player* player = ObjectAccessor::FindPlayer(guid);
+    if (!player)
+        return;                          // logged out: MailPendingRewards has them
+
+    if (!player->IsInWorld() || player->IsBeingTeleported())
+    {
+        player->m_Events.AddEventAtOffset([guid]() { sAtlasMgr->DeliverPendingRewards(guid); }, 1s);
+        return;
+    }
+
+    std::vector<uint32> items;
+    {
+        std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
+        auto it = _pendingRewards.find(guid);
+        if (it == _pendingRewards.end())
+            return;
+        items = std::move(it->second);
+        _pendingRewards.erase(it);
+    }
+
+    for (uint32 itemEntry : items)
+        StoreOrMailRewardItem(player, itemEntry);
+}
+
+void AtlasMgr::MailPendingRewards(Player* player)
+{
+    if (!player)
+        return;
+
+    std::vector<uint32> items;
+    {
+        std::lock_guard<std::mutex> lock(_pendingRewardsMutex);
+        auto it = _pendingRewards.find(player->GetGUID());
+        if (it == _pendingRewards.end())
+            return;
+        items = std::move(it->second);
+        _pendingRewards.erase(it);
+    }
+
+    CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+    for (uint32 itemEntry : items)
+    {
+        Item* mailItem = Item::CreateItem(itemEntry, 1, player);
+        if (!mailItem)
+        {
+            LOG_ERROR("module", "Atlas: Failed to create mail item {} for {}", itemEntry, player->GetName());
+            continue;
+        }
+        mailItem->SaveToDB(trans);       // see StoreOrMailRewardItem
+        MailDraft("A reward from the Keepers of Time",
+            "You left before we could hand it to you. The timeways thank you.")
+            .AddItem(mailItem)
+            .SendMailTo(trans, MailReceiver(player, player->GetGUID().GetCounter()),
+                MailSender(MAIL_NORMAL, 0, MAIL_STATIONERY_GM));
+    }
+    CharacterDatabase.CommitTransaction(trans);
+    LOG_INFO("module", "Atlas: {} logged out with {} reward item(s) waiting; sent by mail.", player->GetName(),
+        items.size());
+}
+
+void AtlasMgr::StoreOrMailRewardItem(Player* player, uint32 itemEntry)
+{
     ItemPosCountVec dest;
     if (player->CanStoreNewItem(NULL_BAG, NULL_SLOT, dest, itemEntry, 1) == EQUIP_ERR_OK)
     {
@@ -281,6 +362,9 @@ void AtlasMgr::GiveItemReward(Player* player, uint8 level, uint8 quality)
         if (mailItem)
         {
             CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+            // The mail only links the item: save it first, or the core finds
+            // no item behind the mail when it loads and deletes it.
+            mailItem->SaveToDB(trans);
             MailDraft("A reward from the Keepers of Time",
                 "Your bags were full, so we sent it this way. The timeways thank you.")
                 .AddItem(mailItem)
@@ -349,6 +433,7 @@ void AtlasMgr::MailItemReward(Player* player, uint8 level, uint8 quality,
         // Must use a real transaction (nullptr crashes SendMailTo)
         // inside SendMailTo when it calls trans->Append() on the null ptr.
         CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
+        mailItem->SaveToDB(trans);       // see GiveItemReward
 
         MailDraft(subject, body)
             .AddItem(mailItem)
