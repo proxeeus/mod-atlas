@@ -23,7 +23,7 @@ inline std::string BuildBossSpawnPointQuery(uint32 mapId)
         "WHERE c.map = " + std::to_string(mapId) + " "
         "AND COALESCE(ci.MechanicsMask, 0) > 0 "
         "AND ct.`rank` >= 1 "
-        "ORDER BY COALESCE(ci.MechanicsMask, 0) DESC";
+        "ORDER BY COALESCE(ci.MechanicsMask, 0) DESC, c.guid";
 }
 
 } // namespace Atlas

@@ -52,6 +52,8 @@ public:
                               float& outEliteChanceMult) const;
     bool        HasActiveAffixes(uint32 runId) const;
     std::string GetActiveAffixNames(uint32 runId) const;
+    // For the run log: current depth, the descent's seed, active affix ids ("1,4").
+    bool        GetRunLogInfo(uint32 runId, uint32& depth, uint64& seed, std::string& affixIds) const;
 
     // Buff system
     void IncrementBuffStacks(uint32 runId);
@@ -85,9 +87,9 @@ public:
 private:
     void BuildAffixPool();
     void SelectAffixesForTier(RoguelikeRun& run);
-    uint32 PickFloorTheme(RoguelikeRun const& run) const;
+    uint32 PickFloorTheme(RoguelikeRun& run) const;
     // A dungeon in the run's level range that the whole party may enter, skipping `tried`.
-    uint32 SelectRandomDungeon(RoguelikeRun const& run, std::vector<Player*> const& party,
+    uint32 SelectRandomDungeon(RoguelikeRun& run, std::vector<Player*> const& party,
                                std::set<uint32> const& tried) const;
     // Opens one floor on mapId; on failure no session is left behind.
     bool OpenFloor(RoguelikeRun& run, Player* leader, uint32 mapId);

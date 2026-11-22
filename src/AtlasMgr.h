@@ -8,6 +8,7 @@
 
 #include "AtlasTypes.h"
 #include "AtlasConfig.h"
+#include "StockLayoutProvider.h"
 #include <mutex>
 #include <map>
 #include <string>
@@ -36,7 +37,9 @@ public:
     void LoadDungeonGeometry();   // also used by `.atlas reload`
 
     // Session lifecycle
-    Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true);
+    // seed 0 = the leader's pending GM seed if any, else a fresh one.
+    Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true,
+                            uint64 seed = 0);
     Session*  GetSession(uint32 sessionId);
     Session*  GetSessionByInstance(uint32 instanceId);
     Session*  GetSessionByPlayer(ObjectGuid playerGuid);
@@ -64,6 +67,10 @@ public:
     // Rewards
     void DistributeRewards(Session* session);
     void FillCreatureLoot(Creature* creature, Session* session, bool isBoss);
+
+    // GM replay (`.atlas seed`): the next run this character starts uses this seed.
+    void   SetPendingSeed(ObjectGuid guid, uint64 seed);
+    uint64 TakePendingSeed(ObjectGuid guid);
 
     // Cooldowns
     bool   IsOnCooldown(ObjectGuid playerGuid) const;
@@ -113,6 +120,7 @@ public:
     float GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature);
 
     Position    GetDungeonEntrance(uint32 mapId);
+    std::shared_ptr<Layout const> GetLayout(uint32 mapId) const;
     std::string GetSessionStatusString(Session const* session) const;
     uint8       ComputeEffectiveLevel(Player* leader) const;
 
@@ -138,12 +146,8 @@ public:
     void ScaleSummonedCreature(Creature* creature, Session* session);
 
 private:
-    // Cached reads (see LoadDungeonGeometry) and the world-DB builders behind them.
-    std::vector<SpawnPoint> GetSpawnPointsForMap(uint32 mapId);
-    std::vector<SpawnPoint> BuildSpawnPointsForMap(uint32 mapId);
-    Position                QueryDungeonEntrance(uint32 mapId);
-    uint32 SelectCreatureForTheme(Theme const* theme, bool isBoss, Session const* session = nullptr);
-    uint32 SelectDungeonBoss(Theme const* theme);
+    uint32 SelectCreatureForTheme(Theme const* theme, bool isBoss, RunRng& rng, Session const* session = nullptr);
+    uint32 SelectDungeonBoss(Theme const* theme, RunRng& rng);
 
     void   GiveGoldReward(Player* player, uint32 amount);
     void   GiveItemReward(Player* player, uint8 rewardLevel, uint8 quality);
@@ -166,6 +170,11 @@ private:
     void LoadLeaderboard();
     void CleanupSession(Session& session);
 
+    // Run records (AtlasRecords.cpp): atlas_run_active while a run uses an
+    // instance, atlas_run_log once it ends (BACKLOG R4).
+    void RecordRunActive(Session const& session, uint32 instanceId, uint32 mapId);
+    void LogRun(Session const& session, bool success);
+
     std::unordered_map<uint32, Session>      _activeSessions;
     std::unordered_map<uint32, uint32>       _instanceToSession;
     std::unordered_map<ObjectGuid, uint32>   _playerToSession;
@@ -175,12 +184,16 @@ private:
     std::unordered_map<ObjectGuid, uint64>   _cooldowns;
     mutable std::mutex _cooldownMutex;
 
+    std::unordered_map<ObjectGuid, uint64>   _pendingSeeds;
+    std::mutex _seedMutex;
+
     std::unordered_map<uint32, PlayerStats>  _playerStats;
     mutable std::mutex _statsMutex;
 
-    std::unordered_map<uint32, std::vector<CreaturePoolEntry>> _creaturesByType;
-    std::unordered_map<uint32, std::vector<CreaturePoolEntry>> _bossCreatures;
-    std::unordered_map<uint32, std::vector<CreaturePoolEntry>> _dungeonBossPool;
+    // Ordered: the order candidates are listed in feeds the run RNG (C8).
+    std::map<uint32, std::vector<CreaturePoolEntry>> _creaturesByType;
+    std::map<uint32, std::vector<CreaturePoolEntry>> _bossCreatures;
+    std::map<uint32, std::vector<CreaturePoolEntry>> _dungeonBossPool;
 
     std::map<std::pair<uint8,uint8>, ClassLevelStatEntry> _classLevelStats;
     std::unordered_map<uint32, std::vector<ObjectGuid>> _instanceCreatureGuids;
@@ -200,9 +213,9 @@ private:
     std::vector<LeaderboardEntry> _leaderboard;
     mutable std::mutex _leaderboardMutex;
 
-    std::unordered_map<uint32, Position>                _entrances;
-    std::unordered_map<uint32, std::vector<SpawnPoint>> _spawnPoints;
-    mutable std::mutex _geometryMutex;
+    // Where runs happen (DESIGN §5). V0 runs in stock dungeons; clone layouts
+    // come with PLAN stage 2 behind the same LayoutProvider interface.
+    StockLayoutProvider _stockLayouts;
 
     uint32 _updateTimer = 0;
     static constexpr uint32 UPDATE_INTERVAL = 1000;

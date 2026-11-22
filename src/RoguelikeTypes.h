@@ -9,6 +9,7 @@
 #include "Define.h"
 #include "ObjectGuid.h"
 #include "Position.h"
+#include "RunRng.h"
 #include <string>
 #include <vector>
 
@@ -77,6 +78,10 @@ struct RoguelikeRun
     uint32  CurrentSessionId     = 0;
     uint32  DungeonsCleared      = 0;
     uint32  PreviousMapId        = 0;
+
+    // The descent's own draws: floor dungeons, themes, affixes, and each floor's seed.
+    uint64  Seed = 0;
+    RunRng  Rng;
 
     uint32  BuffStacks = 0;                 // +10% all stats per stack (BoK aura with visual stacks)
 

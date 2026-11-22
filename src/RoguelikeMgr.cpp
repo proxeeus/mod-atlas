@@ -16,21 +16,12 @@
 #include "Log.h"
 #include "SpellAuras.h"
 #include "SpellAuraEffects.h"
-#include "Containers.h"
 #include "Random.h"
 #include "StringFormat.h"
 #include <algorithm>
 
 namespace Atlas
 {
-
-// RNG: AC's helpers (Random.h), thread-safe. RandInt keeps the call sites'
-// integer types; every range used here fits in uint32.
-template<typename T>
-static T RandInt(T lo, T hi)
-{
-    return static_cast<T>(urand(static_cast<uint32>(lo), static_cast<uint32>(hi)));
-}
 
 // Singleton
 RoguelikeMgr::RoguelikeMgr()  = default;
@@ -175,6 +166,12 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     run.CurrentTier    = 1;
     run.RunStartTime   = GameTime::GetGameTime().count();
 
+    // One seed for the whole descent (C8); each floor draws its own from it.
+    run.Seed = sAtlasMgr->TakePendingSeed(leader->GetGUID());
+    if (!run.Seed)
+        run.Seed = RunRng::MakeSeed();
+    run.Rng.Seed(run.Seed);
+
     // Use the difficulty selected by the player (or fall back to first available)
     run.BaseDifficultyId = difficultyId;
     DifficultyTier const* diff = sAtlasConfig->GetDifficulty(difficultyId);
@@ -270,9 +267,9 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
             AnnounceToRun(run, Acore::StringFormat("{} This echo is unstable: {}", CHAT_PREFIX_ENDLESS, affixNames));
     }
 
-    LOG_INFO("module", "RoguelikeMgr: Run {} started — leader {}, party {}, theme {}, map {}",
+    LOG_INFO("module", "RoguelikeMgr: Run {} started — leader {}, party {}, theme {}, map {}, seed {:016X}",
         run.RunId, leader->GetName(), run.Players.size(),
-        theme ? theme->Name.c_str() : "Random", mapId);
+        theme ? theme->Name.c_str() : "Random", mapId, run.Seed);
 
     return true;
 }
@@ -770,6 +767,25 @@ std::string RoguelikeMgr::GetActiveAffixNames(uint32 runId) const
     return result;
 }
 
+bool RoguelikeMgr::GetRunLogInfo(uint32 runId, uint32& depth, uint64& seed, std::string& affixIds) const
+{
+    std::lock_guard<std::mutex> lock(_runMutex);
+    auto it = _activeRuns.find(runId);
+    if (it == _activeRuns.end())
+        return false;
+
+    depth = it->second.CurrentTier;
+    seed = it->second.Seed;
+    affixIds.clear();
+    for (RoguelikeAffix afxId : it->second.ActiveAffixes)
+    {
+        if (!affixIds.empty())
+            affixIds += ',';
+        affixIds += std::to_string(static_cast<uint32>(afxId));
+    }
+    return true;
+}
+
 // Buff system: +10% all stats per cleared floor, carried by the module's own
 // stacking aura (see ApplyBuffAura).
 
@@ -867,7 +883,7 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
         if (def.Id != AFFIX_NONE)
             pool.push_back(def.Id);
 
-    Acore::Containers::RandomShuffle(pool);
+    run.Rng.Shuffle(pool);
 
     for (uint32 i = 0; i < numAffixes && i < pool.size(); ++i)
         run.ActiveAffixes.push_back(pool[i]);
@@ -879,17 +895,17 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 // module's entry hook, a full instance). Reroll this many times before giving up.
 static constexpr uint32 MAX_FLOOR_ATTEMPTS = 3;
 
-uint32 RoguelikeMgr::PickFloorTheme(RoguelikeRun const& run) const
+uint32 RoguelikeMgr::PickFloorTheme(RoguelikeRun& run) const
 {
     // Run-locked theme, or a fresh random one per floor
     if (run.ThemeId != 0)
         return run.ThemeId;
 
     auto const& themes = sAtlasConfig->GetThemes();
-    return themes.empty() ? 0 : themes[RandInt<size_t>(0, themes.size() - 1)].Id;
+    return themes.empty() ? 0 : run.Rng.Pick(themes).Id;
 }
 
-uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run, std::vector<Player*> const& party,
+uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun& run, std::vector<Player*> const& party,
     std::set<uint32> const& tried) const
 {
     // Fallback without a difficulty: the broadest range
@@ -915,16 +931,17 @@ uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run, std::vector<Pl
                 filtered.push_back(d);
 
         if (!filtered.empty())
-            return filtered[RandInt<size_t>(0, filtered.size() - 1)]->MapId;
+            return run.Rng.Pick(filtered)->MapId;
     }
 
-    return dgs[RandInt<size_t>(0, dgs.size() - 1)]->MapId;
+    return run.Rng.Pick(dgs)->MapId;
 }
 
 bool RoguelikeMgr::OpenFloor(RoguelikeRun& run, Player* leader, uint32 mapId)
 {
+    uint32 const themeId = PickFloorTheme(run);
     Session* session = sAtlasMgr->CreateSession(
-        leader, run.BaseDifficultyId, PickFloorTheme(run), mapId, run.ScaleToParty);
+        leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty, run.Rng.Next());
     if (!session)
     {
         LOG_ERROR("module", "RoguelikeMgr: Failed to create session for run {} tier {} (map {})",

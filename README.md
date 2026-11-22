@@ -218,6 +218,10 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas end [id]` | Admin | Force-end a session (defaults to your own) |
 | `.atlas clearcooldown` | GM | Clear cooldown for target's whole group |
 | `.atlas reload` | Admin | Hot-reload configuration |
+| `.atlas run` | GM | The target's (or your) current run: state, map, progress and the seed it was built from; for an Endless floor also the descent's seed, depth and affixes |
+| `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
+
+Every run is logged in `atlas_run_log` (characters DB) with its seed and result (completed, failed, abandoned, or interrupted by a restart).
 
 ---
 
@@ -253,10 +257,19 @@ mod-atlas/
 ├── data/sql/
 │   ├── db-world/base/atlas_world_setup.sql
 │   └── db-characters/base/atlas_characters_setup.sql
+├── tests/                            # Unit tests (AC unit_tests target)
 └── src/
     ├── AtlasConfig.cpp / .h          # Config loader
     ├── AtlasTypes.h                  # Shared data structures, chat prefixes
-    ├── AtlasMgr.cpp / .h             # Core run (session) manager
+    ├── AtlasMgr.cpp / .h             # Run (session) manager: lifecycle, binds, deaths, update loop
+    ├── AtlasPopulation.cpp           # AtlasMgr: creature pools, clearing and populating a run
+    ├── AtlasScaling.cpp              # AtlasMgr: base stats, level ownership, damage scales
+    ├── AtlasRewards.cpp              # AtlasMgr: reward and loot pools, run rewards, creature loot
+    ├── AtlasRecords.cpp              # AtlasMgr: stats, leaderboard, run records and run log
+    ├── AtlasInternal.h               # Helpers shared by the AtlasMgr files
+    ├── AtlasLayout.h                 # Layout (entrance, anchors, arenas) and the LayoutProvider interface
+    ├── StockLayoutProvider.cpp / .h  # Layouts of the stock dungeons echoes run in
+    ├── RunRng.h                      # Seeded, reproducible RNG for run layout choices
     ├── AtlasBossSpawnQuery.h         # Boss spawn-point query
     ├── AtlasChronicle.h              # The Chronicle window's server API
     ├── RoguelikeMgr.cpp / .h         # Endless Timeways run manager

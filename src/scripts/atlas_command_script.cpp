@@ -1,6 +1,7 @@
 /*
  * mod-atlas — atlas_command_script.cpp
- * GM commands: .atlas reload, .atlas status, .atlas list, .atlas end, .atlas clearcooldown
+ * GM commands: .atlas reload, .atlas status, .atlas list, .atlas end, .atlas clearcooldown,
+ * .atlas run (the current run and its seed), .atlas seed (replay a seed)
  */
 
 #include "ScriptMgr.h"
@@ -10,6 +11,8 @@
 #include "Group.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
+#include "RoguelikeMgr.h"
+#include <charconv>
 
 using namespace Acore::ChatCommands;
 using namespace Atlas;
@@ -28,6 +31,8 @@ public:
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
             { "end",           HandleEnd,            SEC_ADMINISTRATOR,  Console::No  },
             { "clearcooldown", HandleClearCD,        SEC_GAMEMASTER,     Console::No  },
+            { "run",           HandleRun,            SEC_GAMEMASTER,     Console::No  },
+            { "seed",          HandleSeed,           SEC_GAMEMASTER,     Console::No  },
         };
         static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
@@ -96,6 +101,70 @@ public:
         uint32 id = s->SessionId;
         sAtlasMgr->EndSession(id, false);
         h->PSendSysMessage("Session {} ended (all players teleported out).", id);
+        return true;
+    }
+
+    // The selected player, else the invoker.
+    static Player* TargetOrSelf(ChatHandler* h)
+    {
+        if (Player* t = h->getSelectedPlayer())
+            return t;
+        return h->GetSession() ? h->GetSession()->GetPlayer() : nullptr;
+    }
+
+    // .atlas run: the target's current run and the seed that built it.
+    static bool HandleRun(ChatHandler* h)
+    {
+        Player* target = TargetOrSelf(h);
+        Session* s = target ? sAtlasMgr->GetSessionByPlayer(target->GetGUID()) : nullptr;
+        if (!s)
+        {
+            h->SendSysMessage("Atlas: no run for that player.");
+            return false;
+        }
+
+        h->PSendSysMessage("Atlas: {}", sAtlasMgr->GetSessionStatusString(s));
+
+        uint32 depth = 0;
+        uint64 descentSeed = 0;
+        std::string affixIds;
+        if (s->RoguelikeRunId
+            && sRoguelikeMgr->GetRunLogInfo(s->RoguelikeRunId, depth, descentSeed, affixIds))
+            h->PSendSysMessage("Atlas: Endless descent {} at depth {}, descent seed {:016X}, affixes [{}]",
+                s->RoguelikeRunId, depth, descentSeed, affixIds);
+        return true;
+    }
+
+    // .atlas seed <hex>|clear: the target's next run (an echo, or a whole
+    // Endless descent) is built from this seed, as printed by `.atlas run` and
+    // in the run log. Same seed, same dungeon and settings: same population.
+    static bool HandleSeed(ChatHandler* h, std::string const& value)
+    {
+        Player* target = TargetOrSelf(h);
+        if (!target)
+            return false;
+
+        if (value == "clear")
+        {
+            sAtlasMgr->SetPendingSeed(target->GetGUID(), 0);
+            h->PSendSysMessage("Atlas: {}'s next run gets a fresh seed.", target->GetName());
+            return true;
+        }
+
+        std::string_view text(value);
+        if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X'))
+            text.remove_prefix(2);
+
+        uint64 seed = 0;
+        auto const parsed = std::from_chars(text.data(), text.data() + text.size(), seed, 16);
+        if (text.empty() || parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || !seed)
+        {
+            h->SendSysMessage("Atlas: usage .atlas seed <hex seed>|clear (for example 3F2A9C0D11E4B7A5).");
+            return false;
+        }
+
+        sAtlasMgr->SetPendingSeed(target->GetGUID(), seed);
+        h->PSendSysMessage("Atlas: {}'s next run will use seed {:016X}.", target->GetName(), seed);
         return true;
     }
 

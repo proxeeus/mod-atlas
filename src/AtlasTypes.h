@@ -9,6 +9,7 @@
 #include "Define.h"
 #include "ObjectGuid.h"
 #include "Position.h"
+#include "RunRng.h"
 #include <string>
 #include <vector>
 
@@ -127,6 +128,11 @@ struct Session
     uint32  InstanceId      = 0;
     bool    ScaleToParty    = true;
     uint32  RoguelikeRunId  = 0;  // 0 = standalone, >0 = roguelike
+
+    // Seed of the run's layout choices (creatures, elites, rare, boss), logged
+    // with the run so it can be replayed (DESIGN C8). Rng draws from it.
+    uint64  Seed = 0;
+    RunRng  Rng;
 
     uint8   EffectiveLevel = 1;
     uint8   LevelBandMin   = 1;
