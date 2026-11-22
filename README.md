@@ -37,7 +37,7 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 
 ### Maps: Echo Sigils and the Timeways Lens
 - **Echo Sigils** — map items of tiers 1 to 16, normal (white), magic (green, 1-2 instabilities) or rare (blue, 3-4); each holds one echo: a dungeon, a timeline, a seed and its instabilities
-- **The Timeways Lens** — the Keepers' hourglass beside the Chronicler in Dalaran; place a sigil and a Rift in Time opens beside it
+- **The Timeways Lens** — the Keepers' scrying orb beside the Chronicler in Dalaran; place a sigil and a Rift in Time opens beside it
 - **Rifts** — each member's first crossing is free, and bots cross with the player who uses the rift; every later crossing, and every wipe, spends one of the run's 6 rifts. With none left and nobody inside, the echo is lost
 - **Cache of the Keepers** — where the master falls: each player's share of gold and gear, and new sigils (the run's tier, sometimes higher); bots are paid at the kill
 - **Starter sigils** — the Chronicler gives three tier-1 sigils once to each level-80 character

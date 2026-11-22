@@ -63,13 +63,17 @@ INSERT INTO `item_template` (`entry`, `class`, `subclass`, `name`, `displayid`, 
 (90215, 15, 4, 'Echo Sigil (Tier 15)', 35465, 3, 0, 0, 0, 0, 195, 80, 0, 1, 1, 'A deeply unstable echo. Place it in the Timeways Lens in Dalaran to open it.', -1),
 (90216, 15, 4, 'Echo Sigil (Tier 16)', 35465, 3, 0, 0, 0, 0, 196, 80, 0, 1, 1, 'A deeply unstable echo. Place it in the Timeways Lens in Dalaran to open it.', -1);
 
--- The Timeways Lens (the Caverns of Time hourglass), the rifts and the cache.
+-- The Timeways Lens, the rifts and the cache. Models by their size in the
+-- client's GameObjectDisplayInfo.dbc (bounding boxes): the scrying orb on its
+-- stand (7150, about 2 yd), the mage portals to the Caverns of Time (8475) and
+-- to Dalaran (8111, about 3.4 yd), the titan chest (1387). The Caverns'
+-- hourglass and time rift are landmarks of 150 and 50 yd: never use them here.
 DELETE FROM `gameobject_template` WHERE `entry` BETWEEN 900000 AND 900003 AND `ScriptName` LIKE 'go_atlas_%';
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `size`, `ScriptName`) VALUES
-(900000,  2, 7133, 'The Timeways Lens',         'Speak',    0.5, 'go_atlas_lens'),
-(900001, 10, 4713, 'Rift in Time',              'Interact', 0.8, 'go_atlas_rift'),
-(900002, 10, 4713, 'Rift to Dalaran',           'Interact', 0.8, 'go_atlas_rift_home'),
-(900003, 10, 1387, 'Cache of the Keepers',      'Interact', 1.0, 'go_atlas_cache');
+(900000,  2, 7150, 'The Timeways Lens',         'Speak',    1.0, 'go_atlas_lens'),
+(900001, 10, 8475, 'Rift in Time',              'Interact', 1.0, 'go_atlas_rift'),
+(900002, 10, 8111, 'Rift to Dalaran',           'Interact', 1.0, 'go_atlas_rift_home'),
+(900003, 10, 1387, 'Cache of the Keepers',      'Interact', 0.8, 'go_atlas_cache');
 
 -- The Lens stands beside Chronicler Esmadormu in Dalaran (creature guid 8000010).
 DELETE FROM `gameobject` WHERE `guid` = 8000101 AND `id` = 900000;
