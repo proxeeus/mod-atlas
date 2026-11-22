@@ -16,21 +16,19 @@
 #include "Log.h"
 #include "SpellAuras.h"
 #include "SpellAuraEffects.h"
-#include <random>
+#include "Random.h"
+#include "StringFormat.h"
 #include <algorithm>
-#include <cstdio>
-#include <cstring>
 
 namespace DungeonMaster
 {
 
-// RNG helpers (thread-local for safety)
-static thread_local std::mt19937 tRng{ std::random_device{}() };
-
+// RNG: AC's helpers (Random.h), thread-safe. RandInt keeps the call sites'
+// integer types; every range used here fits in uint32.
 template<typename T>
 static T RandInt(T lo, T hi)
 {
-    return std::uniform_int_distribution<T>(lo, hi)(tRng);
+    return static_cast<T>(urand(static_cast<uint32>(lo), static_cast<uint32>(hi)));
 }
 
 // Singleton
@@ -48,6 +46,7 @@ void RoguelikeMgr::Initialize()
 {
     BuildAffixPool();
     LoadAllRoguelikePlayerStats();
+    LoadRoguelikeLeaderboard();
     LOG_INFO("module", "RoguelikeMgr: Initialized — {} affix definitions, {} buff pool entries.",
         _affixDefs.size(), sDMConfig->GetRoguelikeBuffPool().size());
 }
@@ -123,24 +122,24 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
 
     if (!sDMConfig->IsRoguelikeEnabled())
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r Roguelike mode is disabled.");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} The Endless Timeways are sealed for now.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
     // Check: player not already in a run
     if (IsPlayerInRun(leader->GetGUID()))
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r You are already in a roguelike run!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} You are already bound to the Endless Timeways.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
     // Check: player not in a DM session
     if (sDungeonMasterMgr->GetSessionByPlayer(leader->GetGUID()))
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r You are in an active dungeon challenge!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} You are already walking an echo.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
@@ -148,19 +147,17 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     if (sDungeonMasterMgr->IsOnCooldown(leader->GetGUID()))
     {
         uint32 rem = sDungeonMasterMgr->GetRemainingCooldown(leader->GetGUID());
-        char buf[256];
-        snprintf(buf, sizeof(buf),
-            "|cFFFF0000[Roguelike]|r Wait |cFFFFFFFF%u|r min |cFFFFFFFF%u|r sec before starting.",
-            rem / 60, rem % 60);
-        ChatHandler(leader->GetSession()).SendSysMessage(buf);
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} The timeways need |cFFFFFFFF{}|r min |cFFFFFFFF{}|r sec to settle first.",
+            CHAT_PREFIX_ENDLESS, rem / 60, rem % 60);
         return false;
     }
 
     // Check: can create a session
     if (!sDungeonMasterMgr->CanCreateNewSession())
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r Too many active challenges. Try again later.");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} Too many echoes are open at once. Return shortly.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
@@ -179,10 +176,10 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
 
     // Use the difficulty selected by the player (or fall back to first available)
     run.BaseDifficultyId = difficultyId;
-    const DifficultyTier* diff = sDMConfig->GetDifficulty(difficultyId);
+    DifficultyTier const* diff = sDMConfig->GetDifficulty(difficultyId);
     if (!diff)
     {
-        const auto& diffs = sDMConfig->GetDifficulties();
+        auto const& diffs = sDMConfig->GetDifficulties();
         run.BaseDifficultyId = diffs.empty() ? 1 : diffs[0].Id;
     }
 
@@ -221,13 +218,13 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     uint32 mapId = SelectRandomDungeon(run);
     if (!mapId)
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r No dungeons available for your level!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} No echo can be reached at your level.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
     // Clear cooldowns for all party members so they can enter
-    for (const auto& pd : run.Players)
+    for (auto const& pd : run.Players)
         sDungeonMasterMgr->ClearCooldown(pd.PlayerGuid);
 
     // Create the DM session with the player's scaling choice
@@ -235,8 +232,8 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
         leader, run.BaseDifficultyId, themeId, mapId, run.ScaleToParty);
     if (!session)
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r Failed to create dungeon session!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} The first echo would not hold.", CHAT_PREFIX_ENDLESS);
         return false;
     }
 
@@ -247,16 +244,16 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     // Start the dungeon
     if (!sDungeonMasterMgr->StartDungeon(session))
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r Failed to initialize dungeon!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} The first echo could not be opened.", CHAT_PREFIX_ENDLESS);
         sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
         return false;
     }
 
     if (!sDungeonMasterMgr->TeleportPartyIn(session))
     {
-        ChatHandler(leader->GetSession()).SendSysMessage(
-            "|cFFFF0000[Roguelike]|r Teleport failed!");
+        ChatHandler(leader->GetSession()).PSendSysMessage(
+            "{} The timeways would not carry you.", CHAT_PREFIX_ENDLESS);
         sDungeonMasterMgr->CleanupRoguelikeSession(session->SessionId, false);
         return false;
     }
@@ -275,37 +272,23 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
         std::lock_guard<std::mutex> lock(_runMutex);
         _activeRuns[run.RunId] = run;
         _sessionToRun[run.CurrentSessionId] = run.RunId;
-        for (const auto& pd : run.Players)
+        for (auto const& pd : run.Players)
             _playerToRun[pd.PlayerGuid] = run.RunId;
     }
 
     // Announce
-    const Theme* theme = sDMConfig->GetTheme(themeId);
-    char buf[256];
-    snprintf(buf, sizeof(buf),
-        "|cFF00FFFF[Roguelike]|r |cFFFFD700%s|r started a Roguelike Run! "
-        "Theme: |cFF00FF00%s|r — How far can you go?",
-        leader->GetName().c_str(),
-        theme ? theme->Name.c_str() : "Random");
-
-    for (const auto& pd : run.Players)
-        if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
-            ChatHandler(p->GetSession()).SendSysMessage(buf);
+    Theme const* theme = sDMConfig->GetTheme(themeId);
+    AnnounceToRun(run, Acore::StringFormat(
+        "{} |cFFFFD700{}|r leads the descent into the Endless Timeways. Timeline: |cFF00FF00{}|r. "
+        "How deep can you go?",
+        CHAT_PREFIX_ENDLESS, leader->GetName(), theme ? theme->Name : "ever-shifting"));
 
     // Announce active affixes if any are present at tier 1
     if (!run.ActiveAffixes.empty())
     {
         std::string affixNames = GetActiveAffixNames(run.RunId);
         if (!affixNames.empty())
-        {
-            char affixBuf[512];
-            snprintf(affixBuf, sizeof(affixBuf),
-                "|cFF00FFFF[Roguelike]|r Active affixes: %s",
-                affixNames.c_str());
-            for (const auto& pd : run.Players)
-                if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
-                    ChatHandler(p->GetSession()).SendSysMessage(affixBuf);
-        }
+            AnnounceToRun(run, Acore::StringFormat("{} This echo is unstable: {}", CHAT_PREFIX_ENDLESS, affixNames));
     }
 
     LOG_INFO("module", "RoguelikeMgr: Run {} started — leader {}, party {}, theme {}, map {}",
@@ -314,7 +297,6 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
 
     return true;
 }
-
 
 void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
 {
@@ -345,7 +327,7 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
             sessionMobsKilled   = session->MobsKilled;
             sessionBossesKilled = session->BossesKilled;
             sessionMapId        = session->MapId;
-            for (const auto& pd : session->Players)
+            for (auto const& pd : session->Players)
                 sessionDeaths += pd.Deaths;
 
             // Distribute per-floor rewards while session pointer is still valid
@@ -380,17 +362,15 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
     IncrementBuffStacks(run->RunId);
 
     // Announce progress
-    char buf[512];
-    snprintf(buf, sizeof(buf),
-        "|cFF00FFFF[Roguelike]|r |cFFFFD700Floor %u cleared!|r "
-        "Advancing to |cFFFF0000Tier %u|r...",
-        run->DungeonsCleared, run->CurrentTier);
+    std::string msg = Acore::StringFormat(
+        "{} |cFFFFD700Echo {} mended!|r The timeways pull you deeper, to |cFFFF0000depth {}|r...",
+        CHAT_PREFIX_ENDLESS, run->DungeonsCleared, run->CurrentTier);
 
     // Append active affixes
     std::string affixStr;
     for (RoguelikeAffix afxId : run->ActiveAffixes)
     {
-        for (const auto& def : _affixDefs)
+        for (auto const& def : _affixDefs)
         {
             if (def.Id == afxId)
             {
@@ -401,12 +381,9 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
         }
     }
     if (!affixStr.empty())
-    {
-        size_t len = strlen(buf);
-        snprintf(buf + len, sizeof(buf) - len, " Affixes: %s", affixStr.c_str());
-    }
+        msg += " Instabilities: " + affixStr;
 
-    AnnounceToRun(*run, buf);
+    AnnounceToRun(*run, msg);
 
     // Grace period for abandoned detection
     run->TransitionStartTime = GameTime::GetGameTime().count();
@@ -415,12 +392,10 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
     if (!TransitionToNextDungeon(*run))
     {
         // Failed to create next dungeon — end the run gracefully
-        char failBuf[256];
-        snprintf(failBuf, sizeof(failBuf),
-            "|cFFFF0000[Roguelike]|r No more dungeons available! "
-            "Run ended at |cFFFFD700Tier %u|r after |cFFFFFFFF%u|r floors.",
-            run->CurrentTier, run->DungeonsCleared);
-        AnnounceToRun(*run, failBuf);
+        AnnounceToRun(*run, Acore::StringFormat(
+            "{} No further echo can be reached. The descent ends at |cFFFFD700depth {}|r "
+            "after |cFFFFFFFF{}|r echo{}.",
+            CHAT_PREFIX_ENDLESS, run->CurrentTier, run->DungeonsCleared, run->DungeonsCleared != 1 ? "es" : ""));
         EndRun(run->RunId, true);
     }
 }
@@ -442,7 +417,7 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
     {
         run->TotalMobsKilled   += session->MobsKilled;
         run->TotalBossesKilled += session->BossesKilled;
-        for (const auto& pd : session->Players)
+        for (auto const& pd : session->Players)
             run->TotalDeaths += pd.Deaths;
     }
 
@@ -451,23 +426,20 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
         GameTime::GetGameTime().count() - run->RunStartTime);
     uint32 dm = duration / 60, ds = duration % 60;
 
-    char buf[512];
-    snprintf(buf, sizeof(buf),
-        "|cFFFF0000[Roguelike]|r |cFFFF4444TOTAL PARTY WIPE!|r "
-        "Your run has ended.\n"
-        "|cFF00FFFF[Roguelike]|r Final Results:\n"
-        "  Tier Reached: |cFFFFD700%u|r\n"
-        "  Floors Cleared: |cFFFFFFFF%u|r\n"
-        "  Mobs Killed: |cFFFFFFFF%u|r\n"
-        "  Bosses Slain: |cFFFFFFFF%u|r\n"
-        "  Total Deaths: |cFFFF0000%u|r\n"
-        "  Run Duration: |cFF00FFFF%um %02us|r",
-        run->CurrentTier, run->DungeonsCleared,
-        run->TotalMobsKilled, run->TotalBossesKilled,
-        run->TotalDeaths, dm, ds);
+    std::string const results = Acore::StringFormat(
+        "{} |cFFFF4444Your whole party has fallen.|r The timeways cast you out.\n"
+        "{} The descent, as the Keepers will chronicle it:\n"
+        "  Depth Reached: |cFFFFD700{}|r\n"
+        "  Echoes Mended: |cFFFFFFFF{}|r\n"
+        "  Foes Slain: |cFFFFFFFF{}|r\n"
+        "  Masters Slain: |cFFFFFFFF{}|r\n"
+        "  Total Deaths: |cFFFF0000{}|r\n"
+        "  Duration: |cFF00FFFF{}m {:02}s|r",
+        CHAT_PREFIX_ENDLESS, CHAT_PREFIX_ENDLESS, run->CurrentTier, run->DungeonsCleared,
+        run->TotalMobsKilled, run->TotalBossesKilled, run->TotalDeaths, dm, ds);
 
     // Resurrect dead players
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (!p || !p->IsInWorld()) continue;
@@ -479,13 +451,13 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
         }
     }
 
-    AnnounceToRun(*run, buf);
+    AnnounceToRun(*run, results);
 
     // Save leaderboard
     SaveRoguelikeLeaderboard(*run);
 
     // Remove all buff stacks (skip mid-teleport players)
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (p && p->IsInWorld())
@@ -500,7 +472,7 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
     TeleportRunPlayersOut(*run);
 
     // Set cooldowns
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
         sDungeonMasterMgr->SetCooldown(pd.PlayerGuid);
 
     // Save before erase invalidates the pointer
@@ -512,11 +484,10 @@ void RoguelikeMgr::OnPartyWipe(uint32 runId)
     {
         std::lock_guard<std::mutex> lock(_runMutex);
         _sessionToRun.erase(savedSessId);
-        for (const auto& pd : run->Players)
+        for (auto const& pd : run->Players)
             _playerToRun.erase(pd.PlayerGuid);
         _activeRuns.erase(runId);
     }
-
 
     LOG_INFO("module", "RoguelikeMgr: Run {} ended (wipe) — tier {}, {} floors cleared.",
         runId, savedTier, savedCleared);
@@ -539,24 +510,21 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
             GameTime::GetGameTime().count() - run->RunStartTime);
         uint32 dm = duration / 60, ds = duration % 60;
 
-        char buf[512];
-        snprintf(buf, sizeof(buf),
-            "|cFF00FFFF[Roguelike]|r Run complete!\n"
-            "  Tier Reached: |cFFFFD700%u|r\n"
-            "  Floors Cleared: |cFFFFFFFF%u|r\n"
-            "  Mobs Killed: |cFFFFFFFF%u|r\n"
-            "  Bosses Slain: |cFFFFFFFF%u|r\n"
-            "  Run Duration: |cFF00FFFF%um %02us|r",
-            run->CurrentTier, run->DungeonsCleared,
-            run->TotalMobsKilled, run->TotalBossesKilled,
-            dm, ds);
-        AnnounceToRun(*run, buf);
+        AnnounceToRun(*run, Acore::StringFormat(
+            "{} The descent is over.\n"
+            "  Depth Reached: |cFFFFD700{}|r\n"
+            "  Echoes Mended: |cFFFFFFFF{}|r\n"
+            "  Foes Slain: |cFFFFFFFF{}|r\n"
+            "  Masters Slain: |cFFFFFFFF{}|r\n"
+            "  Duration: |cFF00FFFF{}m {:02}s|r",
+            CHAT_PREFIX_ENDLESS, run->CurrentTier, run->DungeonsCleared,
+            run->TotalMobsKilled, run->TotalBossesKilled, dm, ds));
 
         SaveRoguelikeLeaderboard(*run);
     }
 
     // Resurrect all dead players (skip mid-teleport players)
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (!p || !p->IsInWorld()) continue;
@@ -569,7 +537,7 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
     }
 
     // Remove buff stacks (skip mid-teleport players)
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
         if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
             if (p->IsInWorld())
                 RemoveBuffStacks(p, run->RunId);
@@ -579,14 +547,14 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
     {
         // Compute effective level from the leader (or first available player)
         uint8 effectiveLevel = 1;
-        for (const auto& pd : run->Players)
+        for (auto const& pd : run->Players)
         {
             Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
             if (p) { effectiveLevel = p->GetLevel(); break; }
         }
 
         std::vector<ObjectGuid> guids;
-        for (const auto& pd : run->Players)
+        for (auto const& pd : run->Players)
             guids.push_back(pd.PlayerGuid);
 
         sDungeonMasterMgr->DistributeRoguelikeRewards(
@@ -601,7 +569,7 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
     TeleportRunPlayersOut(*run);
 
     // Set cooldowns
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
         sDungeonMasterMgr->SetCooldown(pd.PlayerGuid);
 
     // Save before erase invalidates the pointer
@@ -613,11 +581,10 @@ void RoguelikeMgr::EndRun(uint32 runId, bool announceResults)
     {
         std::lock_guard<std::mutex> lock(_runMutex);
         _sessionToRun.erase(savedSessId);
-        for (const auto& pd : run->Players)
+        for (auto const& pd : run->Players)
             _playerToRun.erase(pd.PlayerGuid);
         _activeRuns.erase(runId);
     }
-
 
     LOG_INFO("module", "RoguelikeMgr: Run {} ended (graceful) — tier {}, {} floors.",
         runId, savedTier, savedCleared);
@@ -771,7 +738,7 @@ void RoguelikeMgr::GetAffixMultipliers(
 
     for (RoguelikeAffix afxId : it->second.ActiveAffixes)
     {
-        for (const auto& def : _affixDefs)
+        for (auto const& def : _affixDefs)
         {
             if (def.Id == afxId)
             {
@@ -808,7 +775,7 @@ std::string RoguelikeMgr::GetActiveAffixNames(uint32 runId) const
     std::string result;
     for (RoguelikeAffix afxId : it->second.ActiveAffixes)
     {
-        for (const auto& def : _affixDefs)
+        for (auto const& def : _affixDefs)
         {
             if (def.Id == afxId)
             {
@@ -862,7 +829,7 @@ void RoguelikeMgr::IncrementBuffStacks(uint32 runId)
 
     ++run->BuffStacks;
 
-    for (const auto& pd : run->Players)
+    for (auto const& pd : run->Players)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (p && p->IsInWorld())
@@ -870,12 +837,10 @@ void RoguelikeMgr::IncrementBuffStacks(uint32 runId)
     }
 
     // Announce
-    float totalPct = BUFF_PCT_PER_STACK * run->BuffStacks;
-    char buf[256];
-    snprintf(buf, sizeof(buf),
-        "|cFF00FFFF[Roguelike]|r |cFF00FF00+%.0f%% All Stats|r (Stack %u)",
-        totalPct, run->BuffStacks);
-    AnnounceToRun(*run, buf);
+    AnnounceToRun(*run, Acore::StringFormat(
+        "{} Timeways Resonance grows: |cFF00FF00+{:.0f}% all stats|r ({} echo{} deep).",
+        CHAT_PREFIX_ENDLESS, BUFF_PCT_PER_STACK * run->BuffStacks, run->BuffStacks,
+        run->BuffStacks != 1 ? "es" : ""));
 }
 
 void RoguelikeMgr::ApplyBuffStacks(Player* player, uint32 runId)
@@ -915,9 +880,8 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
     else if (run.CurrentTier >= secondAffix)
         numAffixes = 2;
 
-
     std::vector<RoguelikeAffix> pool;
-    for (const auto& def : _affixDefs)
+    for (auto const& def : _affixDefs)
         if (def.Id != AFFIX_NONE)
             pool.push_back(def.Id);
 
@@ -929,9 +893,9 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 
 // DUNGEON SELECTION
 
-uint32 RoguelikeMgr::SelectRandomDungeon(const RoguelikeRun& run) const
+uint32 RoguelikeMgr::SelectRandomDungeon(RoguelikeRun const& run) const
 {
-    const DifficultyTier* diff = sDMConfig->GetDifficulty(run.BaseDifficultyId);
+    DifficultyTier const* diff = sDMConfig->GetDifficulty(run.BaseDifficultyId);
     if (!diff)
     {
         // Fallback: use broadest range
@@ -946,8 +910,8 @@ uint32 RoguelikeMgr::SelectRandomDungeon(const RoguelikeRun& run) const
     // Try to avoid repeating the same dungeon
     if (dgs.size() > 1 && run.PreviousMapId != 0)
     {
-        std::vector<const DungeonInfo*> filtered;
-        for (const auto* d : dgs)
+        std::vector<DungeonInfo const*> filtered;
+        for (auto const* d : dgs)
             if (d->MapId != run.PreviousMapId)
                 filtered.push_back(d);
 
@@ -974,7 +938,7 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
     Player* leader = ObjectAccessor::FindPlayer(run.LeaderGuid);
     if (!leader)
     {
-        for (const auto& pd : run.Players)
+        for (auto const& pd : run.Players)
         {
             leader = ObjectAccessor::FindPlayer(pd.PlayerGuid);
             if (leader) { run.LeaderGuid = leader->GetGUID(); break; }
@@ -988,14 +952,14 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
     }
 
     // Clear cooldowns (EndSession might have set them)
-    for (const auto& pd : run.Players)
+    for (auto const& pd : run.Players)
         sDungeonMasterMgr->ClearCooldown(pd.PlayerGuid);
 
     // Select theme: run-locked theme or random
     uint32 themeId = run.ThemeId;
     if (themeId == 0)
     {
-        const auto& themes = sDMConfig->GetThemes();
+        auto const& themes = sDMConfig->GetThemes();
         if (!themes.empty())
             themeId = themes[RandInt<size_t>(0, themes.size() - 1)].Id;
     }
@@ -1045,12 +1009,9 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
 
     run.State = RoguelikeRunState::Active;
 
-    const DungeonInfo* dg = sDMConfig->GetDungeon(mapId);
-    char buf[256];
-    snprintf(buf, sizeof(buf),
-        "|cFF00FFFF[Roguelike]|r Entering |cFFFFFFFF%s|r — Tier |cFFFF0000%u|r",
-        dg ? dg->Name.c_str() : "Unknown", run.CurrentTier);
-    AnnounceToRun(run, buf);
+    DungeonInfo const* dg = sDMConfig->GetDungeon(mapId);
+    AnnounceToRun(run, Acore::StringFormat("{} An echo of |cFFFFFFFF{}|r forms — |cFFFF0000depth {}|r.",
+        CHAT_PREFIX_ENDLESS, dg ? dg->Name : "an unknown place", run.CurrentTier));
 
     LOG_INFO("module", "RoguelikeMgr: Run {} transitioned to tier {} — map {} ({})",
         run.RunId, run.CurrentTier, mapId,
@@ -1061,7 +1022,7 @@ bool RoguelikeMgr::TransitionToNextDungeon(RoguelikeRun& run)
 
 void RoguelikeMgr::TeleportRunPlayersOut(RoguelikeRun& run)
 {
-    for (const auto& pd : run.Players)
+    for (auto const& pd : run.Players)
     {
         Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
         if (!p) continue;
@@ -1087,23 +1048,19 @@ void RoguelikeMgr::TeleportRunPlayersOut(RoguelikeRun& run)
 
 // ANNOUNCEMENTS
 
-void RoguelikeMgr::AnnounceToRun(const RoguelikeRun& run, const char* msg)
+void RoguelikeMgr::AnnounceToRun(RoguelikeRun const& run, std::string const& msg)
 {
-    for (const auto& pd : run.Players)
+    for (auto const& pd : run.Players)
         if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
             if (p->GetSession())
                 ChatHandler(p->GetSession()).SendSysMessage(msg);
 }
 
-void RoguelikeMgr::AnnounceCountdown(const RoguelikeRun& run, uint32 remainingSec)
+void RoguelikeMgr::AnnounceCountdown(RoguelikeRun const& run, uint32 remainingSec)
 {
-    char buf[128];
-    snprintf(buf, sizeof(buf),
-        "|cFF00FFFF[Roguelike]|r Next dungeon in |cFFFFFFFF%u|r second%s...",
-        remainingSec, remainingSec != 1 ? "s" : "");
-    AnnounceToRun(run, buf);
+    AnnounceToRun(run, Acore::StringFormat("{} The next echo opens in |cFFFFFFFF{}|r second{}...",
+        CHAT_PREFIX_ENDLESS, remainingSec, remainingSec != 1 ? "s" : ""));
 }
-
 
 void RoguelikeMgr::Update(uint32 diff)
 {
@@ -1131,7 +1088,7 @@ void RoguelikeMgr::Update(uint32 diff)
 
             // ---- Abandoned detection: all players offline ----
             bool anyOnline = false;
-            for (const auto& pd : run.Players)
+            for (auto const& pd : run.Players)
             {
                 Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
                 if (p && p->IsInWorld()) { anyOnline = true; break; }
@@ -1146,7 +1103,7 @@ void RoguelikeMgr::Update(uint32 diff)
             // ---- Re-apply buff aura after death ----
             if (run.State == RoguelikeRunState::Active && run.BuffStacks > 0)
             {
-                for (const auto& pd : run.Players)
+                for (auto const& pd : run.Players)
                 {
                     Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
                     if (!p || !p->IsInWorld() || !p->IsAlive()) continue;
@@ -1167,84 +1124,102 @@ void RoguelikeMgr::Update(uint32 diff)
 
 // LEADERBOARD
 
-void RoguelikeMgr::SaveRoguelikeLeaderboard(const RoguelikeRun& run)
+void RoguelikeMgr::SaveRoguelikeLeaderboard(RoguelikeRun const& run)
 {
-    uint32 duration = 0;
+    RoguelikeLeaderboardEntry e;
     if (GameTime::GetGameTime().count() > static_cast<time_t>(run.RunStartTime))
-        duration = static_cast<uint32>(GameTime::GetGameTime().count() - run.RunStartTime);
+        e.RunDuration = static_cast<uint32>(GameTime::GetGameTime().count() - run.RunStartTime);
 
-    std::string leaderName = "Unknown";
+    e.Guid            = run.LeaderGuid.GetCounter();
+    e.CharName        = "Unknown";
     if (Player* leader = ObjectAccessor::FindPlayer(run.LeaderGuid))
-        leaderName = leader->GetName();
+        e.CharName = leader->GetName();
+    e.TierReached     = run.CurrentTier;
+    e.DungeonsCleared = run.DungeonsCleared;
+    e.TotalKills      = run.TotalMobsKilled + run.TotalBossesKilled;
+    e.TotalBosses     = run.TotalBossesKilled;
+    e.TotalDeaths     = run.TotalDeaths;
+    e.PartySize       = static_cast<uint8>(run.Players.size());
 
-    std::string safeName = leaderName;
-    size_t pos = 0;
-    while ((pos = safeName.find('\'', pos)) != std::string::npos)
-    {
-        safeName.replace(pos, 1, "''");
-        pos += 2;
-    }
-
-    uint8 partySize = static_cast<uint8>(run.Players.size());
-
-    char query[512];
-    snprintf(query, sizeof(query),
+    std::string safeName = e.CharName;
+    CharacterDatabase.EscapeString(safeName);
+    CharacterDatabase.Execute(
         "INSERT INTO dm_roguelike_leaderboard "
         "(guid, char_name, tier_reached, dungeons_cleared, total_kills, "
         "total_bosses, total_deaths, run_duration, party_size) "
-        "VALUES (%u, '%s', %u, %u, %u, %u, %u, %u, %u)",
-        run.LeaderGuid.GetCounter(), safeName.c_str(),
-        run.CurrentTier, run.DungeonsCleared,
-        run.TotalMobsKilled + run.TotalBossesKilled,
-        run.TotalBossesKilled, run.TotalDeaths,
-        duration, partySize);
-    CharacterDatabase.Execute(query);
+        "VALUES ({}, '{}', {}, {}, {}, {}, {}, {}, {})",
+        e.Guid, safeName, e.TierReached, e.DungeonsCleared, e.TotalKills,
+        e.TotalBosses, e.TotalDeaths, e.RunDuration, e.PartySize);
+
+    {
+        std::lock_guard<std::mutex> lock(_leaderboardMutex);
+        _leaderboard.push_back(std::move(e));
+    }
 
     // Also update per-player roguelike stats
     UpdateRoguelikePlayerStats(run);
+}
+
+// Read from the NPC menu (a map thread): served from memory, loaded once at
+// startup and appended on save, instead of a synchronous query per menu open.
+void RoguelikeMgr::LoadRoguelikeLeaderboard()
+{
+    std::vector<RoguelikeLeaderboardEntry> rows;
+
+    if (QueryResult result = CharacterDatabase.Query(
+            "SELECT id, guid, char_name, tier_reached, dungeons_cleared, "
+            "total_kills, total_bosses, total_deaths, run_duration, party_size "
+            "FROM dm_roguelike_leaderboard"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            RoguelikeLeaderboardEntry e;
+            e.Id              = f[0].Get<uint32>();
+            e.Guid            = f[1].Get<uint32>();
+            e.CharName        = f[2].Get<std::string>();
+            e.TierReached     = f[3].Get<uint32>();
+            e.DungeonsCleared = f[4].Get<uint32>();
+            e.TotalKills      = f[5].Get<uint32>();
+            e.TotalBosses     = f[6].Get<uint32>();
+            e.TotalDeaths     = f[7].Get<uint32>();
+            e.RunDuration     = f[8].Get<uint32>();
+            e.PartySize       = f[9].Get<uint8>();
+            rows.push_back(std::move(e));
+        } while (result->NextRow());
+    }
+
+    std::lock_guard<std::mutex> lock(_leaderboardMutex);
+    _leaderboard = std::move(rows);
 }
 
 std::vector<RoguelikeLeaderboardEntry> RoguelikeMgr::GetRoguelikeLeaderboard(
     uint32 limit, bool sortByFloors) const
 {
     std::vector<RoguelikeLeaderboardEntry> entries;
-
-    char query[512];
-    if (sortByFloors)
-        snprintf(query, sizeof(query),
-            "SELECT id, guid, char_name, tier_reached, dungeons_cleared, "
-            "total_kills, total_bosses, total_deaths, run_duration, party_size "
-            "FROM dm_roguelike_leaderboard "
-            "ORDER BY dungeons_cleared DESC, tier_reached DESC, run_duration ASC "
-            "LIMIT %u", limit);
-    else
-        snprintf(query, sizeof(query),
-            "SELECT id, guid, char_name, tier_reached, dungeons_cleared, "
-            "total_kills, total_bosses, total_deaths, run_duration, party_size "
-            "FROM dm_roguelike_leaderboard "
-            "ORDER BY tier_reached DESC, dungeons_cleared DESC, run_duration ASC "
-            "LIMIT %u", limit);
-
-    QueryResult result = CharacterDatabase.Query(query);
-    if (!result) return entries;
-
-    do
     {
-        Field* f = result->Fetch();
-        RoguelikeLeaderboardEntry e;
-        e.Id              = f[0].Get<uint32>();
-        e.Guid            = f[1].Get<uint32>();
-        e.CharName        = f[2].Get<std::string>();
-        e.TierReached     = f[3].Get<uint32>();
-        e.DungeonsCleared = f[4].Get<uint32>();
-        e.TotalKills      = f[5].Get<uint32>();
-        e.TotalBosses     = f[6].Get<uint32>();
-        e.TotalDeaths     = f[7].Get<uint32>();
-        e.RunDuration     = f[8].Get<uint32>();
-        e.PartySize       = f[9].Get<uint8>();
-        entries.push_back(e);
-    } while (result->NextRow());
+        std::lock_guard<std::mutex> lock(_leaderboardMutex);
+        entries = _leaderboard;
+    }
 
+    // Same orderings as the former SQL ORDER BY clauses.
+    std::sort(entries.begin(), entries.end(),
+        [sortByFloors](RoguelikeLeaderboardEntry const& a, RoguelikeLeaderboardEntry const& b)
+        {
+            uint32 const aFirst  = sortByFloors ? a.DungeonsCleared : a.TierReached;
+            uint32 const bFirst  = sortByFloors ? b.DungeonsCleared : b.TierReached;
+            uint32 const aSecond = sortByFloors ? a.TierReached : a.DungeonsCleared;
+            uint32 const bSecond = sortByFloors ? b.TierReached : b.DungeonsCleared;
+
+            if (aFirst != bFirst)
+                return aFirst > bFirst;
+            if (aSecond != bSecond)
+                return aSecond > bSecond;
+            return a.RunDuration < b.RunDuration;
+        });
+
+    if (entries.size() > limit)
+        entries.resize(limit);
     return entries;
 }
 
@@ -1302,13 +1277,13 @@ RoguelikePlayerStats RoguelikeMgr::GetRoguelikePlayerStats(ObjectGuid guid) cons
     return {};
 }
 
-void RoguelikeMgr::UpdateRoguelikePlayerStats(const RoguelikeRun& run)
+void RoguelikeMgr::UpdateRoguelikePlayerStats(RoguelikeRun const& run)
 {
     uint32 duration = 0;
     if (GameTime::GetGameTime().count() > static_cast<time_t>(run.RunStartTime))
         duration = static_cast<uint32>(GameTime::GetGameTime().count() - run.RunStartTime);
 
-    for (const auto& pd : run.Players)
+    for (auto const& pd : run.Players)
     {
         uint32 guidLow = pd.PlayerGuid.GetCounter();
 
@@ -1335,17 +1310,15 @@ void RoguelikeMgr::UpdateRoguelikePlayerStats(const RoguelikeRun& run)
             ps = _roguelikeStats[guidLow];
         }
 
-        char query[512];
-        snprintf(query, sizeof(query),
+        CharacterDatabase.Execute(
             "REPLACE INTO dm_roguelike_player_stats "
             "(guid, total_runs, highest_tier, most_floors_cleared, "
             "total_floors_cleared, total_mobs_killed, total_bosses_killed, "
             "total_deaths, longest_run_time) "
-            "VALUES (%u, %u, %u, %u, %u, %u, %u, %u, %u)",
+            "VALUES ({}, {}, {}, {}, {}, {}, {}, {}, {})",
             guidLow, ps.TotalRuns, ps.HighestTier, ps.MostFloorsCleared,
             ps.TotalFloorsCleared, ps.TotalMobsKilled, ps.TotalBossesKilled,
             ps.TotalDeaths, ps.LongestRunTime);
-        CharacterDatabase.Execute(query);
     }
 }
 

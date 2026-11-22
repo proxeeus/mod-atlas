@@ -61,6 +61,19 @@ CREATE TABLE IF NOT EXISTS `dm_roguelike_player_stats` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ---------------------------------------------------------------------------
+-- Stock dungeon instances currently used by a run. Runs empty a real dungeon
+-- instance; this table lets a restart (or crash) mid-run release the binds to
+-- those instances at startup, so nobody is left saved to an emptied dungeon.
+-- Rows are removed as soon as a run ends normally.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `dm_open_instance` (
+    `instance_id` INT UNSIGNED NOT NULL,
+    `map_id`      SMALLINT UNSIGNED NOT NULL,
+    `opened_at`   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`instance_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ---------------------------------------------------------------------------
 -- Roguelike leaderboard (sorted by tier reached, then floors, then speed)
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `dm_roguelike_leaderboard` (

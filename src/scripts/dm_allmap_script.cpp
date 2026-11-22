@@ -10,7 +10,6 @@
 #include "DMConfig.h"
 #include "Chat.h"
 #include "Log.h"
-#include <cstdio>
 
 using namespace DungeonMaster;
 
@@ -58,8 +57,8 @@ public:
 
         session->InstanceId = instance->GetInstanceId();
 
-        ChatHandler(player->GetSession()).SendSysMessage(
-            "|cFF00FF00[Dungeon Master]|r Preparing the challenge...");
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "{} The echo takes shape around you...", CHAT_PREFIX);
 
         sDungeonMasterMgr->PopulateDungeon(session, instance);
 
@@ -67,13 +66,10 @@ public:
             session->SessionId, player->GetName(), map->GetId(),
             session->TotalMobs, session->TotalBosses);
 
-        char buf[256];
-        snprintf(buf, sizeof(buf),
-            "|cFF00FF00[Dungeon Master]|r |cFFFFFFFF%u|r enemies and |cFFFFFFFF%u|r boss(es) spawned. "
-            "Creature levels: |cFFFFFFFF%u-%u|r. Good luck!",
-            session->TotalMobs, session->TotalBosses,
+        ChatHandler(player->GetSession()).PSendSysMessage(
+            "{} |cFFFFFFFF{}|r foes and |cFFFFFFFF{}|r master{} hold this echo (levels |cFFFFFFFF{}-{}|r).",
+            CHAT_PREFIX, session->TotalMobs, session->TotalBosses, session->TotalBosses != 1 ? "s" : "",
             session->LevelBandMin, session->LevelBandMax);
-        ChatHandler(player->GetSession()).SendSysMessage(buf);
     }
 };
 

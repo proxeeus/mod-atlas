@@ -95,7 +95,7 @@ struct RoguelikeRun
 
     bool HasPlayer(ObjectGuid guid) const
     {
-        for (const auto& p : Players)
+        for (auto const& p : Players)
             if (p.PlayerGuid == guid) return true;
         return false;
     }

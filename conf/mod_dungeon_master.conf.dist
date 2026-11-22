@@ -1,5 +1,7 @@
 ########################################
 # DUNGEON MASTER MODULE CONFIGURATION
+# (In game: Chronicler Esmadormu of the Keepers of Time, "echoes" of dungeons
+#  from fractured timelines, and the Endless Timeways roguelike mode.)
 ########################################
 #
 # Procedural dungeon challenge system for AzerothCore.
@@ -187,15 +189,16 @@ DungeonMaster.Dungeon.Blacklist = ""
 #        6=Undead 7=Humanoid 9=Mechanical   -1=Any (random)
 ###############################################################################
 
-DungeonMaster.Theme.1 = "Beast Hunt,1"
-DungeonMaster.Theme.2 = "Dragon's Lair,2"
-DungeonMaster.Theme.3 = "Demonic Invasion,3"
-DungeonMaster.Theme.4 = "Elemental Chaos,4"
-DungeonMaster.Theme.5 = "Giant's Keep,5"
-DungeonMaster.Theme.6 = "Undead Rising,6"
-DungeonMaster.Theme.7 = "Humanoid Stronghold,7"
-DungeonMaster.Theme.8 = "Mechanical Mayhem,9"
-DungeonMaster.Theme.9 = "Random Chaos,-1"
+# Each theme is a fractured timeline: who rules the dungeon's halls there.
+DungeonMaster.Theme.1 = "A timeline where beasts reclaimed the halls,1"
+DungeonMaster.Theme.2 = "A timeline where dragonkin rule,2"
+DungeonMaster.Theme.3 = "A timeline where the Legion prevailed,3"
+DungeonMaster.Theme.4 = "A timeline torn by unbound elements,4"
+DungeonMaster.Theme.5 = "A timeline of giants,5"
+DungeonMaster.Theme.6 = "A timeline the Scourge swallowed,6"
+DungeonMaster.Theme.7 = "A timeline held by mortal warbands,7"
+DungeonMaster.Theme.8 = "A timeline of rogue machines,9"
+DungeonMaster.Theme.9 = "A shattered timeline (anything goes),-1"
 DungeonMaster.Theme.10 = ""
 DungeonMaster.Theme.11 = ""
 DungeonMaster.Theme.12 = ""

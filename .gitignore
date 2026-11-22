@@ -34,3 +34,6 @@
 # Github
 .github/CODEOWNERS
 .github/FUNDING
+
+# macOS Finder metadata
+.DS_Store

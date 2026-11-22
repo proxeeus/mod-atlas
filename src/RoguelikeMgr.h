@@ -70,22 +70,23 @@ public:
     bool   IsPlayerInRun(ObjectGuid guid) const;
 
     // Leaderboard
-    void SaveRoguelikeLeaderboard(const RoguelikeRun& run);
+    void SaveRoguelikeLeaderboard(RoguelikeRun const& run);
+    void LoadRoguelikeLeaderboard();
     std::vector<RoguelikeLeaderboardEntry> GetRoguelikeLeaderboard(uint32 limit = 10, bool sortByFloors = false) const;
 
     // Player stats (separate from normal run stats)
     void LoadAllRoguelikePlayerStats();
     RoguelikePlayerStats GetRoguelikePlayerStats(ObjectGuid guid) const;
-    void UpdateRoguelikePlayerStats(const RoguelikeRun& run);
+    void UpdateRoguelikePlayerStats(RoguelikeRun const& run);
 
 private:
     void BuildAffixPool();
     void SelectAffixesForTier(RoguelikeRun& run);
-    uint32 SelectRandomDungeon(const RoguelikeRun& run) const;
+    uint32 SelectRandomDungeon(RoguelikeRun const& run) const;
     bool TransitionToNextDungeon(RoguelikeRun& run);
     void TeleportRunPlayersOut(RoguelikeRun& run);
-    void AnnounceCountdown(const RoguelikeRun& run, uint32 remainingSec);
-    void AnnounceToRun(const RoguelikeRun& run, const char* msg);
+    void AnnounceCountdown(RoguelikeRun const& run, uint32 remainingSec);
+    void AnnounceToRun(RoguelikeRun const& run, std::string const& msg);
 
     std::unordered_map<uint32, RoguelikeRun>   _activeRuns;
     std::unordered_map<uint32, uint32>          _sessionToRun;  // sessionId -> runId
@@ -94,6 +95,9 @@ private:
     mutable std::mutex _runMutex;
 
     std::vector<AffixDef> _affixDefs;
+
+    std::vector<RoguelikeLeaderboardEntry> _leaderboard;
+    mutable std::mutex _leaderboardMutex;
 
     std::unordered_map<uint32, RoguelikePlayerStats> _roguelikeStats;  // guidLow -> stats
     mutable std::mutex _rlStatsMutex;

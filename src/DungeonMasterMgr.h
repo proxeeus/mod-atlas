@@ -31,6 +31,7 @@ public:
 
     void Initialize();
     void LoadFromDB();
+    void LoadDungeonGeometry();   // also used by `.dm reload`
 
     // Session lifecycle
     Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true);
@@ -44,6 +45,7 @@ public:
     // Session ops
     bool StartDungeon(Session* session);
     bool ReleaseBindsBeforeRun(Session* session);
+    void ReleaseInstancesLeftOpen();
     void ReleaseRunInstanceBinds(Session const& session);
     bool TeleportPartyIn(Session* session);
     void TeleportPartyOut(Session* session);
@@ -71,8 +73,8 @@ public:
     PlayerStats GetPlayerStats(ObjectGuid guid) const;
     void        LoadAllPlayerStats();
     void        SavePlayerStats(uint32 guidLow);
-    void        UpdatePlayerStatsFromSession(const Session& session, bool success);
-    void        SaveLeaderboardEntry(const Session& session);
+    void        UpdatePlayerStatsFromSession(Session const& session, bool success);
+    void        SaveLeaderboardEntry(Session const& session);
     std::vector<LeaderboardEntry> GetLeaderboard(uint32 mapId, uint32 difficultyId, uint32 limit = 10) const;
     std::vector<LeaderboardEntry> GetOverallLeaderboard(uint32 limit = 10) const;
 
@@ -91,13 +93,14 @@ public:
     bool  IsSessionBoss(ObjectGuid playerGuid, ObjectGuid creatureGuid);
     float GetEnvironmentalDamageScale(ObjectGuid playerGuid);
     float GetSessionCreatureDamageScale(ObjectGuid playerGuid, ObjectGuid creatureGuid);
+    float GetOwnedCreatureDamageScale(ObjectGuid playerGuid, Creature const* creature);
 
     Position    GetDungeonEntrance(uint32 mapId);
-    std::string GetSessionStatusString(const Session* session) const;
+    std::string GetSessionStatusString(Session const* session) const;
     uint8       ComputeEffectiveLevel(Player* leader) const;
 
     void   DistributeRoguelikeRewards(uint32 tier, uint8 effectiveLevel,
-                                       const std::vector<ObjectGuid>& playerGuids);
+                                       std::vector<ObjectGuid> const& playerGuids);
 
     // -----------------------------------------------------------------------
     // Creature level ownership.
@@ -118,27 +121,32 @@ public:
     void ScaleSummonedCreature(Creature* creature, Session* session);
 
 private:
+    // Cached reads (see LoadDungeonGeometry) and the world-DB builders behind them.
     std::vector<SpawnPoint> GetSpawnPointsForMap(uint32 mapId);
-    uint32 SelectCreatureForTheme(const Theme* theme, bool isBoss, const Session* session = nullptr);
-    uint32 SelectDungeonBoss(const Theme* theme);
+    std::vector<SpawnPoint> BuildSpawnPointsForMap(uint32 mapId);
+    Position                QueryDungeonEntrance(uint32 mapId);
+    uint32 SelectCreatureForTheme(Theme const* theme, bool isBoss, Session const* session = nullptr);
+    uint32 SelectDungeonBoss(Theme const* theme);
 
     void   GiveGoldReward(Player* player, uint32 amount);
     void   GiveItemReward(Player* player, uint8 rewardLevel, uint8 quality);
     void   MailItemReward(Player* player, uint8 level, uint8 quality,
-                          const std::string& subject, const std::string& body);
+                          std::string const& subject, std::string const& body);
     void   GiveKillXP(Session* session, bool isBoss, bool isElite);
     uint32 SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass);
     uint32 SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality, bool equipmentOnly = false, uint32 playerClass = 0);
 
-    float CalculateHealthMultiplier(const Session* session) const;
-    float CalculateDamageMultiplier(const Session* session) const;
-    const ClassLevelStatEntry* GetBaseStatsForLevel(uint8 unitClass, uint8 level) const;
+    float ComputeLevelDamageScale(Session const& session, Creature const* creature) const;
+    float CalculateHealthMultiplier(Session const* session) const;
+    float CalculateDamageMultiplier(Session const* session) const;
+    ClassLevelStatEntry const* GetBaseStatsForLevel(uint8 unitClass, uint8 level) const;
 
     void LoadCreaturePools();
     void LoadDungeonBossPool();
     void LoadClassLevelStats();
     void LoadRewardItems();
     void LoadLootPool();
+    void LoadLeaderboard();
     void CleanupSession(Session& session);
 
     std::unordered_map<uint32, Session>      _activeSessions;
@@ -171,6 +179,13 @@ private:
 
     std::vector<RewardItem> _rewardItems;
     std::vector<LootPoolItem> _lootPool;
+
+    std::vector<LeaderboardEntry> _leaderboard;
+    mutable std::mutex _leaderboardMutex;
+
+    std::unordered_map<uint32, Position>                _entrances;
+    std::unordered_map<uint32, std::vector<SpawnPoint>> _spawnPoints;
+    mutable std::mutex _geometryMutex;
 
     uint32 _updateTimer = 0;
     static constexpr uint32 UPDATE_INTERVAL = 1000;

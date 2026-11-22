@@ -25,6 +25,10 @@ public:
 
     void OnStartup() override
     {
+        // Even when disabled: a run interrupted by the last shutdown must not
+        // leave anyone saved to an emptied dungeon instance.
+        sDungeonMasterMgr->ReleaseInstancesLeftOpen();
+
         if (!sDMConfig->IsEnabled())
         {
             LOG_INFO("module", "DungeonMaster: Disabled in configuration.");

@@ -12,8 +12,7 @@
 namespace DungeonMaster
 {
 
-
-static std::vector<std::string> SplitString(const std::string& str, char delim)
+static std::vector<std::string> SplitString(std::string const& str, char delim)
 {
     std::vector<std::string> tokens;
     std::stringstream ss(str);
@@ -30,8 +29,7 @@ static std::vector<std::string> SplitString(const std::string& str, char delim)
     return tokens;
 }
 
-
-static std::string StripQuotes(const std::string& s)
+static std::string StripQuotes(std::string const& s)
 {
     std::string out = s;
     if (!out.empty() && out.front() == '"') out.erase(out.begin());
@@ -238,7 +236,7 @@ void DMConfig::LoadDungeons()
 {
     _dungeons.clear();
 
-    struct Def { uint32 map; const char* name; uint8 lo; uint8 hi; };
+    struct Def { uint32 map; char const* name; uint8 lo; uint8 hi; };
 
     static const Def kDungeons[] =
     {
@@ -284,7 +282,8 @@ void DMConfig::LoadDungeons()
         { 604, "Gundrak",              74, 80 },
         { 599, "Halls of Stone",       75, 80 },
         { 602, "Halls of Lightning",   77, 80 },
-        { 578, "The Oculus",           77, 80 },
+        // The Oculus (578) is left out: its platforms are reachable only on
+        // drake vehicles, which an emptied instance does not provide.
         { 575, "Utgarde Pinnacle",     78, 80 },
         { 595, "Culling of Stratholme",78, 80 },
         { 632, "Forge of Souls",       79, 80 },
@@ -292,7 +291,7 @@ void DMConfig::LoadDungeons()
         { 668, "Halls of Reflection",  79, 80 },
     };
 
-    for (const auto& d : kDungeons)
+    for (auto const& d : kDungeons)
     {
         if (!IsDungeonAllowed(d.map))
             continue;
@@ -308,50 +307,50 @@ void DMConfig::LoadDungeons()
 }
 
 // Utility
-void DMConfig::ParseStringList(const std::string& str, std::unordered_set<uint32>& outSet)
+void DMConfig::ParseStringList(std::string const& str, std::unordered_set<uint32>& outSet)
 {
     if (str.empty()) return;
-    for (const auto& tok : SplitString(str, ','))
+    for (auto const& tok : SplitString(str, ','))
     {
         try { outSet.insert(static_cast<uint32>(std::stoul(tok))); }
         catch (...) { /* skip */ }
     }
 }
 
-const DifficultyTier* DMConfig::GetDifficulty(uint32 id) const
+DifficultyTier const* DMConfig::GetDifficulty(uint32 id) const
 {
-    for (const auto& d : _difficulties)
+    for (auto const& d : _difficulties)
         if (d.Id == id) return &d;
     return nullptr;
 }
 
-std::vector<const DifficultyTier*> DMConfig::GetDifficultiesForLevel(uint8 level) const
+std::vector<DifficultyTier const*> DMConfig::GetDifficultiesForLevel(uint8 level) const
 {
-    std::vector<const DifficultyTier*> out;
-    for (const auto& d : _difficulties)
+    std::vector<DifficultyTier const*> out;
+    for (auto const& d : _difficulties)
         if (d.IsValidForLevel(level))
             out.push_back(&d);
     return out;
 }
 
-const Theme* DMConfig::GetTheme(uint32 id) const
+Theme const* DMConfig::GetTheme(uint32 id) const
 {
-    for (const auto& t : _themes)
+    for (auto const& t : _themes)
         if (t.Id == id) return &t;
     return nullptr;
 }
 
-const DungeonInfo* DMConfig::GetDungeon(uint32 mapId) const
+DungeonInfo const* DMConfig::GetDungeon(uint32 mapId) const
 {
-    for (const auto& d : _dungeons)
+    for (auto const& d : _dungeons)
         if (d.MapId == mapId) return &d;
     return nullptr;
 }
 
-std::vector<const DungeonInfo*> DMConfig::GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const
+std::vector<DungeonInfo const*> DMConfig::GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const
 {
-    std::vector<const DungeonInfo*> out;
-    for (const auto& d : _dungeons)
+    std::vector<DungeonInfo const*> out;
+    for (auto const& d : _dungeons)
         if (d.MaxLevel >= minLevel && d.MinLevel <= maxLevel && d.IsAvailable)
             out.push_back(&d);
     return out;

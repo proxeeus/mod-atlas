@@ -1,19 +1,19 @@
 -- =============================================
--- Dungeon Master Module - Production SQL Setup
+-- Dungeon Master Module - World DB Setup
 -- =============================================
--- Safe to run on a fresh AzerothCore world database.
--- Idempotent: clears previous data before inserting.
+-- Lore frame: the Keepers of Time (bronze dragonflight) open "echoes" of
+-- dungeons from fractured timelines. Player-facing names follow that frame;
+-- internal names (ScriptName, config keys) keep "dungeon master".
 --
 -- This script creates:
---   1. creature_template         - NPC template (entry 500000)
---   2. creature_template_model   - Stormwind Guard display model
---   3. creature                  - Spawn entries in every major city
+--   1. creature_template         - Chronicler Esmadormu (entry 500000)
+--   2. creature_template_model   - Keepers of Time display (19373)
+--   3. npc_text                  - her greeting (ID 500000)
+--   4. creature                  - city spawns (guids 8000001-8000011)
+--   5. the Endless Timeways vendor (entry 500001) and the run buff spell (91001)
 --
--- Spawn coordinates sourced from verified working NPC positions
--- (cross-referenced with PortalMaster module and existing city NPCs).
---
--- IMPORTANT: spawnMask=1 and phaseMask=1 are explicitly set to ensure
--- visibility across all AzerothCore builds (some default these to 0).
+-- Idempotent: re-running replaces only this module's own rows.
+-- spawnMask=1 and phaseMask=1 are set explicitly for visibility.
 -- =============================================
 
 -- -----------------------------------------------
@@ -29,16 +29,16 @@ DELETE FROM `creature_template_model` WHERE `CreatureID` = 500000
     AND EXISTS (SELECT 1 FROM `creature_template` ct
                 WHERE ct.`entry` = 500000 AND ct.`ScriptName` = 'npc_dungeon_master');
 DELETE FROM `creature_template` WHERE `entry` = 500000 AND `ScriptName` = 'npc_dungeon_master';
+DELETE FROM `npc_text` WHERE `ID` = 500000 AND `text0_0` LIKE 'Time is fracturing%';
 
 -- -----------------------------------------------
--- Step 2: NPC Template
+-- Step 2: NPC Template  (Chronicler Esmadormu, a bronze dragon in mortal form)
 -- -----------------------------------------------
 -- npcflag  = 1          (UNIT_NPC_FLAG_GOSSIP)
--- faction  = 190        (Neutral / yellow nameplate — safe in all cities)
+-- faction  = 35         (friendly to all, like the other Keepers of Time NPCs)
 -- unit_flags = 2        (NON_ATTACKABLE)
 -- flags_extra = 2       (CIVILIAN - no aggro radius)
--- type = 7              (Humanoid)
--- unit_class = 1        (Warrior - simplest stats)
+-- type = 2              (Dragonkin, as other Keepers of Time)
 -- ScriptName must match the CreatureScript registered in C++
 INSERT INTO `creature_template` (
     `entry`,
@@ -51,113 +51,78 @@ INSERT INTO `creature_template` (
     `ScriptName`
 ) VALUES (
     500000,
-    'The Dungeon Master',
-    'Challenge Awaits',
+    'Chronicler Esmadormu',
+    'Keepers of Time',
     80, 80,
-    190,   -- neutral (yellow nameplate)
+    35,    -- friendly to all
     1,     -- gossip flag
     1.0, 1.14286,
-    1,     -- warrior
+    8,     -- mage
     2,     -- NON_ATTACKABLE
     0,
-    7,     -- humanoid
+    2,     -- dragonkin
     2,     -- CIVILIAN
     'npc_dungeon_master'
 );
 
-
-
 -- -----------------------------------------------
--- Step 3: Display Model  (Stormwind Guard)
+-- Step 3: Display Model
 -- -----------------------------------------------
--- DisplayID 3167 = Stormwind City Guard (plate armor, sword & shield)
--- This is a universally recognizable, faction-neutral appearance.
+-- DisplayID 19373 = the generic Keepers of Time "Steward of Time" look
+-- (Caverns of Time), not a named lore character.
 INSERT INTO `creature_template_model` (
     `CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`
 ) VALUES (
-    500000, 0, 3167, 1.2, 1.0
+    500000, 0, 19373, 1.0, 1.0
 );
 
 -- -----------------------------------------------
--- Step 4: City Spawns
+-- Step 4: Greeting (gossip text shown by npc_dungeon_master)
 -- -----------------------------------------------
--- Coordinates verified against known working NPC spawns (PortalMaster,
--- existing city vendors/guards, and EmuCoach reference data).
---
--- CRITICAL: spawnMask=1 and phaseMask=1 are required for visibility.
--- Some AzerothCore builds default these to 0 if omitted, which makes
--- the creature exist in the DB but appear invisible in-game.
+INSERT INTO `npc_text` (`ID`, `text0_0`, `text0_1`, `Probability0`) VALUES
+(500000,
+ 'Time is fracturing, $c. In countless timelines the halls you know belong to other masters: beasts, demons, the restless dead. The Keepers of Time can open an echo of such a place.$B$BWalk it, defeat whoever rules there, and the echo mends. Mend enough of them, and the timeways grow a little steadier. We reward those who help.',
+ 'Time is fracturing, $c. In countless timelines the halls you know belong to other masters: beasts, demons, the restless dead. The Keepers of Time can open an echo of such a place.$B$BWalk it, defeat whoever rules there, and the echo mends. Mend enough of them, and the timeways grow a little steadier. We reward those who help.',
+ 1);
+
+-- -----------------------------------------------
+-- Step 5: City Spawns
+-- -----------------------------------------------
+-- Where Chronomancer Noriol (mod-playerbot-reset-instances) stands, the
+-- Chronicler stands 3 yd to her left, facing the same way: one bronze corner
+-- per city. Noriol's positions are this server's own `.npc add` spawns; check
+-- these in game and nudge with `.npc move` if one clips a wall.
+-- Silvermoon and Shattrath (no Noriol there) keep the module's original spots;
+-- the Caverns of Time entrance replaces the old Booty Bay spot.
 --
 -- guid range: 8000001-8000011  (high range to avoid collisions)
 -- spawntimesecs = 180           (3 min respawn if somehow killed)
---
 
 INSERT INTO `creature` (
     `guid`, `id`, `map`, `spawnMask`, `phaseMask`,
     `position_x`, `position_y`, `position_z`, `orientation`,
     `spawntimesecs`
 ) VALUES
--- =========================================================================
--- ALLIANCE CITIES
--- =========================================================================
-
--- Stormwind City - Trade District, near the fountain
--- Ref: PortalMaster (-8845.09, 624.828, 94.2999) / game_tele offset
-(8000001, 500000, 0, 1, 1,  -8842.0, 626.0, 94.30, 0.44,  180),
-
--- Ironforge - The Commons, near the central forge area
--- Ref: game_tele (-4981.25, -881.542, 502.66) / PortalMaster (-4898, -965, 501.4)
-(8000002, 500000, 0, 1, 1,  -4918.0, -957.0, 501.53, 2.26,  180),
-
--- Darnassus - Tradesman's Terrace
--- Ref: game_tele (9869.91, 2493.58, 1315.88)
-(8000003, 500000, 1, 1, 1,  9869.0, 2494.0, 1316.20, 3.1,  180),
-
--- Exodar - The Crystal Hall central area
--- Ref: PortalMaster (-3862.69, -11645.8, -137.629)
-(8000004, 500000, 530, 1, 1,  -3862.7, -11645.8, -137.63, 2.38,  180),
-
--- =========================================================================
--- HORDE CITIES
--- =========================================================================
-
--- Orgrimmar - Valley of Strength, near the bank
--- Ref: game_tele (1676.21, -4315.29, 61.52) with Z verified
-(8000005, 500000, 1, 1, 1,  1676.0, -4316.0, 61.80, 5.7,  180),
-
--- Thunder Bluff - High Rise central platform
--- Ref: PortalMaster (-1277.65, 72.9751, 128.742)
-(8000006, 500000, 1, 1, 1,  -1277.6, 73.0, 128.75, 5.96,  180),
-
--- Undercity - Trade Quarter
--- Ref: PortalMaster (1637.21, 240.132, -43.1034) — original was at -52, ~9 units underground!
-(8000007, 500000, 0, 1, 1,  1637.2, 240.1, -43.10, 3.14,  180),
-
--- Silvermoon City - near the Walk of Elders
--- Ref: PortalMaster (9741.67, -7454.19, 13.5572) / game_tele (9338, -7277, 13.78)
-(8000008, 500000, 530, 1, 1,  9738.0, -7454.0, 13.56, 0.5,  180),
-
--- =========================================================================
--- NEUTRAL CITIES
--- =========================================================================
-
--- Shattrath City - Terrace of Light
--- Ref: game_tele (-1850.21, 5435.82, -12.4281) with Z bump for safety
-(8000009, 500000, 530, 1, 1,  -1850.0, 5436.0, -12.10, 5.5,  180),
-
--- Dalaran (Northrend) - Runeweaver Square / The Eventide
--- Ref: PortalMaster (5807.06, 506.244, 657.576) — original was at 647.77, ~10 units underground!
-(8000010, 500000, 571, 1, 1,  5807.0, 506.2, 657.58, 5.54,  180),
-
--- Booty Bay - Inn / dock level
--- Ref: game_tele (-14406.6, 419.353, 23.3907) — keep close but bump Z slightly
-(8000011, 500000, 0, 1, 1,  -14406.0, 420.0, 23.70, 4.0,  180);
+-- Beside Chronomancer Noriol
+(8000001, 500000, 0,   1, 1,  -8998.05,   871.70,  148.60, 5.69, 180),  -- Stormwind
+(8000002, 500000, 0,   1, 1,  -4620.79,  -905.76,  501.07, 5.33, 180),  -- Ironforge
+(8000003, 500000, 1,   1, 1,   9970.96,  2292.60, 1341.39, 5.73, 180),  -- Darnassus
+(8000004, 500000, 530, 1, 1,  -3972.38, -11639.35, -138.89, 0.99, 180), -- The Exodar
+(8000005, 500000, 1,   1, 1,   1653.78, -4384.47,   22.22, 4.81, 180),  -- Orgrimmar
+(8000006, 500000, 1,   1, 1,  -1242.15,   116.15,  130.19, 2.71, 180),  -- Thunder Bluff
+(8000007, 500000, 0,   1, 1,   1593.25,   279.66,  -43.10, 4.37, 180),  -- Undercity
+(8000010, 500000, 571, 1, 1,   5808.61,   799.05,  662.14, 0.35, 180),  -- Dalaran
+-- No Noriol: original spots
+(8000008, 500000, 530, 1, 1,   9738.00, -7454.00,   13.56, 0.50, 180),  -- Silvermoon, Walk of Elders
+(8000009, 500000, 530, 1, 1,  -1850.00,  5436.00,  -12.10, 5.50, 180),  -- Shattrath, Terrace of Light
+-- Caverns of Time entrance, Tanaris (game_tele CavernsOfTime, 3 yd aside)
+(8000011, 500000, 1,   1, 1,  -8201.88, -4495.20,    9.01, 4.73, 180);
 
 
 -- =============================================
--- Roguelike Vendor NPC (entry 500001)
+-- Endless Timeways vendor (entry 500001): Timeways Quartermaster
 -- =============================================
--- Friendly vendor that spawns at dungeon entrances during roguelike runs.
+-- Friendly vendor that spawns at echo entrances during Endless Timeways runs.
 -- Provides: sell/buy (general goods, reagents, ammo), repair.
 -- Spawned programmatically by PopulateDungeon() — no world spawn entries needed.
 -- =============================================
@@ -168,11 +133,11 @@ INSERT INTO `creature` (
 -- Same rule as above: only touch entry 500001 if it is this module's vendor.
 DELETE FROM `npc_vendor` WHERE `entry` = 500001
     AND EXISTS (SELECT 1 FROM `creature_template` ct
-                WHERE ct.`entry` = 500001 AND ct.`name` = 'Dungeon Provisioner');
+                WHERE ct.`entry` = 500001 AND ct.`name` = 'Timeways Quartermaster');
 DELETE FROM `creature_template_model` WHERE `CreatureID` = 500001
     AND EXISTS (SELECT 1 FROM `creature_template` ct
-                WHERE ct.`entry` = 500001 AND ct.`name` = 'Dungeon Provisioner');
-DELETE FROM `creature_template` WHERE `entry` = 500001 AND `name` = 'Dungeon Provisioner';
+                WHERE ct.`entry` = 500001 AND ct.`name` = 'Timeways Quartermaster');
+DELETE FROM `creature_template` WHERE `entry` = 500001 AND `name` = 'Timeways Quartermaster';
  
 -- -----------------------------------------------
 -- Vendor NPC Template
@@ -192,8 +157,8 @@ INSERT INTO `creature_template` (
     `ScriptName`
 ) VALUES (
     500001,
-    'Dungeon Provisioner',
-    'Roguelike Supplies',
+    'Timeways Quartermaster',
+    'Keepers of Time',
     80, 80,
     35,     -- friendly to all (green nameplate)
     6785,   -- GOSSIP(1) + VENDOR(128) + VENDOR_FOOD(512) + VENDOR_REAGENT(2048) + REPAIR(4096)
@@ -201,7 +166,7 @@ INSERT INTO `creature_template` (
     1,      -- warrior (simplest stats)
     2,      -- NON_ATTACKABLE
     0,
-    7,      -- humanoid
+    2,      -- dragonkin (Keepers of Time)
     2,      -- CIVILIAN
     ''      -- no custom script; built-in vendor/repair handling
 );
@@ -211,11 +176,12 @@ INSERT INTO `creature_template` (
 -- -----------------------------------------------
 -- Vendor Display Model
 -- -----------------------------------------------
--- DisplayID 4307 = Generic merchant (human male with apron)
+-- DisplayID 19373 = generic Keepers of Time look (same as the Chronicler;
+-- the vendor only appears inside runs)
 INSERT INTO `creature_template_model` (
     `CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`
 ) VALUES (
-    500001, 0, 4307, 1.0, 1.0
+    500001, 0, 19373, 1.0, 1.0
 );
  
 -- -----------------------------------------------
@@ -334,7 +300,7 @@ INSERT INTO `npc_vendor` (`entry`, `slot`, `item`, `maxcount`, `incrtime`, `Exte
 
 
 -- =============================================
--- Roguelike buff spell (ID 91001), server-side only
+-- Endless Timeways buff spell "Timeways Resonance" (ID 91001), server-side only
 -- =============================================
 -- The module's own aura for the roguelike "+10% all stats per cleared floor"
 -- buff. It replaces the earlier use of Greater Blessing of Kings, a paladin
@@ -357,7 +323,7 @@ INSERT INTO `npc_vendor` (`entry`, `slot`, `item`, `maxcount`, `incrtime`, `Exte
 -- spell_dbc rows sit at 100001+). The DELETE only removes this module's own
 -- row; if another row already uses 91001 the INSERT fails loudly.
 -- -----------------------------------------------
-DELETE FROM `spell_dbc` WHERE `ID` = 91001 AND `Name_Lang_enUS` = 'Dungeon Master: Roguelike Might';
+DELETE FROM `spell_dbc` WHERE `ID` = 91001 AND `Name_Lang_enUS` = 'Timeways Resonance';
 INSERT INTO `spell_dbc` (
     `ID`, `Attributes`, `CastingTimeIndex`, `DurationIndex`, `RangeIndex`,
     `CumulativeAura`, `EquippedItemClass`,
@@ -369,5 +335,5 @@ INSERT INTO `spell_dbc` (
     255, -1,
     6, 1, 9, 1,
     137, -1,
-    'Dungeon Master: Roguelike Might'
+    'Timeways Resonance'
 );

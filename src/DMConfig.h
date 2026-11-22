@@ -32,18 +32,18 @@ public:
     uint32 GetNpcEntry()      const { return _npcEntry; }
 
     // --- Difficulties ---
-    const std::vector<DifficultyTier>&      GetDifficulties() const { return _difficulties; }
-    const DifficultyTier*                   GetDifficulty(uint32 id) const;
-    std::vector<const DifficultyTier*>      GetDifficultiesForLevel(uint8 level) const;
+    std::vector<DifficultyTier> const&      GetDifficulties() const { return _difficulties; }
+    DifficultyTier const*                   GetDifficulty(uint32 id) const;
+    std::vector<DifficultyTier const*>      GetDifficultiesForLevel(uint8 level) const;
 
     // --- Themes ---
-    const std::vector<Theme>&   GetThemes() const { return _themes; }
-    const Theme*                GetTheme(uint32 id) const;
+    std::vector<Theme> const&   GetThemes() const { return _themes; }
+    Theme const*                GetTheme(uint32 id) const;
 
     // --- Dungeons ---
-    const std::vector<DungeonInfo>&     GetDungeons() const { return _dungeons; }
-    const DungeonInfo*                  GetDungeon(uint32 mapId) const;
-    std::vector<const DungeonInfo*>     GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const;
+    std::vector<DungeonInfo> const&     GetDungeons() const { return _dungeons; }
+    DungeonInfo const*                  GetDungeon(uint32 mapId) const;
+    std::vector<DungeonInfo const*>     GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const;
     bool                                IsDungeonAllowed(uint32 mapId) const;
 
     // --- Scaling ---
@@ -101,7 +101,7 @@ public:
     uint32 GetRoguelikeSecondAffixTier()    const { return _roguelikeSecondAffixTier; }
     uint32 GetRoguelikeThirdAffixTier()     const { return _roguelikeThirdAffixTier; }
     uint32 GetRoguelikeMaxBuffs()           const { return _roguelikeMaxBuffs; }
-    const std::vector<RoguelikeBuff>& GetRoguelikeBuffPool() const { return _roguelikeBuffPool; }
+    std::vector<RoguelikeBuff> const& GetRoguelikeBuffPool() const { return _roguelikeBuffPool; }
     bool   IsRoguelikeVendorEnabled()       const { return _roguelikeVendorEnabled; }
 
 private:
@@ -109,7 +109,7 @@ private:
     void LoadThemes();
     void LoadDungeons();
     void LoadRoguelikeBuffPool();
-    void ParseStringList(const std::string& str, std::unordered_set<uint32>& outSet);
+    void ParseStringList(std::string const& str, std::unordered_set<uint32>& outSet);
 
     // Core
     bool   _enabled   = true;

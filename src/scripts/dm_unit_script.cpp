@@ -107,9 +107,24 @@ private:
 
                 return;
             }
+
+            // Adds summoned during the run: level-scaled like a boss, not
+            // capped like a hazard (the cap made them deal at most 3% max HP).
+            if (Creature const* creature = attacker->ToCreature())
+            {
+                float scale = sDungeonMasterMgr->GetOwnedCreatureDamageScale(playerGuid, creature);
+                if (scale >= 0.0f)
+                {
+                    if (scale < 1.0f)
+                        damage = std::max(1u, static_cast<uint32>(damage * scale));
+
+                    return;
+                }
+            }
         }
 
-        // Non-session attacker (environmental hazards, traps, etc.)
+        // Anything else (no attacker, or a creature the run doesn't own:
+        // environmental hazards, traps, leftover dungeon scripts)
         float envScale = sDungeonMasterMgr->GetEnvironmentalDamageScale(playerGuid);
         if (envScale < 1.0f)
             damage = static_cast<uint32>(damage * envScale);

@@ -2,7 +2,7 @@
 
 A procedural dungeon challenge system for **AzerothCore** (WotLK 3.3.5a).
 
-Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dungeon — then get teleported into a cleared instance repopulated with level-scaled themed enemies and a boss. Kill everything to earn rewards. Roguelike mode chains dungeons together with escalating difficulty, affixes, and stacking stat buffs until the party wipes.
+**In game:** Chronicler Esmadormu of the **Keepers of Time** (bronze dragonflight) opens *echoes* of known dungeons from fractured timelines, where the halls belong to other masters: beasts, demons, the restless dead. Players pick a difficulty, a timeline (creature theme) and a dungeon, then walk the echo: an emptied instance repopulated with level-scaled themed enemies and a master (boss). Mending the echo earns rewards. **The Endless Timeways** (roguelike mode) chains echoes with escalating difficulty, instabilities (affixes) and a growing stat buff, Timeways Resonance, until the party falls.
 
 > ⚠️ **Early development** — expect bugs and rough edges. Bug reports welcome via Issues.
 
@@ -11,30 +11,30 @@ Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dun
 ## Features
 
 ### Core System
-- **37 dungeons** — Classic, TBC, and WotLK 5-man instances
-- **9 creature themes** — Beast Hunt, Dragon's Lair, Demonic Invasion, Elemental Chaos, Giant's Keep, Undead Rising, Humanoid Stronghold, Mechanical Mayhem, Random Chaos
+- **44 dungeons** — Classic, TBC, and WotLK 5-man instances (The Oculus is left out: it needs drake vehicles)
+- **9 timelines (creature themes)** — beasts, dragonkin, the Legion, elementals, giants, the Scourge, mortal warbands, rogue machines, or a shattered mix
 - **6 difficulty tiers** — Novice through Grandmaster with tuned HP/damage/reward multipliers
 - **Level scaling** — Scale creatures to your party's level or use the tier's natural range
-- **Any dungeon, any level** — A level 80 can run Deadmines scaled to 80, or at its original difficulty
+- **Any dungeon, any level** — A level 80 can walk an echo of a classic dungeon scaled to 80, or at its original difficulty
 - **Real dungeon bosses** — Final bosses are pulled from a global pool of all dungeon bosses across Classic, TBC, and WotLK instances, matched to the session's theme.
 - **Party support** — Solo or groups up to 5 (Normal dungeon difficulty only; each run starts in a fresh instance and the instance is released afterwards)
 - **Group Loot support** — Items dropped by enemies support the Group Loot game mechanic where party members roll Need or Greed on qualifying items
 - **Per-player difficulty** — HP and damage scale with party size; solo players get a reduction
 - **Auto-resurrect** — Dead players revive at the entrance when combat ends
-- **Environmental damage scaling** — Native dungeon hazards are scaled down for level-mismatched parties, hard-capped at 3% max HP per tick
+- **Environmental damage scaling** — Native dungeon hazards are scaled down for level-mismatched parties, hard-capped at 3% max HP per tick (adds summoned during a run are level-scaled instead of capped)
 - **Cooldown system** — Configurable per-character cooldown between runs
 - **Persistent stats** — Tracks runs, kills, deaths, fastest clear times per character
 - **Statistics & Leaderboards** — Separate tracking for normal runs and roguelike mode. Normal stats track win rate, kills, deaths, K/D ratio, and fastest clear. Roguelike stats track highest tier, most floors, total floors cleared, and longest run. Leaderboards include Normal Fastest Clears, Roguelike Highest Tier, and Roguelike Most Floors — with your own entries highlighted
 - **GM commands** — `.dm reload`, `.dm status`, `.dm list`, `.dm end`, `.dm clearcooldown`
 
-### Roguelike Mode
-- **Infinite progression** — Clear a dungeon, get teleported to the next one, repeat until you wipe
+### The Endless Timeways (roguelike mode)
+- **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
 - **Escalating difficulty** — Enemy HP and damage scale per tier (linear, then exponential)
-- **Stacking stat buff** — +10% all stats per dungeon cleared (the module's own server-side aura, spell 91001; no class spell is modified)
+- **Timeways Resonance** — +10% all stats per echo mended (the module's own server-side passive aura, spell 91001; no class spell is modified; not shown as a buff icon, the total is announced in chat)
 - **Mythic+ style affixes** — Fortified, Tyrannical, Raging, Bolstering, Savage; layered at configurable tier thresholds
 - **Random dungeon rotation** — Each floor picks a new dungeon appropriate for your level band
 - **Tier-scaled rewards** — Better loot at higher tiers, with increasing epic drop chance
-- **Dungeon Provisioner** — Sell items, repair gear and buy ammo/reagents at the start of each floor
+- **Timeways Quartermaster** — Sell items, repair gear and buy ammo/reagents at the start of each echo
 
 
 ---
@@ -66,62 +66,54 @@ Players talk to a Dungeon Master NPC, pick a difficulty, creature theme, and dun
 
 6. **Enable it:** set `DungeonMaster.Enable = 1` (the default is 0, also when no config file exists).
 
-7. **Restart the server.** The Dungeon Master NPC appears in all major cities (it stays hidden while the module is disabled).
+7. **Restart the server.** Chronicler Esmadormu appears in the major cities and at the Caverns of Time (she stays hidden while the module is disabled).
 
 ---
 
 ## NPC Spawn Locations
 
-The Dungeon Master NPC (entry `500000`) spawns in every major city. You can also spawn one manually with `.npc add 500000`.
+Chronicler Esmadormu (entry `500000`) has 11 spawns (guids 8000001–8000011). You can also spawn one manually with `.npc add 500000`.
 
-### Alliance
+On this server, eight of them stand 3 yards to the left of **Chronomancer Noriol** (mod-playerbot-reset-instances), facing the same way, so each city has one "bronze corner". Noriol's positions are this server's own `.npc add` spawns, so check these in game and adjust with `.npc move` if one clips a wall.
 
-| City | Location | Map | Coordinates |
-|------|----------|-----|-------------|
-| Stormwind | Trade District, near fountain | 0 | -8842.0, 626.0, 94.3 |
-| Ironforge | The Commons, near central forge | 0 | -4918.0, -957.0, 501.5 |
-| Darnassus | Tradesman's Terrace | 1 | 9869.0, 2494.0, 1316.2 |
-| Exodar | The Crystal Hall | 530 | -3862.7, -11645.8, -137.6 |
-
-### Horde
-
-| City | Location | Map | Coordinates |
-|------|----------|-----|-------------|
-| Orgrimmar | Valley of Strength, near bank | 1 | 1676.0, -4316.0, 61.8 |
-| Thunder Bluff | High Rise, central platform | 1 | -1277.6, 73.0, 128.8 |
-| Undercity | Trade Quarter | 0 | 1637.2, 240.1, -43.1 |
-| Silvermoon | Walk of Elders | 530 | 9738.0, -7454.0, 13.6 |
-
-### Neutral
-
-| City | Location | Map | Coordinates |
-|------|----------|-----|-------------|
+| City | Placement | Map | Coordinates |
+|------|-----------|-----|-------------|
+| Stormwind | beside Noriol | 0 | -8998.05, 871.70, 148.60 |
+| Ironforge | beside Noriol | 0 | -4620.79, -905.76, 501.07 |
+| Darnassus | beside Noriol | 1 | 9970.96, 2292.60, 1341.39 |
+| The Exodar | beside Noriol | 530 | -3972.38, -11639.35, -138.89 |
+| Orgrimmar | beside Noriol | 1 | 1653.78, -4384.47, 22.22 |
+| Thunder Bluff | beside Noriol | 1 | -1242.15, 116.15, 130.19 |
+| Undercity | beside Noriol | 0 | 1593.25, 279.66, -43.10 |
+| Dalaran | beside Noriol | 571 | 5808.61, 799.05, 662.14 |
+| Silvermoon | Walk of Elders | 530 | 9738.0, -7454.0, 13.56 |
 | Shattrath | Terrace of Light | 530 | -1850.0, 5436.0, -12.1 |
-| Dalaran | Runeweaver Square | 571 | 5807.0, 506.2, 657.6 |
-| Booty Bay | Docks / Inn level | 0 | -14406.0, 420.0, 23.7 |
+| Tanaris | Caverns of Time entrance | 1 | -8201.88, -4495.20, 9.01 |
 
 ---
 
 ## How It Works
 
-### Standard Mode
+### Walking an echo
 
-1. Talk to the Dungeon Master NPC
+1. Talk to Chronicler Esmadormu
 2. Choose **difficulty tier** (Novice → Grandmaster)
-3. Choose **scaling mode**:
-   - **Scale to Party** — creatures match your group's average level
-   - **Use Dungeon Difficulty** — creatures stay at the tier's natural level range
-4. Choose **creature theme** (Undead, Demons, Beasts, etc.)
-5. Choose **dungeon**
-6. Confirm → teleport in → kill everything → collect rewards → teleport out
+3. Choose **attunement**:
+   - **Attune to my party** — creatures match your group's average level
+   - **Leave it as it was** — creatures stay at the tier's natural level range
+4. Choose a **timeline** (who rules the halls: the Scourge, the Legion, beasts…)
+5. Choose a **dungeon**, or let the timeways choose
+6. Confirm → enter the echo → defeat its master → collect rewards → return
 
-### Roguelike Mode
+Echoes run on **Normal** dungeon difficulty only (a heroic run could lock the group out of the real heroic). Each run starts in a fresh instance: a temporary Normal save to that dungeon is reset first, and the run is refused if someone is still inside that saved instance.
 
-1. Talk to the NPC → select **Roguelike Challenge**
+### The Endless Timeways
+
+1. Talk to the Chronicler → **I will descend the Endless Timeways**
 2. Choose difficulty, scaling, and theme (or random theme each floor)
-3. Clear floor 1 → earn +10% all stats buff → auto-transition to floor 2
-4. Enemies get harder each tier; affixes kick in at tier 3+
-5. Keep going until you wipe — highest tier reached, floors cleared, and kills are saved to the roguelike leaderboard (separate from normal runs)
+3. Mend echo 1 → Timeways Resonance grows by +10% all stats → the next echo forms
+4. Each depth is harder; instabilities (affixes) start at depth 3
+5. Keep going until the party falls — depth reached, echoes mended and kills go to the Endless Timeways chronicle (separate from normal runs)
 
 ### Level Scaling
 
@@ -220,6 +212,9 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 - **Thread safety** — Session maps and cooldowns are mutex-guarded for multi-player safety.
 - **Async teleport handling** — 30-second grace period after teleports to prevent false "abandoned" detection.
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
+- **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `dm_open_instance` so a restart mid-run releases them at startup.
+- **Hot-path gating** — Damage, death and creature-add hooks check a lock-free "any run active?" flag and the map type before touching the session mutex.
+- **Cached lookups** — Dungeon entrances, spawn points and leaderboards are loaded once (startup, `.dm reload`) instead of queried during play.
 - **Debuff purging** — Lingering debuffs from despawned creatures are removed before each floor.
 - **Custom creature AI** — Trash creatures use `DungeonMasterCreatureAI` which patrols a 5 yd radius around spawn points, actively scans for players within aggro range (with a 1-second fallback timer for grid edge cases), and hooks `JustDied` for proper loot timing. Bosses use the same AI (auto-attack only): their native scripted mechanics do not run.
 - **Boss spell damage scaling** — Boss abilities have hard-coded damage values designed for their original level range. The unit script intercepts all incoming damage from session bosses (spells, periodic ticks, and melee) and scales it using `creature_classlevelstats` base damage ratios between the boss's template level and the session's effective level. This ensures a level-70 boss spell deals proportionally correct damage to a level-25 party.
@@ -227,6 +222,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 - **Group Loot support** — Creature loot triggers the group's Need/Greed roll system for items above the group's loot quality threshold.
 - **Boss damage scaling** — Boss damage uses only party-size scaling (not stacked with the difficulty tier's DamageMultiplier) to prevent excessive damage when combined with level scaling.
 - **Standard AzerothCore** — All queries use standard AzerothCore column names. No fork-specific dependencies.
+- **Reserved IDs** — creature entries 500000–500001, creature guids 8000001–8000011, npc_text 500000, spells 91000–91099 (91001 = Timeways Resonance). The world SQL only deletes rows it created; a clash fails the install loudly.
 
 ---
 

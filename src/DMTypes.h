@@ -24,6 +24,10 @@ constexpr uint32 MAX_DIFFICULTIES      = 10;
 constexpr uint32 MAX_THEMES            = 20;
 constexpr uint32 MAX_PARTY_SIZE        = 5;
 
+// Player-facing chat prefixes (Keepers of Time / bronze dragonflight frame).
+constexpr char const* CHAT_PREFIX         = "|cFFCD7F32[Keepers of Time]|r";
+constexpr char const* CHAT_PREFIX_ENDLESS = "|cFFCD7F32[Endless Timeways]|r";
+
 enum class SessionState : uint8
 {
     None       = 0,
@@ -148,7 +152,7 @@ struct Session
 
     bool IsSessionCreature(ObjectGuid guid) const
     {
-        for (const auto& sc : SpawnedCreatures)
+        for (auto const& sc : SpawnedCreatures)
             if (sc.Guid == guid) return true;
         return false;
     }
@@ -164,7 +168,7 @@ struct Session
 
     bool HasPlayer(ObjectGuid guid) const
     {
-        for (const auto& p : Players)
+        for (auto const& p : Players)
             if (p.PlayerGuid == guid) return true;
         return false;
     }
