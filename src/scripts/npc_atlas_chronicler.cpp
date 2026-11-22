@@ -137,7 +137,7 @@ public:
             else
                 chat.PSendSysMessage("{} You are still bound to the Endless Timeways.", CHAT_PREFIX_ENDLESS);
 
-            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFFFF0000Abandon the descent|r",
+            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFF8B0000Abandon the descent|r",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_QUIT);
             AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Never mind.",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
@@ -311,28 +311,28 @@ private:
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "Show me an echo to walk.",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_MAIN_START);
         if (sAtlasConfig->IsRoguelikeEnabled())
-            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFFCD7F32I will descend the Endless Timeways.|r",
+            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "I will descend the Endless Timeways.",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_START);
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "What are these echoes?",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_MAIN_INFO);
-        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFFFD700Show me the chronicles.|r",
+        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "Show me the chronicles.",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
 
+    // Gossip options sit on the parchment frame: keep them plain (the default
+    // dark text). Colour only marks what can't be picked, in dark shades that
+    // stay readable on parchment.
     static std::string DifficultyLabel(DifficultyTier const& d, uint8 lvl, bool roguelike)
     {
         if (!d.IsValidForLevel(lvl))
-            return Acore::StringFormat("|cFF808080{}|r (Lv {}-{}) - |cFFFF0000Requires {}+|r",
+            return Acore::StringFormat("|cFF5A5A5A{} (Lv {}-{})|r - |cFF8B0000Requires {}+|r",
                 d.Name, d.MinLevel, d.MaxLevel, d.MinLevel);
 
-        if (roguelike)
-            return Acore::StringFormat("|cFFCD7F32{}|r (Lv {}-{})", d.Name, d.MinLevel, d.MaxLevel);
+        if (!roguelike && !d.IsOnLevelFor(lvl))
+            return Acore::StringFormat("{} (Lv {}-{}, easy for you)", d.Name, d.MinLevel, d.MaxLevel);
 
-        if (!d.IsOnLevelFor(lvl))
-            return Acore::StringFormat("{} |cFF808080(Lv {}-{} — Easy)|r", d.Name, d.MinLevel, d.MaxLevel);
-
-        return Acore::StringFormat("|cFF00FF00{}|r (Lv {}-{})", d.Name, d.MinLevel, d.MaxLevel);
+        return Acore::StringFormat("{} (Lv {}-{})", d.Name, d.MinLevel, d.MaxLevel);
     }
 
     void ShowDifficultyMenu(Player* player, Creature* creature)
@@ -345,7 +345,7 @@ private:
                 d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, false), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
 
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
 
@@ -365,14 +365,14 @@ private:
         uint8 partyLevel = sAtlasMgr->ComputeEffectiveLevel(player);
 
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE,
-            Acore::StringFormat("|cFF00FF00Attune the echo to my party|r (Lv {}) — a full challenge at your level",
+            Acore::StringFormat("Attune the echo to my party (Lv {}) — a full challenge at your level",
                 partyLevel),
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SCALE_PARTY);
         AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1,
-            Acore::StringFormat("|cFFFFD700Leave the echo as it was|r (Lv {}-{}) — the original level range",
+            Acore::StringFormat("Leave the echo as it was (Lv {}-{}) — the original level range",
                 diff->MinLevel, diff->MaxLevel),
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_SCALE_TIER);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -382,7 +382,7 @@ private:
         player->PlayerTalkClass->ClearMenus();
         for (auto const& t : sAtlasConfig->GetThemes())
             AddGossipItemFor(player, GOSSIP_ICON_BATTLE, t.Name, GOSSIP_SENDER_MAIN, GOSSIP_ACTION_THEME_BASE + t.Id);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
 
@@ -423,7 +423,7 @@ private:
 
         // "Any echo" stays reachable: shown only on the first page.
         if (page == 0)
-            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFFFFD700Let the timeways choose.|r",
+            AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "Let the timeways choose.",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DUNGEON_RANDOM);
 
         // Render this page's slice of dungeons.
@@ -439,17 +439,17 @@ private:
 
         if (dungeons.empty())
             AddGossipItemFor(player, GOSSIP_ICON_CHAT,
-                "|cFF808080No echo can be reached from here.|r", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
+                "No echo can be reached from here.", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
 
         // Page navigation, rendered conditionally.
         if (page > 0)
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFF00FF00<< Previous Page|r",
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Previous Page",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DUNGEON_PREV_PAGE);
         if (end < total)
-            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFF00FF00Next Page >>|r",
+            AddGossipItemFor(player, GOSSIP_ICON_CHAT, "Next Page >>",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DUNGEON_NEXT_PAGE);
 
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
 
@@ -485,9 +485,9 @@ private:
             chat.SendSysMessage("|cFFFFFF00  Your whole party will be drawn into the echo.|r");
         chat.SendSysMessage("|cFFCD7F32==============================|r");
 
-        AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "|cFF00FF00Open the echo.|r",
+        AddGossipItemFor(player, GOSSIP_ICON_BATTLE, "Open the echo.",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CONFIRM);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Not yet|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Not yet",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -517,11 +517,11 @@ private:
         AddGossipItemFor(player, GOSSIP_ICON_TABARD, "My echoes",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_NORMAL);
         if (sAtlasConfig->IsRoguelikeEnabled())
-            AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFCD7F32My descents into the Endless Timeways|r",
+            AddGossipItemFor(player, GOSSIP_ICON_TABARD, "My descents into the Endless Timeways",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_ROGUELIKE);
-        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFFFD700Chronicles of the fastest and deepest|r",
+        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "Chronicles of the fastest and deepest",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_MENU);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -553,9 +553,9 @@ private:
 
         chat.SendSysMessage("|cFFFFD700══════════════════════════════════════════|r");
 
-        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFFFD700View the chronicles|r",
+        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "View the chronicles",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_MENU);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -589,9 +589,9 @@ private:
 
         chat.SendSysMessage("|cFFCD7F32══════════════════════════════════════════|r");
 
-        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "|cFFFFD700View the chronicles|r",
+        AddGossipItemFor(player, GOSSIP_ICON_TABARD, "View the chronicles",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_MENU);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -602,18 +602,18 @@ private:
     {
         player->PlayerTalkClass->ClearMenus();
         AddGossipItemFor(player, GOSSIP_ICON_TABARD,
-            "|cFFFFD700Echoes — fastest mended|r",
+            "Echoes — fastest mended",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_NORMAL);
         if (sAtlasConfig->IsRoguelikeEnabled())
         {
             AddGossipItemFor(player, GOSSIP_ICON_TABARD,
-                "|cFFCD7F32Endless Timeways — deepest descents|r",
+                "Endless Timeways — deepest descents",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_RL_TIER);
             AddGossipItemFor(player, GOSSIP_ICON_TABARD,
-                "|cFFCD7F32Endless Timeways — most echoes mended|r",
+                "Endless Timeways — most echoes mended",
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_RL_FLOORS);
         }
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -649,7 +649,7 @@ private:
         }
 
         chat.SendSysMessage("|cFFFFD700════════════════════════════════════════════════|r");
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -685,7 +685,7 @@ private:
         }
 
         chat.SendSysMessage("|cFFCD7F32══════════════════════════════════════════════|r");
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_BOARD_MENU);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -709,7 +709,7 @@ private:
                 d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, true), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
 
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -721,12 +721,12 @@ private:
         uint8 partyLevel = sAtlasMgr->ComputeEffectiveLevel(player);
 
         AddGossipItemFor(player, GOSSIP_ICON_BATTLE,
-            Acore::StringFormat("|cFF00FF00Attune the echoes to my party|r (Lv {})", partyLevel),
+            Acore::StringFormat("Attune the echoes to my party (Lv {})", partyLevel),
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_SCALE_PARTY);
         AddGossipItemFor(player, GOSSIP_ICON_INTERACT_1,
-            "|cFFFFD700Leave the echoes as they were|r — original level ranges",
+            "Leave the echoes as they were — original level ranges",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_SCALE_TIER);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }
@@ -737,7 +737,7 @@ private:
         for (auto const& t : sAtlasConfig->GetThemes())
             AddGossipItemFor(player, GOSSIP_ICON_BATTLE, t.Name,
                 GOSSIP_SENDER_MAIN, GOSSIP_ACTION_ROGUELIKE_THEME + t.Id);
-        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "|cFFFF0000<< Back|r",
+        AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
         SendGossipMenuFor(player, NPC_TEXT_GREETING, creature->GetGUID());
     }

@@ -1432,6 +1432,11 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         // Bosses rely on auto-attack only — no scripted spell rotations.
         // AIM_Initialize deletes the creature's previous AI; Unit::SetAI only
         // swaps the pointer, which leaked one AI object per spawned creature.
+        // Before deleting it, cancel the creature's pending events: stock
+        // scripts queue lambdas on me->m_Events that capture their AI (e.g.
+        // Murmur, Keleseth, Novos schedule them in Reset at spawn), and those
+        // would fire into the deleted AI a few seconds later (use-after-free).
+        c->m_Events.KillAllEvents(false);
         CreatureAI* dmAI = new AtlasCreatureAI(c);
         if (!c->AIM_Initialize(dmAI))
             delete dmAI;
