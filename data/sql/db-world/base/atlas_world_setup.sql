@@ -7,7 +7,7 @@
 --
 -- This script creates:
 --   1. creature_template         - Chronicler Esmadormu (entry 500000)
---   2. creature_template_model   - Keepers of Time display (19373)
+--   2. creature_template_model   - a bronze dragon in mortal guise (display 20222)
 --   3. npc_text                  - her greeting (ID 500000)
 --   4. creature                  - city spawns (guids 8000001-8000011)
 --   5. the Endless Timeways vendor (entry 500001) and the run buff spell (91001)
@@ -68,12 +68,13 @@ INSERT INTO `creature_template` (
 -- -----------------------------------------------
 -- Step 3: Display Model
 -- -----------------------------------------------
--- DisplayID 19373 = the generic Keepers of Time "Steward of Time" look
--- (Caverns of Time), not a named lore character.
+-- DisplayID 20222 = a bronze dragon in her blood elf guise, in Keepers of
+-- Time robes (the look of Soridormi's mortal form). Person-sized; the old
+-- 19373 was the Steward of Time drake and towered over the city NPCs.
 INSERT INTO `creature_template_model` (
     `CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`
 ) VALUES (
-    500000, 0, 19373, 1.0, 1.0
+    500000, 0, 20222, 1.0, 1.0
 );
 
 -- -----------------------------------------------
@@ -176,12 +177,13 @@ INSERT INTO `creature_template` (
 -- -----------------------------------------------
 -- Vendor Display Model
 -- -----------------------------------------------
--- DisplayID 19373 = generic Keepers of Time look (same as the Chronicler;
--- the vendor only appears inside runs)
+-- DisplayID 21445 = a bronze dragon in his blood elf guise (the look of
+-- Tydormu, Keeper of Lost Artifacts). That display is drawn at 1.35x, so
+-- DisplayScale 0.75 brings him back to person size.
 INSERT INTO `creature_template_model` (
     `CreatureID`, `Idx`, `CreatureDisplayID`, `DisplayScale`, `Probability`
 ) VALUES (
-    500001, 0, 19373, 1.0, 1.0
+    500001, 0, 21445, 0.75, 1.0
 );
  
 -- -----------------------------------------------

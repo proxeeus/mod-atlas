@@ -2065,14 +2065,14 @@ void AtlasMgr::DistributeRewards(Session* session)
     DifficultyTier const* diff = sAtlasConfig->GetDifficulty(session->DifficultyId);
     if (!diff) return;
 
-    uint32 lvl       = session->EffectiveLevel;
-    uint32 baseGold  = lvl * 500;
-    uint32 mobGold   = session->MobsKilled  * (lvl * 10);
-    uint32 bossGold  = session->BossesKilled * (lvl * 500);
+    uint8  lvl       = session->EffectiveLevel;
+    uint32 baseGold  = AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetBaseGold(), lvl);
+    uint32 mobGold   = session->MobsKilled   * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerMob(), lvl);
+    uint32 bossGold  = session->BossesKilled * AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetGoldPerBoss(), lvl);
     uint32 total     = static_cast<uint32>((baseGold + mobGold + bossGold) * diff->RewardMultiplier);
     uint32 perPlayer = total / std::max<uint32>(1, session->Players.size());
 
-    uint8 rewardLevel = static_cast<uint8>(std::min<uint32>(lvl, 80));
+    uint8 rewardLevel = std::min<uint8>(lvl, 80);
 
     LOG_INFO("module", "Atlas: DistributeRewards — EffectiveLevel={}, rewardLevel={}, "
         "rewardPool={} items, players={}",
@@ -2090,8 +2090,11 @@ void AtlasMgr::DistributeRewards(Session* session)
         // Gold goes directly to wallet
         GiveGoldReward(p, perPlayer);
 
-        // Completion item: roll epic first, then rare, fallback green
-        // Item goes directly to inventory (mail fallback if bags full)
+        // Completion item (Atlas.Rewards.ItemChance): roll epic first, then
+        // rare, fallback green. Goes to the bags, by mail if they are full.
+        if (RandInt<uint32>(1, 100) > sAtlasConfig->GetItemChance())
+            continue;
+
         uint8 quality = 2;  // green baseline
         if (RandInt<uint32>(1, 100) <= sAtlasConfig->GetEpicChance())
             quality = 4;
@@ -2118,7 +2121,7 @@ void AtlasMgr::GiveKillXP(Session* session, bool isBoss, bool isElite)
         if (isBoss)       mult = 10.0f;
         else if (isElite) mult = 2.0f;
 
-        uint32 xp = static_cast<uint32>(baseXP * mult);
+        uint32 xp = static_cast<uint32>(baseXP * mult * sAtlasConfig->GetXPMultiplier());
         p->GiveXP(xp, nullptr);
     }
 }
@@ -2285,7 +2288,7 @@ void AtlasMgr::DistributeRoguelikeRewards(uint32 tier, uint8 effectiveLevel,
 {
     uint8 rewardLevel = static_cast<uint8>(std::min<uint32>(effectiveLevel, 80));
 
-    uint32 baseGold = effectiveLevel * 500u;
+    uint32 baseGold = AtlasConfig::ScaleGoldForLevel(sAtlasConfig->GetBaseGold(), effectiveLevel);
     uint32 tierGold = baseGold * tier;
 
     // Epic chance scales with tier
@@ -2402,6 +2405,14 @@ static float ScoreItemForClass(uint32 itemEntry, uint32 playerClass)
     return primaryTotal / totalStats;
 }
 
+// Atlas.Rewards.MaxItemLevel: keeps raid-tier gear (ICC, arena) out of the pools.
+// 0 disables the ceiling.
+static bool IsUnderItemLevelCeiling(uint16 itemLevel)
+{
+    uint16 const ceiling = sAtlasConfig->GetMaxItemLevel();
+    return ceiling == 0 || itemLevel <= ceiling;
+}
+
 uint32 AtlasMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass)
 {
     uint8  maxArmor   = GetMaxArmorSubclass(playerClass);
@@ -2426,6 +2437,7 @@ uint32 AtlasMgr::SelectRewardItem(uint8 level, uint8 quality, uint32 playerClass
         {
             // Quality filter
             if (ri.Quality != quality) continue;
+            if (!IsUnderItemLevelCeiling(ri.ItemLevel)) continue;
 
             // Level filter: item RequiredLevel must be within window
             if (ri.MinLevel < lo || ri.MinLevel > hi) continue;
@@ -2504,6 +2516,7 @@ uint32 AtlasMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality,
         for (auto const& li : _lootPool)
         {
             if (li.Quality < minQuality || li.Quality > maxQuality) continue;
+            if (!IsUnderItemLevelCeiling(li.ItemLevel)) continue;
             if (equipmentOnly && li.ItemClass != 2 && li.ItemClass != 4) continue;
 
             // Level filter for items with RequiredLevel > 0
@@ -3036,10 +3049,24 @@ std::vector<Player*> AtlasMgr::GatherParty(Player* leader)
     return party;
 }
 
+uint8 AtlasMgr::GetPartyMinLevel(std::vector<Player*> const& party)
+{
+    uint8 lowest = 0;
+    for (Player* p : party)
+        if (!lowest || p->GetLevel() < lowest)
+            lowest = p->GetLevel();
+    return lowest;
+}
+
 bool AtlasMgr::CanPartyEnter(std::vector<Player*> const& party, uint32 mapId)
 {
     if (party.empty())
         return false;
+
+    // Atlas bracket: the dungeon may not start above the lowest party member.
+    if (DungeonInfo const* dg = sAtlasConfig->GetDungeon(mapId))
+        if (dg->MinLevel > GetPartyMinLevel(party))
+            return false;
 
     // Runs are Normal-only (see StartDungeon), so only the Normal requirement applies.
     DungeonProgressionRequirements const* ar = sObjectMgr->GetAccessRequirement(mapId, DUNGEON_DIFFICULTY_NORMAL);

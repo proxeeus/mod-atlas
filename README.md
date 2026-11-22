@@ -29,6 +29,8 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Cooldown system** — Configurable per-character cooldown between runs
 - **Persistent stats** — Tracks runs, kills, deaths, fastest clear times per character
 - **Statistics & Leaderboards** — Separate tracking for normal runs and roguelike mode. Normal stats track win rate, kills, deaths, K/D ratio, and fastest clear. Roguelike stats track highest tier, most floors, total floors cleared, and longest run. Leaderboards include Normal Fastest Clears, Roguelike Highest Tier, and Roguelike Most Floors — with your own entries highlighted
+- **The Chronicle of Echoes** — With the `AtlasChronicle` client addon, the records open in a window styled as the Keepers of Time's chronicle: the swiftest mendings (filterable by dungeon), the deepest Endless descents, and your own thread. Without the addon, the Chronicler reads the records out in chat
+- **Level brackets** — A tier opens once everyone in the party reaches it and stays open afterwards; no dungeon may start above the party's lowest level
 - **GM commands** — `.atlas reload`, `.atlas status`, `.atlas list`, `.atlas end`, `.atlas clearcooldown`
 
 ### The Endless Timeways (roguelike mode)
@@ -72,6 +74,8 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 
 7. **Restart the server.** Chronicler Esmadormu appears in the major cities and at the Caverns of Time (she stays hidden while the module is disabled).
 
+8. **Optional, per player: the Chronicle window.** Copy `client_addon/AtlasChronicle` into the WoW client's `Interface/AddOns` folder. Open it with `/chronicle`, or from the Chronicler's records menu (**Open the Chronicle of Echoes**). Unmodified clients still play normally and get the chat records.
+
 ---
 
 ## NPC Spawn Locations
@@ -108,6 +112,8 @@ On this server, eight of them stand 3 yards to the left of **Chronomancer Noriol
 4. Choose a **timeline** (who rules the halls: the Scourge, the Legion, beasts…)
 5. Choose a **dungeon**, or let the timeways choose
 6. Confirm → enter the echo → defeat its master → collect rewards → return
+
+**Brackets.** Tiers and dungeons follow the lowest level in the party. A tier opens at its minimum level, or at the first dungeon it can roll if that starts higher (Novice opens at 13 with Ragefire Chasm), and stays open afterwards. A dungeon is only offered when it doesn't start above the party's lowest level, and only when everyone meets its own entry requirements (attunement quests, item level). The menu lists only those dungeons.
 
 Echoes run on **Normal** dungeon difficulty only (a heroic run could lock the group out of the real heroic). Each run starts in a fresh instance: a temporary Normal save to that dungeon is reset first, and the run is refused if someone is still inside that saved instance.
 
@@ -170,13 +176,18 @@ All settings live in `mod_atlas.conf`. Key options:
 
 ### Rewards
 
+Gold settings are copper at level 80; a lower effective level earns its share (level 40 gets half), then the tier's reward multiplier applies.
+
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `Rewards.BaseGold` | 50000 | Completion gold reward (copper) |
-| `Rewards.XPMultiplier` | 1.0 | Kill XP multiplier |
-| `Rewards.ItemChance` | 80 | % chance of item reward on completion |
-| `Rewards.RareChance` | 40 | % chance reward is rare quality |
-| `Rewards.EpicChance` | 15 | % chance reward is epic quality |
+| `Rewards.BaseGold` | 40000 | Gold per echo mended (split across the party); the Endless payout is this x depth, per player |
+| `Rewards.GoldPerMob` | 800 | Added per mob killed |
+| `Rewards.GoldPerBoss` | 40000 | Added per boss killed |
+| `Rewards.XPMultiplier` | 1.0 | Kill XP multiplier (below max level) |
+| `Rewards.ItemChance` | 80 | % chance each player gets an item when an echo is mended |
+| `Rewards.RareChance` | 40 | % chance a non-epic reward is blue |
+| `Rewards.EpicChance` | 15 | % chance the reward is epic |
+| `Rewards.MaxItemLevel` | 219 | Item level ceiling for rewards and drops (keeps raid and arena gear out); 0 = none |
 
 See `mod_atlas.conf.dist` for the full list with descriptions.
 
@@ -235,6 +246,8 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 ```
 mod-atlas/
 ├── CMakeLists.txt
+├── client_addon/
+│   └── AtlasChronicle/               # The Chronicle window (copy to Interface/AddOns)
 ├── conf/
 │   └── mod_atlas.conf.dist
 ├── data/sql/
@@ -245,6 +258,7 @@ mod-atlas/
     ├── AtlasTypes.h                  # Shared data structures, chat prefixes
     ├── AtlasMgr.cpp / .h             # Core run (session) manager
     ├── AtlasBossSpawnQuery.h         # Boss spawn-point query
+    ├── AtlasChronicle.h              # The Chronicle window's server API
     ├── RoguelikeMgr.cpp / .h         # Endless Timeways run manager
     ├── RoguelikeTypes.h              # Endless Timeways data structures
     ├── mod_atlas_loader.cpp          # Module entry point
@@ -252,6 +266,7 @@ mod-atlas/
         ├── npc_atlas_chronicler.cpp  # Chronicler Esmadormu gossip menus
         ├── atlas_allcreature_script.cpp  # Creature level ownership, add scaling, NPC hiding
         ├── atlas_allmap_script.cpp   # Map entry trigger
+        ├── atlas_chronicle_script.cpp  # Chronicle addon protocol
         ├── atlas_command_script.cpp  # GM commands (.atlas)
         ├── atlas_player_script.cpp   # Player death handling
         ├── atlas_unit_script.cpp     # Damage scaling

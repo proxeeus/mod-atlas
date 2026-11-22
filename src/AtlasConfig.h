@@ -44,6 +44,10 @@ public:
     std::vector<DungeonInfo> const&     GetDungeons() const { return _dungeons; }
     DungeonInfo const*                  GetDungeon(uint32 mapId) const;
     std::vector<DungeonInfo const*>     GetDungeonsForLevel(uint8 minLevel, uint8 maxLevel) const;
+    // Lowest level that opens a tier: its own minimum, raised to the first dungeon
+    // it can roll (no dungeon may start above the party's lowest level).
+    // 255 when the tier has no dungeon at all.
+    uint8                               GetTierEntryLevel(DifficultyTier const& tier) const;
     bool                                IsDungeonAllowed(uint32 mapId) const;
 
     // --- Scaling ---
@@ -64,6 +68,13 @@ public:
     uint32 GetItemChance()   const { return _itemChance; }
     uint32 GetRareChance()   const { return _rareChance; }
     uint32 GetEpicChance()   const { return _epicChance; }
+    uint16 GetMaxItemLevel() const { return _maxItemLevel; }
+    // Gold settings are amounts at level 80; lower levels get a share in
+    // proportion to their level.
+    static uint32 ScaleGoldForLevel(uint32 copperAt80, uint8 level)
+    {
+        return static_cast<uint32>(uint64(copperAt80) * level / 80);
+    }
 
     // --- Dungeon population ---
     uint32 GetBossCount()       const { return _bossCount; }
@@ -134,13 +145,14 @@ private:
     float _bossDamageMult  = 1.5f;
 
     // Rewards
-    uint32 _baseGold    = 50000;
-    uint32 _goldPerMob  = 50;
-    uint32 _goldPerBoss = 10000;
+    uint32 _baseGold    = 40000;
+    uint32 _goldPerMob  = 800;
+    uint32 _goldPerBoss = 40000;
     float  _xpMultiplier = 1.0f;
     uint32 _itemChance  = 80;
     uint32 _rareChance  = 40;
     uint32 _epicChance  = 15;
+    uint16 _maxItemLevel = 219;
 
     // Dungeon
     uint32 _bossCount       = 1;

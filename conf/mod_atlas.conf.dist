@@ -115,26 +115,45 @@ Atlas.Variety.RecentEntries = 12
 # REWARDS
 ###############################################################################
 
-#    Atlas.Rewards.BaseGold    (copper)     Default: 50000 (5g)
-Atlas.Rewards.BaseGold = 50000
+#    Gold amounts are in copper and are what a level 80 run earns; a lower
+#    effective level earns its share (level 40 gets half). The difficulty's
+#    RewardMult then applies, and the echo-cleared total is split across the
+#    party (bots included).
+#
+#    Atlas.Rewards.BaseGold    (copper)     Default: 40000 (4g)
+#        Paid for every echo mended. The Endless payout is BaseGold x depth,
+#        per player.
+Atlas.Rewards.BaseGold = 40000
 
-#    Atlas.Rewards.GoldPerMob  (copper)     Default: 50
-Atlas.Rewards.GoldPerMob = 50
+#    Atlas.Rewards.GoldPerMob  (copper)     Default: 800 (8s)
+#        Added to the echo-cleared reward for each mob killed.
+Atlas.Rewards.GoldPerMob = 800
 
-#    Atlas.Rewards.GoldPerBoss (copper)     Default: 10000 (1g)
-Atlas.Rewards.GoldPerBoss = 10000
+#    Atlas.Rewards.GoldPerBoss (copper)     Default: 40000 (4g)
+#        Added to the echo-cleared reward for each boss killed.
+Atlas.Rewards.GoldPerBoss = 40000
 
 #    Atlas.Rewards.XPMultiplier             Default: 1.0
+#        Multiplies the experience Atlas grants per kill (below max level).
 Atlas.Rewards.XPMultiplier = 1.0
 
 #    Atlas.Rewards.ItemChance  (0-100)      Default: 80
+#        Chance that each player gets an item when an echo is mended.
 Atlas.Rewards.ItemChance = 80
 
 #    Atlas.Rewards.RareChance  (0-100)      Default: 40
+#        When that item is not epic, the chance it is blue rather than green.
 Atlas.Rewards.RareChance = 40
 
 #    Atlas.Rewards.EpicChance  (0-100)      Default: 15
+#        Chance that the echo-mended item is epic.
 Atlas.Rewards.EpicChance = 15
+
+#    Atlas.Rewards.MaxItemLevel             Default: 219
+#        Highest item level any Atlas reward or drop may have. 219 matches the
+#        best five-player dungeon gear (Trial of the Champion, the Icecrown
+#        dungeons) and keeps raid and arena epics out. 0 = no ceiling.
+Atlas.Rewards.MaxItemLevel = 219
 
 ###############################################################################
 # DUNGEON SETTINGS

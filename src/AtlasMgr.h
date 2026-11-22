@@ -94,6 +94,9 @@ public:
     // party is turned away from. They mirror MapMgr::PlayerCannotEnter and say
     // nothing to the players. GatherParty = the leader plus in-world group members.
     static std::vector<Player*> GatherParty(Player* leader);
+    // Brackets follow the lowest level in the party, so a levelling character is
+    // never pulled into a dungeon above it.
+    static uint8                GetPartyMinLevel(std::vector<Player*> const& party);
     static bool                 CanPartyEnter(std::vector<Player*> const& party, uint32 mapId);
     static std::vector<DungeonInfo const*> FilterEnterable(std::vector<DungeonInfo const*> const& dungeons,
                                                            std::vector<Player*> const& party);

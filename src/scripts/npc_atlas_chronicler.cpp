@@ -21,6 +21,7 @@
 #include "ObjectAccessor.h"
 #include "Random.h"
 #include "StringFormat.h"
+#include "AtlasChronicle.h"
 #include "AtlasMgr.h"
 #include "RoguelikeMgr.h"
 #include "RoguelikeTypes.h"
@@ -69,6 +70,7 @@ enum AtlasGossipActions
     GOSSIP_ACTION_BOARD_NORMAL        = 10311,  // Echoes — fastest
     GOSSIP_ACTION_BOARD_RL_TIER       = 10312,  // Timeways — deepest
     GOSSIP_ACTION_BOARD_RL_FLOORS     = 10313,  // Timeways — most echoes
+    GOSSIP_ACTION_OPEN_CHRONICLE      = 10320,  // Chronicle window (client addon)
 };
 
 namespace
@@ -287,6 +289,11 @@ public:
         // ---- Chronicles (statistics & leaderboards) ----
         else if (action == GOSSIP_ACTION_STATS_MENU)
             ShowStatsAndBoardsMenu(player, creature);
+        else if (action == GOSSIP_ACTION_OPEN_CHRONICLE)
+        {
+            player->PlayerTalkClass->SendCloseGossip();
+            Chronicle::Open(player);
+        }
         else if (action == GOSSIP_ACTION_STATS_NORMAL)
             ShowNormalStats(player, creature);
         else if (action == GOSSIP_ACTION_STATS_ROGUELIKE)
@@ -324,11 +331,23 @@ private:
     // Gossip options sit on the parchment frame: keep them plain (the default
     // dark text). Colour only marks what can't be picked, in dark shades that
     // stay readable on parchment.
+    // Brackets: a tier opens once everyone in the party reaches its entry level,
+    // and stays open afterwards (the current bracket and every one below it).
+    static uint8 PartyLevel(Player* player)
+    {
+        return AtlasMgr::GetPartyMinLevel(AtlasMgr::GatherParty(player));
+    }
+
+    static bool IsTierOpen(DifficultyTier const& d, uint8 partyLevel)
+    {
+        return partyLevel >= sAtlasConfig->GetTierEntryLevel(d);
+    }
+
     static std::string DifficultyLabel(DifficultyTier const& d, uint8 lvl, bool roguelike)
     {
-        if (!d.IsValidForLevel(lvl))
+        if (!IsTierOpen(d, lvl))
             return Acore::StringFormat("|cFF5A5A5A{} (Lv {}-{})|r - |cFF8B0000Requires {}+|r",
-                d.Name, d.MinLevel, d.MaxLevel, d.MinLevel);
+                d.Name, d.MinLevel, d.MaxLevel, sAtlasConfig->GetTierEntryLevel(d));
 
         if (!roguelike && !d.IsOnLevelFor(lvl))
             return Acore::StringFormat("{} (Lv {}-{}, easy for you)", d.Name, d.MinLevel, d.MaxLevel);
@@ -339,11 +358,11 @@ private:
     void ShowDifficultyMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
-        uint8 lvl = player->GetLevel();
+        uint8 lvl = PartyLevel(player);
 
         for (auto const& d : sAtlasConfig->GetDifficulties())
             AddGossipItemFor(player,
-                d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
+                IsTierOpen(d, lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, false), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
 
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back", GOSSIP_SENDER_MAIN, GOSSIP_ACTION_CANCEL);
@@ -517,6 +536,11 @@ private:
     void ShowStatsAndBoardsMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
+        // The window needs the AtlasChronicle addon; the chat records below
+        // stay for everyone else.
+        if (Chronicle::HasAddon(player->GetGUID()))
+            AddGossipItemFor(player, GOSSIP_ICON_TABARD, "Open the Chronicle of Echoes",
+                GOSSIP_SENDER_MAIN, GOSSIP_ACTION_OPEN_CHRONICLE);
         AddGossipItemFor(player, GOSSIP_ICON_TABARD, "My echoes",
             GOSSIP_SENDER_MAIN, GOSSIP_ACTION_STATS_NORMAL);
         if (sAtlasConfig->IsRoguelikeEnabled())
@@ -698,7 +722,7 @@ private:
     void ShowRoguelikeDifficultyMenu(Player* player, Creature* creature)
     {
         player->PlayerTalkClass->ClearMenus();
-        uint8 lvl = player->GetLevel();
+        uint8 lvl = PartyLevel(player);
 
         ChatHandler chat(player->GetSession());
         chat.SendSysMessage("|cFFCD7F32========== The Endless Timeways ==========|r");
@@ -709,7 +733,7 @@ private:
 
         for (auto const& d : sAtlasConfig->GetDifficulties())
             AddGossipItemFor(player,
-                d.IsValidForLevel(lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
+                IsTierOpen(d, lvl) ? GOSSIP_ICON_BATTLE : GOSSIP_ICON_CHAT,
                 DifficultyLabel(d, lvl, true), GOSSIP_SENDER_MAIN, GOSSIP_ACTION_DIFF_BASE + d.Id);
 
         AddGossipItemFor(player, GOSSIP_ICON_CHAT, "<< Back",
@@ -762,9 +786,10 @@ private:
           sSelections.erase(it); }
 
         DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
-        if (!diff || !diff->IsValidForLevel(player->GetLevel()))
+        if (!diff || !IsTierOpen(*diff, PartyLevel(player)))
         {
-            chat.PSendSysMessage("{} You are not yet ready for echoes this strong.", CHAT_PREFIX_ENDLESS);
+            chat.PSendSysMessage("{} Not everyone in your party is ready for echoes this strong.",
+                CHAT_PREFIX_ENDLESS);
             return;
         }
 
@@ -795,9 +820,9 @@ private:
           sSelections.erase(it); }
 
         DifficultyTier const* diff = sAtlasConfig->GetDifficulty(sel.DifficultyId);
-        if (!diff || !diff->IsValidForLevel(player->GetLevel()))
+        if (!diff || !IsTierOpen(*diff, PartyLevel(player)))
         {
-            chat.PSendSysMessage("{} You are not yet ready for an echo this strong.", CHAT_PREFIX);
+            chat.PSendSysMessage("{} Not everyone in your party is ready for an echo this strong.", CHAT_PREFIX);
             return;
         }
 

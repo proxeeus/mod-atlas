@@ -11,6 +11,7 @@ void AddSC_atlas_allmap_script();
 void AddSC_atlas_command_script();
 void AddSC_atlas_unit_script();
 void AddSC_atlas_allcreature_script();
+void AddSC_atlas_chronicle_script();
 
 void Addmod_atlasScripts()
 {
@@ -23,4 +24,5 @@ void Addmod_atlasScripts()
     AddSC_atlas_command_script();
     AddSC_atlas_unit_script();
     AddSC_atlas_allcreature_script();
+    AddSC_atlas_chronicle_script();
 }

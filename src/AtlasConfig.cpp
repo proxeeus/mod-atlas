@@ -83,13 +83,14 @@ void AtlasConfig::LoadConfig(bool reload)
     _bossDamageMult  = sConfigMgr->GetOption<float> ("Atlas.Scaling.BossDamageMult",    1.5f);
 
     // Rewards
-    _baseGold     = sConfigMgr->GetOption<uint32>("Atlas.Rewards.BaseGold",    50000);
-    _goldPerMob   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerMob",  50);
-    _goldPerBoss  = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerBoss", 10000);
+    _baseGold     = sConfigMgr->GetOption<uint32>("Atlas.Rewards.BaseGold",    40000);
+    _goldPerMob   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerMob",  800);
+    _goldPerBoss  = sConfigMgr->GetOption<uint32>("Atlas.Rewards.GoldPerBoss", 40000);
     _xpMultiplier = sConfigMgr->GetOption<float> ("Atlas.Rewards.XPMultiplier", 1.0f);
     _itemChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.ItemChance",  80);
     _rareChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.RareChance",  40);
     _epicChance   = sConfigMgr->GetOption<uint32>("Atlas.Rewards.EpicChance",  15);
+    _maxItemLevel = sConfigMgr->GetOption<uint16>("Atlas.Rewards.MaxItemLevel", 219);
 
     // Dungeon settings
     _bossCount       = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.BossCount",      1);
@@ -354,6 +355,14 @@ std::vector<DungeonInfo const*> AtlasConfig::GetDungeonsForLevel(uint8 minLevel,
         if (d.MaxLevel >= minLevel && d.MinLevel <= maxLevel && d.IsAvailable)
             out.push_back(&d);
     return out;
+}
+
+uint8 AtlasConfig::GetTierEntryLevel(DifficultyTier const& tier) const
+{
+    uint8 entry = 255;
+    for (DungeonInfo const* d : GetDungeonsForLevel(tier.MinLevel, tier.MaxLevel))
+        entry = std::min(entry, std::max(tier.MinLevel, d->MinLevel));
+    return entry;
 }
 
 bool AtlasConfig::IsDungeonAllowed(uint32 mapId) const
