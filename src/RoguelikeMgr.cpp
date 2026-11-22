@@ -16,6 +16,7 @@
 #include "Log.h"
 #include "SpellAuras.h"
 #include "SpellAuraEffects.h"
+#include "Containers.h"
 #include "Random.h"
 #include "StringFormat.h"
 #include <algorithm>
@@ -855,7 +856,7 @@ void RoguelikeMgr::ApplyBuffStacks(Player* player, uint32 runId)
     ApplyBuffAura(player, it->second.BuffStacks);
 }
 
-void RoguelikeMgr::RemoveBuffStacks(Player* player, uint32 runId)
+void RoguelikeMgr::RemoveBuffStacks(Player* player, uint32 /*runId*/)
 {
     if (!player || !player->IsInWorld()) return;
     StripRunBuff(player);
@@ -885,7 +886,7 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
         if (def.Id != AFFIX_NONE)
             pool.push_back(def.Id);
 
-    std::shuffle(pool.begin(), pool.end(), tRng);
+    Acore::Containers::RandomShuffle(pool);
 
     for (uint32 i = 0; i < numAffixes && i < pool.size(); ++i)
         run.ActiveAffixes.push_back(pool[i]);
