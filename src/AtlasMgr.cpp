@@ -8,6 +8,7 @@
  */
 
 #include "AtlasMgr.h"
+#include "AtlasAffixes.h"
 #include "AtlasBossSpawnQuery.h"
 #include "RoguelikeMgr.h"
 #include "AtlasConfig.h"
@@ -101,6 +102,7 @@ void AtlasMgr::Initialize()
 
 void AtlasMgr::LoadFromDB()
 {
+    sAtlasAffixes->Load();
     LoadCreaturePools();
     LoadDungeonBossPool();
     LoadRewardItems();
@@ -155,6 +157,10 @@ Session* AtlasMgr::CreateSession(Player* leader, uint32 difficultyId,
     if (!seed)
         seed = RunRng::MakeSeed();
 
+    // GM-forced affixes (`.atlas affix next`); echoes roll none of their own.
+    // Endless floors get theirs from RoguelikeMgr after this.
+    std::vector<ActiveAffix> forced = sAtlasAffixes->TakePending(leader->GetGUID());
+
     std::lock_guard<std::mutex> lock(_sessionMutex);
 
     // Check capacity under the lock to avoid race conditions
@@ -172,6 +178,7 @@ Session* AtlasMgr::CreateSession(Player* leader, uint32 difficultyId,
     s.StartTime    = GameTime::GetGameTime().count();
     s.Seed         = seed;
     s.Rng.Seed(seed);
+    SetSessionAffixes(&s, sAtlasAffixes->AtTier(forced, s.Tier));
 
     if (sAtlasConfig->IsTimeLimitEnabled())
         s.TimeLimit = sAtlasConfig->GetTimeLimitMinutes() * 60;
@@ -453,9 +460,10 @@ bool AtlasMgr::TeleportPartyIn(Session* session)
                 "{} You step into an echo of |cFFFFFFFF{}|r. Defeat its master to mend it.",
                 CHAT_PREFIX, dg->Name);
 
-            if (session->RoguelikeRunId != 0 && sRoguelikeMgr->HasActiveAffixes(session->RoguelikeRunId))
+            if (!session->Affixes.empty())
                 ChatHandler(p->GetSession()).PSendSysMessage("{} This echo is unstable: {}",
-                    CHAT_PREFIX_ENDLESS, sRoguelikeMgr->GetActiveAffixNames(session->RoguelikeRunId));
+                    session->RoguelikeRunId ? CHAT_PREFIX_ENDLESS : CHAT_PREFIX,
+                    sAtlasAffixes->Describe(session->Affixes, true));
         }
         else
         {
@@ -719,6 +727,7 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
             // Persist stats while session is still alive
             UpdatePlayerStatsFromSession(s, success);
             LogRun(s, success);
+            RemoveSessionAffixAuras(s);
             ReleaseRunInstanceBinds(s);
 
             // Clean up mappings
@@ -764,6 +773,7 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
         SaveLeaderboardEntry(s);
 
     LogRun(s, success);
+    RemoveSessionAffixAuras(s);
     TeleportPartyOut(&s);
     ReleaseRunInstanceBinds(s);
 
@@ -799,6 +809,7 @@ void AtlasMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
 
     // The floor's instance is never reused (next floor or teleport home).
     LogRun(s, success);
+    RemoveSessionAffixAuras(s);
     ReleaseRunInstanceBinds(s);
 
     uint32 savedInstanceId = s.InstanceId;
@@ -814,6 +825,13 @@ void AtlasMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
 
     LOG_DEBUG("module", "Atlas: Roguelike session {} cleaned up (success={}).",
         sessionId, success);
+}
+
+void AtlasMgr::RemoveSessionAffixAuras(Session const& s)
+{
+    for (auto const& pd : s.Players)
+        if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+            sAtlasAffixes->RemovePlayerAuras(p);
 }
 
 void AtlasMgr::CleanupSession(Session& s)
@@ -972,6 +990,7 @@ void AtlasMgr::Update(uint32 diff)
 
     std::vector<std::pair<uint32, bool>> toEnd;
     std::vector<std::pair<uint32, uint32>> roguelikeCompleted; // {runId, sessionId}
+    std::vector<GroundRequest> groundRequests;                 // cast after the lock
 
     {
         std::lock_guard<std::mutex> lock(_sessionMutex);
@@ -1263,6 +1282,10 @@ void AtlasMgr::Update(uint32 diff)
                 }
             }
 
+            // ---- Affixes: player auras, ground timers ----
+            if (session.IsActive() && !session.Affixes.empty())
+                TickSessionAffixes(session, groundRequests);
+
             // ---- Time limit ----
             if (session.TimeLimit > 0 && session.State == SessionState::InProgress)
             {
@@ -1354,6 +1377,8 @@ void AtlasMgr::Update(uint32 diff)
             }
         }
     } // release lock
+
+    ExecuteGroundRequests(groundRequests);
 
     for (auto const& [id, ok] : toEnd)
         EndSession(id, ok);

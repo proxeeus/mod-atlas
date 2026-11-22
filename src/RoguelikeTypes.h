@@ -10,6 +10,7 @@
 #include "ObjectGuid.h"
 #include "Position.h"
 #include "RunRng.h"
+#include "AtlasAffix.h"
 #include <string>
 #include <vector>
 
@@ -27,34 +28,12 @@ enum class RoguelikeRunState : uint8
     Ended
 };
 
-enum RoguelikeAffix : uint32
-{
-    AFFIX_NONE        = 0,
-    AFFIX_FORTIFIED   = 1,   // trash: +30% HP, +15% dmg
-    AFFIX_TYRANNICAL  = 2,   // bosses: +40% HP, +20% dmg
-    AFFIX_RAGING      = 3,   // all: +25% dmg
-    AFFIX_BOLSTERING  = 4,   // all: +20% HP
-    AFFIX_SAVAGE      = 5,   // double elite chance
-    AFFIX_COUNT       = 6
-};
-
 struct RoguelikeBuff
 {
     uint32      Id       = 0;
     uint32      SpellId  = 0;
     std::string Name;
     uint32      Weight   = 100;
-};
-
-struct AffixDef
-{
-    RoguelikeAffix  Id            = AFFIX_NONE;
-    std::string     Name;
-    float           TrashHpMult   = 1.0f;
-    float           TrashDmgMult  = 1.0f;
-    float           BossHpMult    = 1.0f;
-    float           BossDmgMult   = 1.0f;
-    float           EliteChanceMult = 1.0f;
 };
 
 struct RoguelikePlayerData
@@ -85,7 +64,8 @@ struct RoguelikeRun
 
     uint32  BuffStacks = 0;                 // +10% all stats per stack (BoK aura with visual stacks)
 
-    std::vector<RoguelikeAffix> ActiveAffixes;
+    std::vector<ActiveAffix> ActiveAffixes;   // this depth's instabilities
+    std::vector<ActiveAffix> ForcedAffixes;   // GM `.atlas affix next`: every depth gets these
     std::vector<RoguelikePlayerData> Players;
 
     uint64  RunStartTime         = 0;

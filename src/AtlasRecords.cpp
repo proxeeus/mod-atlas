@@ -7,6 +7,7 @@
  */
 
 #include "AtlasMgr.h"
+#include "AtlasAffixes.h"
 #include "AtlasBossSpawnQuery.h"
 #include "RoguelikeMgr.h"
 #include "AtlasConfig.h"
@@ -325,6 +326,7 @@ void AtlasMgr::LogRun(Session const& session, bool success)
     std::string affixIds;
     if (session.RoguelikeRunId)
         sRoguelikeMgr->GetRunLogInfo(session.RoguelikeRunId, depth, endlessSeed, affixIds);
+    affixIds = sAtlasAffixes->Codes(session.Affixes);
 
     CharacterDatabase.Execute(
         "INSERT INTO atlas_run_log (kind, endless_run_id, depth, endless_seed, seed, map_id, difficulty_id, "

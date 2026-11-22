@@ -2,7 +2,8 @@
  * mod-atlas — atlas_command_script.cpp
  * GM commands: .atlas reload, .atlas status, .atlas list, .atlas end, .atlas clearcooldown,
  * .atlas run (the current run and its seed), .atlas seed (replay a seed),
- * .atlas scaling (the role table at a level, tier, party size and difficulty)
+ * .atlas scaling (the role table at a level, tier, party size and difficulty),
+ * .atlas affix list|next (the affixes, and forcing some on the next run)
  */
 
 #include "ScriptMgr.h"
@@ -12,6 +13,7 @@
 #include "Group.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
+#include "AtlasAffixes.h"
 #include "RoguelikeMgr.h"
 #include <algorithm>
 #include <charconv>
@@ -26,8 +28,14 @@ public:
 
     ChatCommandTable GetCommands() const override
     {
+        static ChatCommandTable affixTable =
+        {
+            { "list",          HandleAffixList,      SEC_GAMEMASTER,     Console::Yes },
+            { "next",          HandleAffixNext,      SEC_GAMEMASTER,     Console::No  },
+        };
         static ChatCommandTable atlasTable =
         {
+            { "affix",         affixTable },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -44,10 +52,11 @@ public:
     static bool HandleReload(ChatHandler* h)
     {
         sAtlasConfig->LoadConfig(true);
+        sAtlasAffixes->Load();
         // Dungeon list or boss count may have changed: rebuild the cached
         // entrances / spawn points too (guarded by their own mutex).
         sAtlasMgr->LoadDungeonGeometry();
-        h->SendSysMessage("Atlas: Configuration and dungeon geometry reloaded.");
+        h->SendSysMessage("Atlas: Configuration, affixes and dungeon geometry reloaded.");
         return true;
     }
 
@@ -132,6 +141,10 @@ public:
             s->EffectiveLevel, s->Tier, sAtlasMgr->SessionHealthFactor(*s), sAtlasMgr->SessionDamageFactor(*s),
             s->EffectiveLevel, s->Tier, s->Players.size(), s->DifficultyId);
 
+        if (!s->Affixes.empty())
+            h->PSendSysMessage("Atlas: affixes [{}]: {}", sAtlasAffixes->Codes(s->Affixes),
+                sAtlasAffixes->Describe(s->Affixes, true));
+
         uint32 depth = 0;
         uint64 descentSeed = 0;
         std::string affixIds;
@@ -187,6 +200,49 @@ public:
         auto const lines = sAtlasMgr->DescribeRoleScaling(lvl, tier.value_or(1), party.value_or(5), diffId);
         for (std::string const& line : lines)
             h->SendSysMessage(line);
+        return true;
+    }
+
+    // .atlas affix list: every loaded affix.
+    static bool HandleAffixList(ChatHandler* h)
+    {
+        auto defs = sAtlasAffixes->Definitions();
+        h->PSendSysMessage("Atlas: {} affixes (code, name, tiers, values per tier band 1-5/6-10/11-16):",
+            defs->size());
+        for (AffixDefinition const& d : *defs)
+            h->PSendSysMessage("  {} {} — tiers {}-{}, {}/{}/{}{} — {}", d.Code, d.Name, d.MinTier, d.MaxTier,
+                d.Values[0], d.Values[1], d.Values[2], d.BotSafe ? "" : ", not bot-safe",
+                FormatAffix(d, d.Values[0]));
+        return true;
+    }
+
+    // .atlas affix next <codes>|clear: the target's next run (an echo, or every
+    // depth of an Endless descent) carries these affixes, e.g. "M01 P02 A02".
+    static bool HandleAffixNext(ChatHandler* h, Tail codes)
+    {
+        Player* target = TargetOrSelf(h);
+        if (!target)
+            return false;
+
+        std::string_view const text = codes;
+        if (text.empty() || text == "clear")
+        {
+            sAtlasAffixes->SetPending(target->GetGUID(), {});
+            h->PSendSysMessage("Atlas: {}'s next run rolls its own affixes.", target->GetName());
+            return true;
+        }
+
+        std::string unknown;
+        std::vector<ActiveAffix> affixes = sAtlasAffixes->Parse(text, 1, unknown);
+        if (!unknown.empty())
+        {
+            h->PSendSysMessage("Atlas: unknown affix code(s): {} (see .atlas affix list).", unknown);
+            return false;
+        }
+
+        std::string const described = sAtlasAffixes->Describe(affixes, false);
+        sAtlasAffixes->SetPending(target->GetGUID(), std::move(affixes));
+        h->PSendSysMessage("Atlas: {}'s next run carries {} (values follow its tier).", target->GetName(), described);
         return true;
     }
 

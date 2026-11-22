@@ -16,6 +16,7 @@
 #include "SpellInfo.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
+#include "AtlasAffixes.h"
 #include <algorithm>
 #include <cstdint>
 
@@ -28,22 +29,23 @@ class atlas_unit_script : public UnitScript
 public:
     atlas_unit_script() : UnitScript("atlas_unit_script") {}
 
-    void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* /*spellInfo*/) override
+    void ModifyPeriodicDamageAurasTick(Unit* target, Unit* attacker, uint32& damage,
+        SpellInfo const* spellInfo) override
     {
-        ScaleDamage(target, attacker, damage, true);
+        ScaleDamage(target, attacker, damage, spellInfo, true);
     }
 
-    void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* /*spellInfo*/) override
+    void ModifySpellDamageTaken(Unit* target, Unit* attacker, int32& damage, SpellInfo const* spellInfo) override
     {
         if (damage <= 0) return;
         uint32 udmg = static_cast<uint32>(damage);
-        ScaleDamage(target, attacker, udmg, true);
+        ScaleDamage(target, attacker, udmg, spellInfo, true);
         damage = static_cast<int32>(std::min<uint32>(udmg, INT32_MAX));
     }
 
     void ModifyMeleeDamage(Unit* target, Unit* attacker, uint32& damage) override
     {
-        ScaleDamage(target, attacker, damage, false);
+        ScaleDamage(target, attacker, damage, nullptr, false);
     }
 
     // A run creature's heals scale with its health, like its spells with melee.
@@ -89,17 +91,53 @@ public:
     }
 
 private:
-    void ScaleDamage(Unit* target, Unit* attacker, uint32& damage, bool isSpell)
+    static uint32 Scaled(uint32 damage, float factor)
+    {
+        return static_cast<uint32>(std::min<double>(double(damage) * factor, UINT32_MAX));
+    }
+
+    // A player (or a player's pet, totem or guardian) hitting a creature the
+    // run owns: the Armoured and Warded affixes.
+    static void ScaleDamageToRunCreature(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* spellInfo,
+        bool isSpell)
+    {
+        if (!target->IsCreature() || !attacker || !attacker->GetCharmerOrOwnerPlayerOrPlayerItself())
+            return;
+
+        AtlasMgr::CreatureAffixMods mods;
+        float spellScale = 1.0f;
+        if (!sAtlasMgr->GetOwnedCombat(target->GetGUID(), mods, spellScale))
+            return;
+
+        bool const physical = !isSpell || !spellInfo || (spellInfo->GetSchoolMask() & SPELL_SCHOOL_MASK_NORMAL);
+        float const factor = physical ? mods.PhysTaken : mods.SpellTaken;
+        if (factor != 1.0f)
+            damage = std::max(1u, Scaled(damage, factor));
+    }
+
+    void ScaleDamage(Unit* target, Unit* attacker, uint32& damage, SpellInfo const* spellInfo, bool isSpell)
     {
         // Runs for every damage event on the server: bail out before taking
         // the session mutex unless a session exists and the target is in a
         // dungeon (sessions only ever run in dungeon instances).
-        if (!sAtlasConfig->IsEnabled() || damage == 0 || !AtlasMgr::HasActiveSessions())
+        if (!sAtlasConfig->IsEnabled() || damage == 0 || !AtlasMgr::HasActiveSessions() || !target)
             return;
 
-        Player* player = target ? target->ToPlayer() : nullptr;
-        if (!player || !player->GetMap() || !player->GetMap()->IsDungeon())
+        if (!target->GetMap() || !target->GetMap()->IsDungeon())
             return;
+
+        // An affix's own spells (extra hits, zones, bursts) carry the amount
+        // computed when they were cast.
+        if (spellInfo && sAtlasAffixes->IsAffixSpell(spellInfo->Id))
+            return;
+
+        Player* player = target->ToPlayer();
+        if (!player)
+        {
+            if (AtlasMgr::HasOwnedCreatures())
+                ScaleDamageToRunCreature(target, attacker, damage, spellInfo, isSpell);
+            return;
+        }
 
         if (attacker && attacker->ToPlayer())
             return;
@@ -108,15 +146,25 @@ private:
         if (!sAtlasMgr->GetSessionByPlayer(playerGuid))
             return;
 
-        // A creature the run owns: melee already comes from its role stats;
+        // A creature the run owns: melee already comes from its role stats
+        // (plus Brutal, and the extra elemental hit of Searing and its kin);
         // spells and damage over time take its spell scale.
         if (attacker && attacker->IsCreature())
         {
-            float const scale = sAtlasMgr->GetOwnedSpellScale(attacker->GetGUID());
-            if (scale >= 0.0f)
+            AtlasMgr::CreatureAffixMods mods;
+            float spellScale = 1.0f;
+            if (sAtlasMgr->GetOwnedCombat(attacker->GetGUID(), mods, spellScale))
             {
                 if (isSpell)
-                    damage = std::max(1u, static_cast<uint32>(std::min<double>(double(damage) * scale, UINT32_MAX)));
+                    damage = std::max(1u, Scaled(damage, spellScale));
+                else
+                {
+                    if (mods.MeleeDealt != 1.0f)
+                        damage = std::max(1u, Scaled(damage, mods.MeleeDealt));
+                    if (mods.ExtraHitSpell && mods.ExtraHitPct > 0.0f)
+                        AtlasMgr::QueueExtraHit(attacker, player, mods.ExtraHitSpell,
+                            std::max(1, static_cast<int32>(damage * mods.ExtraHitPct)));
+                }
                 return;
             }
         }

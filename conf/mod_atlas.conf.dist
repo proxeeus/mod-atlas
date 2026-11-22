@@ -187,6 +187,12 @@ Atlas.Rewards.MaxItemLevel = 219
 #        Default: 1
 Atlas.Dungeon.BossCount = 1
 
+#    Atlas.Dungeon.MaxCreatures
+#        Most live creatures a run spawns (pack-size affixes such as Teeming
+#        stop there).
+#        Default: 450
+Atlas.Dungeon.MaxCreatures = 450
+
 #    Atlas.Dungeon.EliteChance  (0-100)
 #        Chance for a trash mob to be elite (takes the Elite role)
 #        Default: 20
@@ -289,6 +295,19 @@ Atlas.Completion.TeleportDelay = 30
 Atlas.Completion.Announcement = 1
 
 ###############################################################################
+# AFFIXES (DESIGN section 10)
+#   The affixes themselves are data: world table atlas_affix (module SQL
+#   atlas_affixes.sql). `.atlas affix list` shows them, `.atlas affix next`
+#   forces some on a character's next run. The Endless Timeways rolls them by
+#   depth (Roguelike.AffixStartTier and the second and third affix tiers).
+###############################################################################
+
+#    Atlas.Affix.BotSafeOnly
+#        Only roll affixes playerbots handle with their existing behaviour.
+#        Default: 1
+Atlas.Affix.BotSafeOnly = 1
+
+###############################################################################
 # ROGUELIKE MODE
 #
 # Infinite dungeon progression.  Party clears dungeons until they wipe.
@@ -337,9 +356,9 @@ Atlas.Roguelike.ExponentialThreshold = 5
 #        Default: 1.15
 Atlas.Roguelike.ExponentialFactor = 1.15
 
-# --- AFFIXES (Mythic+ style modifiers) ---
-# Affixes are stat modifiers applied to entire dungeon floors at higher tiers.
-# Pool: Fortified, Tyrannical, Raging, Bolstering, Savage
+# --- AFFIXES ---
+# Each depth from AffixStartTier rolls 1, then 2, then 3 instabilities from the
+# affix table (AFFIXES section above), with the depth as the tier.
 
 #    Atlas.Roguelike.AffixStartTier
 #        First tier where an affix is applied. Set very high to disable.

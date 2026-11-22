@@ -44,6 +44,7 @@
 #include <cmath>
 #include <atomic>
 #include "AtlasInternal.h"
+#include "TemporarySummon.h"
 
 // Creature-pool filters shared by the trash and boss queries (alias `ct` =
 // creature_template). String literals so they concatenate into the queries.
@@ -181,6 +182,25 @@ public:
         // later from HandleCreatureDeath (OnUnitDeath hook) which fires
         // AFTER the core's death processing is finished.
         sAtlasMgr->OnCreatureDeathHook(me);
+
+        // Death affixes (burst, desecrated ground, splitting): after the kill
+        // is counted, outside the session lock.
+        sAtlasMgr->OnRunCreatureDied(me);
+    }
+
+    // Combat-start affixes (Ice-shielded).
+    void JustEngagedWith(Unit* who) override
+    {
+        CreatureAI::JustEngagedWith(who);
+        sAtlasMgr->OnRunCreatureEngaged(me);
+    }
+
+    // Life-threshold affixes (Summoner).
+    void DamageTaken(Unit* attacker, uint32& damage, DamageEffectType damagetype, SpellSchoolMask schoolMask) override
+    {
+        CreatureAI::DamageTaken(attacker, damage, damagetype, schoolMask);
+        if (damage)
+            sAtlasMgr->OnRunCreatureDamaged(me, damage);
     }
 
 private:
@@ -618,8 +638,13 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         session->SessionId, theme->Name, bandMin, bandMax, targetLevel, session->Tier,
         SessionHealthFactor(*session), SessionDamageFactor(*session));
 
-    // Level, role stats (DESIGN §9) and the run's AI for every spawn.
-    auto applyLevelAndStats = [&](Creature* c, CreatureRole role, float affixHpMult, float affixDmgMult, bool isBoss)
+    // Every summon below is scaled here; keep the add-to-world hook out of it.
+    OwnSpawnScope const ownSpawns;
+    ScalingContext const ctx = ContextOf(*session);
+    AffixEffects const& fx = session->Effects;
+
+    // Level, role stats (DESIGN §9), the run's affixes and AI for every spawn.
+    auto applyLevelAndStats = [&](Creature* c, CreatureRole role, bool isBoss)
     {
         // Drop auras the template applied at spawn (creature_template_addon,
         // e.g. 28006 Grand Necrolord Antiok's 50494): they were tuned for the
@@ -643,9 +668,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             c->SetObjectScale(1.3f);                      // 30% larger than normal
         }
 
-        // Health, melee, armor and spell/heal scales from the role table; also
-        // clears the template's spell resistances and records ownership.
-        ScaleCreature(c, *session, role, affixHpMult, affixDmgMult);
+        // Health, melee, armor and spell/heal scales from the role table, the
+        // run's affixes; also clears the template's spell resistances and
+        // records ownership.
+        ScaleCreature(c, ctx, role);
 
         // --- Clear mechanic immunities ---
         for (uint32 mech = 1; mech < MAX_MECHANIC; ++mech)
@@ -691,35 +717,26 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         guidList.push_back(c->GetGUID());
     };
 
-    // Spawn trash mobs
+    // Spawn trash mobs: one per anchor, plus the extra pack members the run's
+    // affixes add (Teeming, Swarming), up to the live-creature cap.
+    uint32 const eliteChance = std::min<uint32>(100,
+        sAtlasConfig->GetEliteChance() + static_cast<uint32>(fx.EliteChanceBonus));
+    uint32 const maxCreatures = sAtlasConfig->GetMaxRunCreatures();
     uint32 spawnedMobs = 0;
-    for (auto& sp : session->SpawnPoints)
+
+    auto spawnTrash = [&](Position const& pos, bool mayBeElite) -> bool
     {
-        if (sp.IsBossPosition) continue;
-
-        // Every draw for this spawn point happens before the summon, so a summon
-        // that fails doesn't shift the draws of the points after it (C8).
+        // Every draw happens before the summon, so a summon that fails doesn't
+        // shift the draws of the points after it (C8).
         uint32 entry = SelectCreatureForTheme(theme, false, session->Rng, session);
-        if (!entry) continue;
+        if (!entry)
+            return false;
+        bool const eliteRoll = session->Rng.Chance(eliteChance);
+        bool const isElite = mayBeElite && eliteRoll;
 
-        bool isElite = session->Rng.Chance(sAtlasConfig->GetEliteChance());
-
-        // Roguelike affix multipliers for trash
-        float affixHpMult = 1.0f, affixDmgMult = 1.0f, affixEliteMult = 1.0f;
-        if (session->RoguelikeRunId != 0)
-        {
-            sRoguelikeMgr->GetAffixMultipliers(session->RoguelikeRunId,
-                false, isElite, affixHpMult, affixDmgMult, affixEliteMult);
-            // Savage affix: boosted elite chance
-            if (affixEliteMult > 1.0f && !isElite)
-            {
-                uint32 boostedChance = static_cast<uint32>(sAtlasConfig->GetEliteChance() * affixEliteMult);
-                isElite = session->Rng.Chance(boostedChance);
-            }
-        }
-
-        Creature* c = map->SummonCreature(entry, sp.Pos);
-        if (!c) continue;
+        Creature* c = map->SummonCreature(entry, pos);
+        if (!c)
+            return false;
 
         c->SetFaction(14);               // hostile to all
         c->SetReactState(REACT_AGGRESSIVE);
@@ -736,7 +753,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         c->SetImmuneToNPC(false);
         c->setActive(true);             // Keep creature in grid update cycle for aggro detection
 
-        applyLevelAndStats(c, isElite ? CreatureRole::Elite : CreatureRole::Trash, affixHpMult, affixDmgMult, false);
+        applyLevelAndStats(c, isElite ? CreatureRole::Elite : CreatureRole::Trash, false);
 
         SpawnedCreature sc;
         sc.Guid = c->GetGUID(); sc.Entry = entry;
@@ -750,12 +767,32 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         }
 
         ++spawnedMobs;
+        return true;
+    };
+
+    for (auto& sp : session->SpawnPoints)
+    {
+        if (sp.IsBossPosition) continue;
+        if (spawnedMobs >= maxCreatures)
+            break;
+
+        spawnTrash(sp.Pos, true);
+
+        // Extra pack members stand at the same anchor; their random patrol
+        // spreads them out. Rolled for every anchor, spawned or not (C8).
+        bool const extraPack  = fx.PackExtraPct  > 0.0f && session->Rng.Chance(uint32(fx.PackExtraPct));
+        bool const extraSwarm = fx.SwarmExtraPct > 0.0f && session->Rng.Chance(uint32(fx.SwarmExtraPct));
+        if (extraPack && spawnedMobs < maxCreatures)
+            spawnTrash(sp.Pos, true);
+        if (extraSwarm && spawnedMobs < maxCreatures)
+            spawnTrash(sp.Pos, false);
     }
     session->TotalMobs = spawnedMobs;
 
     // --- Rare spawn (configurable chance, max 1 per run) ---
-    if (sAtlasConfig->GetRareSpawnChance() > 0 &&
-        session->Rng.Chance(sAtlasConfig->GetRareSpawnChance()))
+    uint32 const rareChance = std::min<uint32>(100,
+        static_cast<uint32>(sAtlasConfig->GetRareSpawnChance() * fx.RareChanceMult));
+    if (rareChance > 0 && session->Rng.Chance(rareChance))
     {
         // Pick non-boss spawn points for rare placement (prefer middle of dungeon)
         std::vector<size_t> validRarePoints;
@@ -794,14 +831,8 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                     // so they already carry an elite frame; size is the extra tell.
                     r->SetObjectScale(1.15f);
 
-                    // Apply roguelike affix multipliers to rares
-                    float affixHpM = 1.0f, affixDmgM = 1.0f, affixEliteM = 1.0f;
-                    if (session->RoguelikeRunId != 0)
-                        sRoguelikeMgr->GetAffixMultipliers(session->RoguelikeRunId,
-                            false, true, affixHpM, affixDmgM, affixEliteM);
-
                     // Also installs the custom AI (rare = enhanced trash).
-                    applyLevelAndStats(r, CreatureRole::Rare, affixHpM, affixDmgM, false);
+                    applyLevelAndStats(r, CreatureRole::Rare, false);
 
                     SpawnedCreature sc;
                     sc.Guid = r->GetGUID(); sc.Entry = rareEntry;
@@ -848,13 +879,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         b->SetImmuneToNPC(false);
         b->setActive(true);             // Keep creature in grid update cycle for aggro detection
 
-        // Roguelike affix multipliers for bosses
-        float bossAffixHpMult = 1.0f, bossAffixDmgMult = 1.0f, _unused = 1.0f;
-        if (session->RoguelikeRunId != 0)
-            sRoguelikeMgr->GetAffixMultipliers(session->RoguelikeRunId,
-                true, true, bossAffixHpMult, bossAffixDmgMult, _unused);
-
-        applyLevelAndStats(b, CreatureRole::Boss, bossAffixHpMult, bossAffixDmgMult, true);
+        applyLevelAndStats(b, CreatureRole::Boss, true);
 
         SpawnedCreature sc;
         sc.Guid = b->GetGUID(); sc.Entry = entry;
@@ -933,6 +958,50 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                 session->SessionId);
         }
     }
+}
+
+Creature* AtlasMgr::SpawnRunAdd(Map* map, uint32 entry, Position const& pos, ScalingContext const& ctx,
+    CreatureRole role, float visualScale, Unit* target)
+{
+    if (!map || !entry)
+        return nullptr;
+
+    OwnSpawnScope const own;
+    TempSummon* add = map->SummonCreature(entry, pos);
+    if (!add)
+        return nullptr;
+
+    add->RemoveAllAuras();
+    add->SetFaction(14);
+    add->SetReactState(REACT_AGGRESSIVE);
+    float const typeScale = sAtlasConfig->GetVisualScaleForCreatureType(add->GetCreatureTemplate()->type);
+    add->SetObjectScale(std::clamp(add->GetObjectScale() * typeScale * visualScale, 0.4f, 1.0f));
+    add->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC
+                                    | UNIT_FLAG_IMMUNE_TO_NPC | UNIT_FLAG_PACIFIED
+                                    | UNIT_FLAG_STUNNED | UNIT_FLAG_FLEEING
+                                    | UNIT_FLAG_NOT_SELECTABLE);
+    add->SetUInt32Value(UNIT_FIELD_FLAGS_2, 0);
+    add->SetImmuneToPC(false);
+    add->SetImmuneToNPC(false);
+    add->setActive(true);
+
+    ScaleCreature(add, ctx, role);
+
+    for (uint32 mech = 1; mech < MAX_MECHANIC; ++mech)
+        add->ApplySpellImmune(0, IMMUNITY_MECHANIC, mech, false);
+    add->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_ALL, false);
+
+    // Same AI as every run creature (see PopulateDungeon for why the old
+    // events are cancelled first).
+    add->m_Events.KillAllEvents(false);
+    CreatureAI* ai = new AtlasCreatureAI(add);
+    if (!add->AIM_Initialize(ai))
+        delete ai;
+
+    add->UpdateObjectVisibility(true);
+    if (target && target->IsAlive() && add->AI())
+        add->AI()->AttackStart(target);
+    return add;
 }
 
 // Select a creature matching the theme

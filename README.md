@@ -37,7 +37,7 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
 - **Escalating difficulty** — Enemy HP and damage scale per tier (linear, then exponential)
 - **Timeways Resonance** — +10% all stats per echo mended (the module's own server-side passive aura, spell 91001; no class spell is modified; not shown as a buff icon, the total is announced in chat)
-- **Mythic+ style affixes** — Fortified, Tyrannical, Raging, Bolstering, Savage; layered at configurable tier thresholds
+- **Affixes (instabilities)** — 30 affixes from the `atlas_affix` table: monster damage, extra elemental hits, speed, defence, absorb shields, on-death bursts, desecrated ground and splitting, player debuffs, Blizzards and plague clouds, larger packs, more elites and rares, a sturdier boss that calls servants. The Endless Timeways rolls 1 to 3 by depth
 - **Random dungeon rotation** — Each floor picks a new dungeon appropriate for your level band
 - **Tier-scaled rewards** — Better loot at higher tiers, with increasing epic drop chance
 - **Timeways Quartermaster** — Sell items, repair gear and buy ammo/reagents at the start of each echo
@@ -197,12 +197,27 @@ See `mod_atlas.conf.dist` for the full list with descriptions.
 
 ---
 
-## Roguelike Affixes
+## Affixes
 
-Affixes are Mythic+ style modifiers applied at higher tiers:
+Affixes (instabilities, in the Keepers of Time's words) are data: the world table `atlas_affix` (module SQL `atlas_affixes.sql`), one row per affix with its handler, values per tier band (1-5, 6-10, 11-16), the lowest tier it rolls at, a weight, an exclusive group (two affixes of one group never roll together) and whether playerbots handle it. The Endless Timeways rolls them by depth: 1 from `Roguelike.AffixStartTier`, 2 and 3 from the second and third affix tiers. Echoes roll none; maps (PLAN 1.4) will carry their own.
 
-| Affix | Effect |
-|-------|--------|
+| Kind | Affixes (code) |
+|---|---|
+| Monster damage | Brutal (M01), Searing (M02), Frostbitten (M03), Necrotic (M04), Blighted (M05), Frenzied (M08), Fleet (M09) |
+| Monster defence | Fecund (M11), Armoured (M12), Warded (M13), Ice-shielded (M14) |
+| On death | Bursting (M24), Desecrating (M25), Splitting (M26) |
+| Players | of Grief (P01), of Frailty (P02), of Enfeeblement (P03), of Elemental Weakness (P04), of Lethargy (P06), of Drought (P08), of the Throne (P11) |
+| Area | Blizzard-swept (A02), Plague-cloud (A03): every 12 or 15 s, during combat, under a random player |
+| Packs | Teeming (C01), Swarming (C02), Elite (C03), Rare-infested (C04) |
+| The master | Colossal (B01), Overpowering (B02), Summoner (B05) |
+
+How they are built:
+- Monster numbers are math in the module's hooks; each creature gets its share of the run's affixes when it spawns.
+- Visible effects use stock spells (Fiery Weapon, Frozen Blows, Shadow Wrath, Fast Acting Poison for the extra hits; Blizzard, Plague Contamination, Desecration; Collapse for the burst; a creature Ice Barrier). Ground zones are at most 10 yards and last a few seconds, the shapes playerbots step out of.
+- Player affixes use the module's own passive spells (90001-90007): the server applies them, unpatched clients see no unknown aura, and they are never saved; they come off when a player leaves the run.
+- `.atlas affix list` shows them; `.atlas affix next <codes>` forces some on a character's next run, for testing.
+
+-------|--------|
 | **Fortified** | Trash mobs: +30% HP, +15% damage |
 | **Tyrannical** | Bosses: +40% HP, +20% damage |
 | **Raging** | All enemies: +25% damage |
@@ -223,6 +238,8 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas clearcooldown` | GM | Clear cooldown for target's whole group |
 | `.atlas reload` | Admin | Hot-reload configuration |
 | `.atlas run` | GM | The target's (or your) current run: state, map, progress and the seed it was built from; for an Endless floor also the descent's seed, depth and affixes |
+| `.atlas affix list` | GM | Every loaded affix with its tiers and values |
+| `.atlas affix next <codes>\|clear` | GM | The target's (or your) next run carries these affixes, e.g. `M01 P02 A02` (an echo, or every depth of a descent) |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
@@ -260,6 +277,7 @@ mod-atlas/
 │   └── mod_atlas.conf.dist
 ├── data/sql/
 │   ├── db-world/base/atlas_world_setup.sql
+│   ├── db-world/base/atlas_affixes.sql   # Affix table and the player affixes' passive spells
 │   └── db-characters/base/atlas_characters_setup.sql
 ├── tests/                            # Unit tests (AC unit_tests target)
 └── src/
@@ -274,6 +292,9 @@ mod-atlas/
     ├── AtlasLayout.h                 # Layout (entrance, anchors, arenas) and the LayoutProvider interface
     ├── StockLayoutProvider.cpp / .h  # Layouts of the stock dungeons echoes run in
     ├── RunRng.h                      # Seeded, reproducible RNG for run layout choices
+    ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
+    ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras
+    ├── AtlasAffixEffects.cpp         # AtlasMgr: affixes in play (shields, death effects, waves, zones)
     ├── AtlasBossSpawnQuery.h         # Boss spawn-point query
     ├── AtlasChronicle.h              # The Chronicle window's server API
     ├── RoguelikeMgr.cpp / .h         # Endless Timeways run manager

@@ -90,38 +90,50 @@ namespace
     }
 }
 
-float AtlasMgr::SessionHealthFactor(Session const& s) const
+AtlasMgr::ScalingContext AtlasMgr::ContextOf(Session const& s)
+{
+    ScalingContext ctx;
+    ctx.Level          = std::max<uint8>(s.EffectiveLevel, 1);
+    ctx.Tier           = std::max<uint32>(s.Tier, 1);
+    ctx.DifficultyId   = s.DifficultyId;
+    ctx.PartySize      = std::max<uint32>(static_cast<uint32>(s.Players.size()), 1);
+    ctx.RoguelikeRunId = s.RoguelikeRunId;
+    ctx.InstanceId     = s.InstanceId;
+    ctx.ThemeId        = s.ThemeId;
+    ctx.Effects        = s.Effects;
+    return ctx;
+}
+
+float AtlasMgr::SessionHealthFactor(ScalingContext const& s) const
 {
     DifficultyTier const* d = sAtlasConfig->GetDifficulty(s.DifficultyId);
     float factor = (d ? d->HealthMultiplier : 1.0f)
-        * PartyFactor(static_cast<uint32>(s.Players.size()), sAtlasConfig->GetSoloMultiplier(),
-            sAtlasConfig->GetPerPlayerHealthMult());
+        * PartyFactor(s.PartySize, sAtlasConfig->GetSoloMultiplier(), sAtlasConfig->GetPerPlayerHealthMult());
     factor *= s.RoguelikeRunId
         ? sRoguelikeMgr->GetTierHealthMultiplier(s.RoguelikeRunId)
         : TierMultiplier(sAtlasConfig->GetTierGrowth(), s.Tier);
     return factor;
 }
 
-float AtlasMgr::SessionDamageFactor(Session const& s) const
+float AtlasMgr::SessionDamageFactor(ScalingContext const& s) const
 {
     DifficultyTier const* d = sAtlasConfig->GetDifficulty(s.DifficultyId);
     float factor = (d ? d->DamageMultiplier : 1.0f)
-        * PartyFactor(static_cast<uint32>(s.Players.size()), sAtlasConfig->GetSoloMultiplier(),
-            sAtlasConfig->GetPerPlayerDamageMult());
+        * PartyFactor(s.PartySize, sAtlasConfig->GetSoloMultiplier(), sAtlasConfig->GetPerPlayerDamageMult());
     factor *= s.RoguelikeRunId
         ? sRoguelikeMgr->GetTierDamageMultiplier(s.RoguelikeRunId)
         : TierMultiplier(sAtlasConfig->GetTierGrowth(), s.Tier);
     return factor;
 }
 
-AtlasMgr::RoleStats AtlasMgr::ComputeRoleStats(Session const& session, CreatureTemplate const* tmpl,
+AtlasMgr::RoleStats AtlasMgr::ComputeRoleStats(ScalingContext const& session, CreatureTemplate const* tmpl,
     CreatureRole role, float affixHealth, float affixDamage) const
 {
     RoleStats stats;
     if (!tmpl)
         return stats;
 
-    uint8 const level = std::max<uint8>(session.EffectiveLevel, 1);
+    uint8 const level = std::max<uint8>(session.Level, 1);
     LevelBase const now = BaseAt(level, tmpl->unit_class, ExpansionForLevel(level));
     RoleMultipliers const& r = sAtlasConfig->GetRole(role);
 
@@ -191,16 +203,77 @@ void AtlasMgr::ApplyRoleStats(Creature* c, RoleStats const& stats, bool keepHeal
     c->SetHealth(std::min(health, c->GetMaxHealth()));
 }
 
-void AtlasMgr::ScaleCreature(Creature* c, Session const& session, CreatureRole role, float affixHealth,
-    float affixDamage)
+void AtlasMgr::ScaleCreature(Creature* c, ScalingContext const& ctx, CreatureRole role)
 {
     if (!c)
         return;
 
-    RoleStats const stats = ComputeRoleStats(session, c->GetCreatureTemplate(), role, affixHealth, affixDamage);
+    AffixEffects const& fx = ctx.Effects;
+    bool const isBoss = role == CreatureRole::Boss;
+    float const affixHealth = isBoss ? fx.BossHealth : fx.MonsterHealth;
+    float const affixDamage = isBoss ? fx.BossDamage : 1.0f;
+
+    RoleStats const stats = ComputeRoleStats(ctx, c->GetCreatureTemplate(), role, affixHealth, affixDamage);
     c->SetLevel(stats.Level);
     ApplyRoleStats(c, stats, false);
-    RegisterOwnedCreature(c->GetGUID(), stats, c->GetMap() ? c->GetMap()->GetInstanceId() : session.InstanceId);
+
+    // Speed affixes, once at spawn (nothing the module re-applies resets them).
+    if (fx.AttackSpeedPct > 0.0f)
+    {
+        c->ApplyAttackTimePercentMod(BASE_ATTACK, fx.AttackSpeedPct, true);
+        c->ApplyAttackTimePercentMod(OFF_ATTACK, fx.AttackSpeedPct, true);
+        c->ApplyCastTimePercentMod(fx.AttackSpeedPct, true);
+    }
+    if (fx.MoveSpeedPct > 0.0f)
+        for (UnitMoveType move : { MOVE_WALK, MOVE_RUN })
+            c->SetSpeed(move, c->GetSpeedRate(move) * (1.0f + fx.MoveSpeedPct / 100.0f), true);
+
+    // Combat affixes, baked per creature for the hooks.
+    CreatureAffixMods mods;
+    mods.MeleeDealt = fx.MeleeDealt;
+    mods.PhysTaken  = fx.PhysTaken;
+    mods.SpellTaken = fx.SpellTaken;
+    if (!fx.ExtraHits.empty())
+    {
+        mods.ExtraHitSpell = fx.ExtraHits.front().SpellId;
+        mods.ExtraHitPct   = fx.ExtraHits.front().Pct;
+    }
+    if (fx.ShieldSpell && fx.ShieldPct > 0.0f)
+    {
+        mods.ShieldSpell  = fx.ShieldSpell;
+        mods.ShieldAmount = static_cast<int32>(stats.MaxHealth * fx.ShieldPct);
+    }
+    if (fx.BurstSpell && fx.BurstPct > 0.0f)
+    {
+        mods.BurstSpell   = fx.BurstSpell;
+        mods.BurstAmount  = static_cast<int32>(stats.MaxHealth * fx.BurstPct);
+        mods.BurstDelayMs = fx.BurstDelayMs;
+    }
+    if (fx.PoolSpell && fx.PoolPct > 0.0f)
+    {
+        float const hit = MeleeHit((stats.WeaponMin + stats.WeaponMax) / 2.0f, stats.AttackPower,
+            std::max(c->GetCreatureTemplate()->DamageModifier, 0.01f), 2.0f);
+        mods.PoolSpell = fx.PoolSpell;
+        mods.PoolTick  = std::max(1, static_cast<int32>(hit * fx.PoolPct));
+    }
+    if (role == CreatureRole::Elite)
+        mods.SplitCount = fx.SplitCount;
+    if (isBoss)
+        mods.AddsPerWave = fx.BossAddsPerWave;
+
+    RegisterOwnedCreature(c->GetGUID(), stats, mods, c->GetMap() ? c->GetMap()->GetInstanceId() : ctx.InstanceId);
+}
+
+float AtlasMgr::ReferenceTrashHit(ScalingContext const& ctx) const
+{
+    CreatureTemplate tmpl;
+    tmpl.unit_class     = 1;
+    tmpl.maxlevel       = ctx.Level;
+    tmpl.expansion      = ExpansionForLevel(ctx.Level);
+    tmpl.DamageModifier = 1.0f;
+    tmpl.ModHealth      = 1.0f;
+    RoleStats const st = ComputeRoleStats(ctx, &tmpl, CreatureRole::Trash);
+    return MeleeHit((st.WeaponMin + st.WeaponMax) / 2.0f, st.AttackPower, 1.0f, 2.0f);
 }
 
 std::vector<std::string> AtlasMgr::DescribeRoleScaling(uint8 level, uint32 tier, uint32 partySize,
@@ -215,17 +288,17 @@ std::vector<std::string> AtlasMgr::DescribeRoleScaling(uint8 level, uint32 tier,
     tmpl.DamageModifier = 1.0f;
     tmpl.ModHealth      = 1.0f;
 
-    Session s;
-    s.EffectiveLevel = level;
-    s.Tier           = std::max<uint32>(tier, 1);
-    s.DifficultyId   = difficultyId;
-    s.Players.resize(std::max<uint32>(partySize, 1));
+    ScalingContext s;
+    s.Level        = level;
+    s.Tier         = std::max<uint32>(tier, 1);
+    s.DifficultyId = difficultyId;
+    s.PartySize    = std::max<uint32>(partySize, 1);
 
     std::vector<std::string> lines;
     DifficultyTier const* d = sAtlasConfig->GetDifficulty(difficultyId);
     lines.push_back(Acore::StringFormat(
         "Level {}, tier {}, party of {}, {}: health x{:.2f}, damage x{:.2f} (warrior-class creature, 2.0 s swing)",
-        level, s.Tier, s.Players.size(), d ? d->Name : "no difficulty", SessionHealthFactor(s),
+        level, s.Tier, s.PartySize, d ? d->Name : "no difficulty", SessionHealthFactor(s),
         SessionDamageFactor(s)));
 
     for (uint8 r = 0; r < static_cast<uint8>(CreatureRole::Count); ++r)
@@ -253,7 +326,8 @@ bool AtlasMgr::HasOwnedCreatures()
     return g_dmOwnedCount.load(std::memory_order_relaxed) != 0;
 }
 
-void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, uint32 instanceId)
+void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, CreatureAffixMods const& mods,
+    uint32 instanceId)
 {
     if (!guid || !stats.Level)
         return;
@@ -265,7 +339,19 @@ void AtlasMgr::RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, ui
         g_dmOwnedCount.fetch_add(1, std::memory_order_relaxed);
 
     oc.Stats      = stats;
+    oc.Mods       = mods;
     oc.InstanceId = instanceId;
+}
+
+bool AtlasMgr::GetOwnedCombat(ObjectGuid guid, CreatureAffixMods& mods, float& spellScale) const
+{
+    std::lock_guard<std::mutex> lock(_ownedMutex);
+    auto it = _ownedCreatures.find(guid);
+    if (it == _ownedCreatures.end())
+        return false;
+    mods = it->second.Mods;
+    spellScale = it->second.Stats.SpellScale;
+    return true;
 }
 
 bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const
@@ -350,7 +436,7 @@ void AtlasMgr::ScaleSummonedCreature(Creature* creature, Session* session)
     if (!creature || !session || !session->EffectiveLevel)
         return;
 
-    ScaleCreature(creature, *session, CreatureRole::Add, 1.0f, 1.0f);
+    ScaleCreature(creature, ContextOf(*session), CreatureRole::Add);
 }
 
 // Scale environmental damage to party level

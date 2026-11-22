@@ -4,6 +4,7 @@
  */
 
 #include "RoguelikeMgr.h"
+#include "AtlasAffixes.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
 #include "Player.h"
@@ -36,73 +37,10 @@ RoguelikeMgr* RoguelikeMgr::Instance()
 // Initialization
 void RoguelikeMgr::Initialize()
 {
-    BuildAffixPool();
     LoadAllRoguelikePlayerStats();
     LoadRoguelikeLeaderboard();
-    LOG_INFO("module", "RoguelikeMgr: Initialized — {} affix definitions, {} buff pool entries.",
-        _affixDefs.size(), sAtlasConfig->GetRoguelikeBuffPool().size());
-}
-
-void RoguelikeMgr::BuildAffixPool()
-{
-    _affixDefs.clear();
-
-    // Fortified — trash mobs are significantly harder
-    {
-        AffixDef a;
-        a.Id           = AFFIX_FORTIFIED;
-        a.Name         = "Fortified";
-        a.TrashHpMult  = 1.30f;
-        a.TrashDmgMult = 1.15f;
-        a.BossHpMult   = 1.0f;
-        a.BossDmgMult  = 1.0f;
-        _affixDefs.push_back(a);
-    }
-    // Tyrannical — bosses are significantly harder
-    {
-        AffixDef a;
-        a.Id           = AFFIX_TYRANNICAL;
-        a.Name         = "Tyrannical";
-        a.TrashHpMult  = 1.0f;
-        a.TrashDmgMult = 1.0f;
-        a.BossHpMult   = 1.40f;
-        a.BossDmgMult  = 1.20f;
-        _affixDefs.push_back(a);
-    }
-    // Raging — everything hits harder
-    {
-        AffixDef a;
-        a.Id           = AFFIX_RAGING;
-        a.Name         = "Raging";
-        a.TrashHpMult  = 1.0f;
-        a.TrashDmgMult = 1.25f;
-        a.BossHpMult   = 1.0f;
-        a.BossDmgMult  = 1.25f;
-        _affixDefs.push_back(a);
-    }
-    // Bolstering — everything has more health
-    {
-        AffixDef a;
-        a.Id           = AFFIX_BOLSTERING;
-        a.Name         = "Bolstering";
-        a.TrashHpMult  = 1.20f;
-        a.TrashDmgMult = 1.0f;
-        a.BossHpMult   = 1.20f;
-        a.BossDmgMult  = 1.0f;
-        _affixDefs.push_back(a);
-    }
-    // Savage — more elites, elites are nastier
-    {
-        AffixDef a;
-        a.Id              = AFFIX_SAVAGE;
-        a.Name            = "Savage";
-        a.TrashHpMult     = 1.0f;
-        a.TrashDmgMult    = 1.10f;
-        a.BossHpMult      = 1.0f;
-        a.BossDmgMult     = 1.0f;
-        a.EliteChanceMult = 2.0f;
-        _affixDefs.push_back(a);
-    }
+    LOG_INFO("module", "RoguelikeMgr: Initialized — {} buff pool entries (affixes come from atlas_affix).",
+        sAtlasConfig->GetRoguelikeBuffPool().size());
 }
 
 // RUN LIFECYCLE
@@ -171,6 +109,7 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     if (!run.Seed)
         run.Seed = RunRng::MakeSeed();
     run.Rng.Seed(run.Seed);
+    run.ForcedAffixes = sAtlasAffixes->TakePending(leader->GetGUID());
 
     // Use the difficulty selected by the player (or fall back to first available)
     run.BaseDifficultyId = difficultyId;
@@ -224,6 +163,10 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     for (auto const& pd : run.Players)
         sAtlasMgr->ClearCooldown(pd.PlayerGuid);
 
+    // Instabilities of depth 1 (none before Roguelike.AffixStartTier, unless
+    // a GM forced some), before the floor opens so its session gets them.
+    SelectAffixesForTier(run);
+
     // Open the first floor
     uint32 const mapId = OpenRandomFloor(run, leader, party);
     if (!mapId)
@@ -240,9 +183,6 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
     // Grace period for async teleport
     run.TransitionStartTime = GameTime::GetGameTime().count();
 
-    // Select affixes for tier 1 (may be none if affix start tier > 1)
-    SelectAffixesForTier(run);
-
     // Register the run
     {
         std::lock_guard<std::mutex> lock(_runMutex);
@@ -258,14 +198,6 @@ bool RoguelikeMgr::StartRun(Player* leader, uint32 difficultyId, uint32 themeId,
         "{} |cFFFFD700{}|r leads the descent into the Endless Timeways. Timeline: |cFF00FF00{}|r. "
         "How deep can you go?",
         CHAT_PREFIX_ENDLESS, leader->GetName(), theme ? theme->Name : "ever-shifting"));
-
-    // Announce active affixes if any are present at tier 1
-    if (!run.ActiveAffixes.empty())
-    {
-        std::string affixNames = GetActiveAffixNames(run.RunId);
-        if (!affixNames.empty())
-            AnnounceToRun(run, Acore::StringFormat("{} This echo is unstable: {}", CHAT_PREFIX_ENDLESS, affixNames));
-    }
 
     LOG_INFO("module", "RoguelikeMgr: Run {} started — leader {}, party {}, theme {}, map {}, seed {:016X}",
         run.RunId, leader->GetName(), run.Players.size(),
@@ -343,21 +275,8 @@ void RoguelikeMgr::OnDungeonCompleted(uint32 runId, uint32 sessionId)
         CHAT_PREFIX_ENDLESS, run->DungeonsCleared, run->CurrentTier);
 
     // Append active affixes
-    std::string affixStr;
-    for (RoguelikeAffix afxId : run->ActiveAffixes)
-    {
-        for (auto const& def : _affixDefs)
-        {
-            if (def.Id == afxId)
-            {
-                if (!affixStr.empty()) affixStr += ", ";
-                affixStr += "|cFFFF8800" + def.Name + "|r";
-                break;
-            }
-        }
-    }
-    if (!affixStr.empty())
-        msg += " Instabilities: " + affixStr;
+    if (!run->ActiveAffixes.empty())
+        msg += " Instabilities: " + sAtlasAffixes->Describe(run->ActiveAffixes, false);
 
     AnnounceToRun(*run, msg);
 
@@ -703,70 +622,6 @@ float RoguelikeMgr::GetTierArmorMultiplier(uint32 runId) const
     return 1.0f + (tier - 1) * baseScale;   // Armor scales linearly only
 }
 
-void RoguelikeMgr::GetAffixMultipliers(
-    uint32 runId, bool isBoss, bool /*isElite*/,
-    float& outHpMult, float& outDmgMult, float& outEliteChanceMult) const
-{
-    outHpMult   = 1.0f;
-    outDmgMult  = 1.0f;
-    outEliteChanceMult = 1.0f;
-
-    std::lock_guard<std::mutex> lock(_runMutex);
-    auto it = _activeRuns.find(runId);
-    if (it == _activeRuns.end()) return;
-
-    for (RoguelikeAffix afxId : it->second.ActiveAffixes)
-    {
-        for (auto const& def : _affixDefs)
-        {
-            if (def.Id == afxId)
-            {
-                if (isBoss)
-                {
-                    outHpMult  *= def.BossHpMult;
-                    outDmgMult *= def.BossDmgMult;
-                }
-                else
-                {
-                    outHpMult  *= def.TrashHpMult;
-                    outDmgMult *= def.TrashDmgMult;
-                }
-                outEliteChanceMult *= def.EliteChanceMult;
-                break;
-            }
-        }
-    }
-}
-
-bool RoguelikeMgr::HasActiveAffixes(uint32 runId) const
-{
-    std::lock_guard<std::mutex> lock(_runMutex);
-    auto it = _activeRuns.find(runId);
-    return it != _activeRuns.end() && !it->second.ActiveAffixes.empty();
-}
-
-std::string RoguelikeMgr::GetActiveAffixNames(uint32 runId) const
-{
-    std::lock_guard<std::mutex> lock(_runMutex);
-    auto it = _activeRuns.find(runId);
-    if (it == _activeRuns.end()) return "";
-
-    std::string result;
-    for (RoguelikeAffix afxId : it->second.ActiveAffixes)
-    {
-        for (auto const& def : _affixDefs)
-        {
-            if (def.Id == afxId)
-            {
-                if (!result.empty()) result += ", ";
-                result += "|cFFFF8800" + def.Name + "|r";
-                break;
-            }
-        }
-    }
-    return result;
-}
-
 bool RoguelikeMgr::GetRunLogInfo(uint32 runId, uint32& depth, uint64& seed, std::string& affixIds) const
 {
     std::lock_guard<std::mutex> lock(_runMutex);
@@ -776,13 +631,7 @@ bool RoguelikeMgr::GetRunLogInfo(uint32 runId, uint32& depth, uint64& seed, std:
 
     depth = it->second.CurrentTier;
     seed = it->second.Seed;
-    affixIds.clear();
-    for (RoguelikeAffix afxId : it->second.ActiveAffixes)
-    {
-        if (!affixIds.empty())
-            affixIds += ',';
-        affixIds += std::to_string(static_cast<uint32>(afxId));
-    }
+    affixIds = sAtlasAffixes->Codes(it->second.ActiveAffixes);
     return true;
 }
 
@@ -865,11 +714,21 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
 {
     run.ActiveAffixes.clear();
 
+    // Depth stands for the map tier (values by tier band, min_tier gates).
+    uint32 const tier = std::min<uint32>(run.CurrentTier, 16);
+
+    // GM-forced affixes replace the roll at every depth.
+    if (!run.ForcedAffixes.empty())
+    {
+        run.ActiveAffixes = sAtlasAffixes->AtTier(run.ForcedAffixes, tier);
+        return;
+    }
+
     uint32 affixStart  = sAtlasConfig->GetRoguelikeAffixStartTier();
     uint32 secondAffix = sAtlasConfig->GetRoguelikeSecondAffixTier();
     uint32 thirdAffix  = sAtlasConfig->GetRoguelikeThirdAffixTier();
 
-    if (run.CurrentTier < affixStart || _affixDefs.empty())
+    if (run.CurrentTier < affixStart)
         return;
 
     uint32 numAffixes = 1;
@@ -878,15 +737,7 @@ void RoguelikeMgr::SelectAffixesForTier(RoguelikeRun& run)
     else if (run.CurrentTier >= secondAffix)
         numAffixes = 2;
 
-    std::vector<RoguelikeAffix> pool;
-    for (auto const& def : _affixDefs)
-        if (def.Id != AFFIX_NONE)
-            pool.push_back(def.Id);
-
-    run.Rng.Shuffle(pool);
-
-    for (uint32 i = 0; i < numAffixes && i < pool.size(); ++i)
-        run.ActiveAffixes.push_back(pool[i]);
+    run.ActiveAffixes = sAtlasAffixes->Roll(tier, numAffixes, run.Rng);
 }
 
 // DUNGEON SELECTION
@@ -949,9 +800,11 @@ bool RoguelikeMgr::OpenFloor(RoguelikeRun& run, Player* leader, uint32 mapId)
         return false;
     }
 
-    // Tag the session as roguelike
+    // Tag the session as roguelike, with this depth's instabilities
     uint32 const sessionId  = session->SessionId;
     session->RoguelikeRunId = run.RunId;
+    session->Tier           = std::min<uint32>(run.CurrentTier, 16);
+    sAtlasMgr->SetSessionAffixes(session, run.ActiveAffixes);
     run.CurrentSessionId    = sessionId;
     {
         std::lock_guard<std::mutex> lock(_runMutex);

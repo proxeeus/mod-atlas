@@ -117,6 +117,8 @@ void AtlasConfig::LoadConfig(bool reload)
 
     // Dungeon settings
     _bossCount       = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.BossCount",      1);
+    _maxRunCreatures = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.MaxCreatures",   450);
+    _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
     _eliteChance     = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.EliteChance",    20);
     _aggroRadius     = sConfigMgr->GetOption<float> ("Atlas.Dungeon.AggroRadius",    15.0f);
     _rareSpawnChance = sConfigMgr->GetOption<uint32>("Atlas.Dungeon.RareSpawnChance", 5);

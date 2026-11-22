@@ -47,12 +47,7 @@ public:
     float GetTierHealthMultiplier(uint32 runId) const;
     float GetTierDamageMultiplier(uint32 runId) const;
     float GetTierArmorMultiplier(uint32 runId) const;
-    void  GetAffixMultipliers(uint32 runId, bool isBoss, bool isElite,
-                              float& outHpMult, float& outDmgMult,
-                              float& outEliteChanceMult) const;
-    bool        HasActiveAffixes(uint32 runId) const;
-    std::string GetActiveAffixNames(uint32 runId) const;
-    // For the run log: current depth, the descent's seed, active affix ids ("1,4").
+    // For the run log: current depth, the descent's seed, active affix codes ("M01,P02").
     bool        GetRunLogInfo(uint32 runId, uint32& depth, uint64& seed, std::string& affixIds) const;
 
     // Buff system
@@ -85,7 +80,6 @@ public:
     void UpdateRoguelikePlayerStats(RoguelikeRun const& run);
 
 private:
-    void BuildAffixPool();
     void SelectAffixesForTier(RoguelikeRun& run);
     uint32 PickFloorTheme(RoguelikeRun& run) const;
     // A dungeon in the run's level range that the whole party may enter, skipping `tried`.
@@ -106,8 +100,6 @@ private:
     std::unordered_map<ObjectGuid, uint32>      _playerToRun;   // guid -> runId
     uint32 _nextRunId = 1;
     mutable std::mutex _runMutex;
-
-    std::vector<AffixDef> _affixDefs;
 
     std::vector<RoguelikeLeaderboardEntry> _leaderboard;
     mutable std::mutex _leaderboardMutex;

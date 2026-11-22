@@ -84,6 +84,11 @@ public:
     float  GetAggroRadius()     const { return _aggroRadius; }
     uint32 GetRareSpawnChance() const { return _rareSpawnChance; }
     uint32 GetRecentCreatureEntries() const { return _recentCreatureEntries; }
+    // Live creatures a run may spawn at most (pack-size affixes stop there).
+    uint32 GetMaxRunCreatures()       const { return _maxRunCreatures; }
+
+    // --- Affixes ---
+    bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
     float  GetVisualScaleForCreatureType(uint32 type) const;
 
     // --- Timers ---
@@ -155,6 +160,8 @@ private:
 
     // Dungeon
     uint32 _bossCount       = 1;
+    uint32 _maxRunCreatures = 450;
+    bool   _affixBotSafeOnly = true;
     uint32 _eliteChance     = 20;
     float  _aggroRadius     = 15.0f;
     uint32 _rareSpawnChance = 5;

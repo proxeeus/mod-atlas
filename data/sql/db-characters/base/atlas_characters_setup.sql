@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS `atlas_run_log` (
     `mobs_killed`     INT UNSIGNED      NOT NULL DEFAULT 0,
     `bosses_killed`   INT UNSIGNED      NOT NULL DEFAULT 0,
     `deaths`          INT UNSIGNED      NOT NULL DEFAULT 0,
-    `affixes`         VARCHAR(255)      NOT NULL DEFAULT '' COMMENT 'Endless affix ids, comma-separated',
+    `affixes`         VARCHAR(255)      NOT NULL DEFAULT '' COMMENT 'affix codes, comma-separated (M01,P02)',
     `logged_at`       DATETIME          NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     INDEX `idx_leader` (`leader_guid`),

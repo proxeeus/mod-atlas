@@ -84,6 +84,11 @@ public:
         if (!AtlasMgr::HasActiveSessions())
             return;
 
+        // The module's own spawns are scaled by the code summoning them, which
+        // may hold the session lock this hook would take next.
+        if (AtlasMgr::IsSpawningOwn())
+            return;
+
         Map* map = creature->GetMap();
         if (!map || !map->IsDungeon())
             return;

@@ -10,6 +10,7 @@
 #include "ObjectGuid.h"
 #include "Position.h"
 #include "RunRng.h"
+#include "AtlasAffix.h"
 #include <string>
 #include <vector>
 
@@ -137,6 +138,12 @@ struct Session
     // Map tier (DESIGN §11), 1 for echoes; drives tier growth in the scaling.
     // Endless floors use their depth curve instead.
     uint32  Tier = 1;
+
+    // Affixes (PLAN 1.2), set when the run is created and folded once into
+    // Effects. GroundTimersMs: per Effects.Ground entry, ms until it fires.
+    std::vector<ActiveAffix> Affixes;
+    AffixEffects             Effects;
+    std::vector<int32>       GroundTimersMs;
 
     uint8   EffectiveLevel = 1;
     uint8   LevelBandMin   = 1;

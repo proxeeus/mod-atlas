@@ -18,6 +18,7 @@
 class Player;
 class Group;
 class Creature;
+class Unit;
 struct CreatureTemplate;
 class Map;
 class InstanceMap;
@@ -148,21 +149,67 @@ public:
         float  HealScale   = 1.0f;   // its heals x this
     };
 
+    // What scaling needs from a session, copied so creatures can be scaled
+    // without holding the session lock (summoning re-enters it, see
+    // OwnSpawnScope).
+    struct ScalingContext
+    {
+        uint8        Level          = 1;
+        uint32       Tier           = 1;
+        uint32       DifficultyId   = 0;
+        uint32       PartySize      = 1;
+        uint32       RoguelikeRunId = 0;
+        uint32       InstanceId     = 0;
+        uint32       ThemeId        = 0;
+        AffixEffects Effects;
+    };
+    static ScalingContext ContextOf(Session const& session);
+    bool      GetScalingContext(uint32 instanceId, ScalingContext& out);
+
+    // Per creature, the run's affixes as they apply to it (DESIGN §10), baked
+    // at spawn so the damage hooks need one lookup.
+    struct CreatureAffixMods
+    {
+        float  MeleeDealt    = 1.0f;
+        float  PhysTaken     = 1.0f;
+        float  SpellTaken    = 1.0f;
+        uint32 ExtraHitSpell = 0;
+        float  ExtraHitPct   = 0.0f;
+        uint32 ShieldSpell   = 0;
+        int32  ShieldAmount  = 0;
+        uint32 BurstSpell    = 0;
+        int32  BurstAmount   = 0;
+        uint32 BurstDelayMs  = 0;
+        uint32 PoolSpell     = 0;
+        int32  PoolTick      = 0;
+        uint32 SplitCount    = 0;
+        uint32 AddsPerWave   = 0;
+        uint8  WavesDone     = 0;
+    };
+
     // Tier growth (or the Endless depth curve) x the difficulty's multiplier x
     // the party factor (1.0 for a party of five).
-    float     SessionHealthFactor(Session const& session) const;
-    float     SessionDamageFactor(Session const& session) const;
-    RoleStats ComputeRoleStats(Session const& session, CreatureTemplate const* tmpl, CreatureRole role,
+    float     SessionHealthFactor(ScalingContext const& ctx) const;
+    float     SessionDamageFactor(ScalingContext const& ctx) const;
+    float     SessionHealthFactor(Session const& session) const { return SessionHealthFactor(ContextOf(session)); }
+    float     SessionDamageFactor(Session const& session) const { return SessionDamageFactor(ContextOf(session)); }
+    RoleStats ComputeRoleStats(ScalingContext const& ctx, CreatureTemplate const* tmpl, CreatureRole role,
                                float affixHealth = 1.0f, float affixDamage = 1.0f) const;
     static void ApplyRoleStats(Creature* creature, RoleStats const& stats, bool keepHealthPct);
-    // Level, role stats and ownership in one step, for anything a run spawns.
-    void      ScaleCreature(Creature* creature, Session const& session, CreatureRole role,
-                            float affixHealth = 1.0f, float affixDamage = 1.0f);
+    // Level, role stats, the run's affixes and ownership in one step, for
+    // anything a run spawns.
+    void      ScaleCreature(Creature* creature, ScalingContext const& ctx, CreatureRole role);
+    // One melee hit of a warrior-class trash creature of the run (affix damage
+    // that follows the run's strength is a share of it).
+    float     ReferenceTrashHit(ScalingContext const& ctx) const;
     // `.atlas scaling`: the role table at a level, tier, party size and difficulty.
     std::vector<std::string> DescribeRoleScaling(uint8 level, uint32 tier, uint32 partySize,
                                                  uint32 difficultyId) const;
 
-    void RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, uint32 instanceId);
+    void RegisterOwnedCreature(ObjectGuid guid, RoleStats const& stats, CreatureAffixMods const& mods,
+                               uint32 instanceId);
+    // Mods and spell scale of an owned creature in one lookup (damage hooks).
+    bool GetOwnedCombat(ObjectGuid guid, CreatureAffixMods& mods, float& spellScale) const;
     bool GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const;
     // For the damage and heal hooks; negative when the creature isn't owned.
     float GetOwnedSpellScale(ObjectGuid guid) const;
@@ -177,7 +224,49 @@ public:
     // Level + stat scaling for a creature summoned by an Atlas mob.
     void ScaleSummonedCreature(Creature* creature, Session* session);
 
+    // -----------------------------------------------------------------------
+    // Affixes in play (AtlasAffixEffects.cpp).
+    // -----------------------------------------------------------------------
+    void SetSessionAffixes(Session* session, std::vector<ActiveAffix> affixes);
+    // From AtlasCreatureAI: shield on engaging, death effects, boss waves.
+    void OnRunCreatureEngaged(Creature* creature);
+    void OnRunCreatureDied(Creature* creature);
+    void OnRunCreatureDamaged(Creature* creature, uint32 damage);
+    // From the melee hook: an affix's extra elemental hit, cast just after.
+    static void QueueExtraHit(Unit* attacker, Unit* target, uint32 spellId, int32 amount);
+
+    // While set, the module is summoning a creature it scales itself; the
+    // add-to-world hook stays out of it. That hook takes the session lock,
+    // so this also keeps summons made under that lock from deadlocking.
+    class OwnSpawnScope
+    {
+    public:
+        OwnSpawnScope();
+        ~OwnSpawnScope();
+        OwnSpawnScope(OwnSpawnScope const&) = delete;
+        OwnSpawnScope& operator=(OwnSpawnScope const&) = delete;
+    };
+    static bool IsSpawningOwn();
+
 private:
+    // Affixes in play (AtlasAffixEffects.cpp).
+    struct GroundRequest
+    {
+        ObjectGuid Player;
+        uint32     InstanceId = 0;
+        uint32     SpellId    = 0;
+        int32      Amount     = 0;
+        uint8      Level      = 1;
+    };
+    void      TickSessionAffixes(Session& session, std::vector<GroundRequest>& out);
+    void      RemoveSessionAffixAuras(Session const& session);
+    void      ExecuteGroundRequests(std::vector<GroundRequest> const& requests);
+    Creature* SpawnAffixCaster(Map* map, Position const& pos, uint8 level, uint32 lifetimeMs);
+    // A creature a run spawns mid-fight (splits, a boss's servants): hostile,
+    // scaled, with the run's AI, despawning once dead (AtlasPopulation.cpp).
+    Creature* SpawnRunAdd(Map* map, uint32 entry, Position const& pos, ScalingContext const& ctx,
+                          CreatureRole role, float visualScale, Unit* target);
+
     uint32 SelectCreatureForTheme(Theme const* theme, bool isBoss, RunRng& rng, Session const* session = nullptr);
     uint32 SelectDungeonBoss(Theme const* theme, RunRng& rng);
 
@@ -225,8 +314,9 @@ private:
 
     struct OwnedCreature
     {
-        RoleStats Stats;
-        uint32    InstanceId = 0;
+        RoleStats         Stats;
+        CreatureAffixMods Mods;
+        uint32            InstanceId = 0;
     };
     std::unordered_map<ObjectGuid, OwnedCreature> _ownedCreatures;
     mutable std::mutex _ownedMutex;
