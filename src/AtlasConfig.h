@@ -120,6 +120,12 @@ public:
     uint32 GetLootMaxQuantity()       const { return _lootMaxQuantity; }
     uint32 GetLootMaxRarity()         const { return _lootMaxRarity; }
 
+    // --- Atmosphere (PLAN 1.6) ---
+    bool   IsAtmosphereEnabled()      const { return _atmosphereEnabled; }
+    uint32 GetAtmosphereAnchor()      const { return _atmosphereAnchor; }
+    uint32 GetAtmosphereAffixAnchor() const { return _atmosphereAffixAnchor; }
+    uint32 GetAtmosphereFadeMs()      const { return _atmosphereFadeMs; }
+
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
     // Affix visibility (PLAN 1.6): markers per creature, and the rares' own.
@@ -209,6 +215,10 @@ private:
     std::vector<Theme> _databaseThemes;
     bool   _affixBotSafeOnly = true;
     uint32 _affixMaxMarkers  = 2;
+    bool   _atmosphereEnabled     = true;
+    uint32 _atmosphereAnchor      = 1826;
+    uint32 _atmosphereAffixAnchor = 2488;
+    uint32 _atmosphereFadeMs      = 2000;
     uint32 _rareMarker       = 48019;
     bool   _mapsEnabled      = true;
     uint8  _mapMinLevel      = 80;

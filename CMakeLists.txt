@@ -10,7 +10,8 @@ set_property(
   "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasAffixTest.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasThemeTest.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasMapItemTest.cpp"
-  "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasLootTest.cpp")
+  "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasLootTest.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/tests/AtlasAtmosphereTest.cpp")
 
 set_property(
   GLOBAL APPEND PROPERTY ACORE_MODULE_TEST_INCLUDES

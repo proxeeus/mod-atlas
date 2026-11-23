@@ -438,6 +438,29 @@ Atlas.Loot.MaxQuantity = 100
 Atlas.Loot.MaxRarity = 150
 
 ###############################################################################
+# ATMOSPHERE (PLAN 1.6)
+#   Echoes and maps get their own sky and fog: an existing client light (world
+#   table atlas_atmosphere: by theme, darker as corruption rises, plus a look
+#   for some affixes), sent as an override of an anchor light that covers any
+#   map. No client change; leaving the map clears it.
+#   GM: .atlas light <id> [anchor] to try a light, .atlas light for the run's.
+###############################################################################
+
+#    Atlas.Atmosphere.Enable              Default: 1
+Atlas.Atmosphere.Enable = 1
+
+#    Atlas.Atmosphere.Anchor / Atlas.Atmosphere.AffixAnchor
+#        Global lights whose sphere covers any map, one per slot (theme look,
+#        affix look). 1826 Azjol-Nerub, 2488 Icecrown Citadel; 1773 and 515
+#        also work.
+#        Default: 1826 / 2488
+Atlas.Atmosphere.Anchor = 1826
+Atlas.Atmosphere.AffixAnchor = 2488
+
+#    Atlas.Atmosphere.FadeMs              Default: 2000
+Atlas.Atmosphere.FadeMs = 2000
+
+###############################################################################
 # AFFIXES (DESIGN section 10)
 #   The affixes themselves are data: world table atlas_affix (module SQL
 #   atlas_affixes.sql). `.atlas affix list` shows them, `.atlas affix next`

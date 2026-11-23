@@ -11,6 +11,7 @@
 #include "StockLayoutProvider.h"
 #include "AtlasMapItem.h"
 #include "AtlasLoot.h"
+#include "AtlasAtmosphere.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -306,6 +307,24 @@ public:
     // The run's affix quantity and rarity bonuses (%), capped by config.
     static uint32 RunQuantity(Session const& session);
     static uint32 RunRarity(Session const& session);
+    // -----------------------------------------------------------------------
+    // Atmosphere (AtlasAtmosphere.cpp, PLAN 1.6): a run's sky and fog.
+    // -----------------------------------------------------------------------
+    struct RunLook
+    {
+        uint32 Light      = 0;   // theme / corruption look, on the main anchor
+        uint32 AffixLight = 0;   // an affix's look, on the second anchor
+        uint32 Music      = 0;
+    };
+    void        LoadAtmosphere();   // atlas_atmosphere (also `.atlas reload`)
+    RunLook     GetRunLook(Session const& session) const;
+    void        SendAtmosphere(Player* player, Session const& session);
+    // From the allmap script: a run member arrived on the run's map.
+    void        OnPlayerEnteredRunMap(Player* player);
+    std::string DescribeRunLook(Session const& session) const;
+    // SMSG_OVERRIDE_LIGHT: `lightId` replaces `anchorLight` (0 clears it).
+    static void SendLightOverride(Player* player, uint32 anchorLight, uint32 lightId, uint32 fadeMs);
+
     // atlas_loot_tier (also `.atlas reload`), and `.atlas loot`.
     void        LoadLootTiers();
     LootTier    GetLootTier(uint8 tier) const;
@@ -466,6 +485,8 @@ private:
     std::vector<RewardItem> _tierGear;                       // map-run gear, item level 187+
     std::array<LootTier, MAP_MAX_TIER> _lootTiers{};         // atlas_loot_tier
     std::unordered_map<uint64, uint32> _accountProgress;     // account << 32 | map -> tiers mask (_mapItemsMutex)
+    std::vector<AtmosphereRow>         _atmosphere;
+    mutable std::mutex                 _atmosphereMutex;
     std::vector<LootPoolItem> _lootPool;
 
     std::vector<LeaderboardEntry> _leaderboard;

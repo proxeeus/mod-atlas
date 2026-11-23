@@ -18,6 +18,7 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **44 dungeons** — Classic, TBC, and WotLK 5-man instances (The Oculus is left out: it needs drake vehicles)
 - **10 timelines (creature themes)** — the dungeon as it was (its own inhabitants, pack by pack), a timeline the Scourge swallowed (a curated Scourge pool), or one of eight creature types: beasts, dragonkin, the Legion, elementals, giants, mortal warbands, rogue machines, or a shattered mix
 - **Scourge corruption** — the higher the tier, the more packs the plague has touched or replaced: 10% touched at tiers 1-3, mostly Scourge from tier 10, all Scourge at 16
+- **Atmosphere** — echoes and maps get their own sky and fog: a client light per theme (fel green for the Legion, nightmare purple for a shattered timeline, the Caverns' smoky bronze by default), plague greys from corruption level 3, the heaviest fog in the game when overrun, and a second look for Blizzard-swept and Plague-cloud runs. No client change (`atlas_atmosphere`)
 - **Packs and rares** — creatures stand in packs where the dungeon's own creatures stood; a pack's leader may be a rare from another timeline, with 2-3 modifiers of its own
 - **6 difficulty tiers** — Novice through Grandmaster with tuned HP/damage/reward multipliers
 - **Level scaling** — Scale creatures to your party's level or use the tier's natural range
@@ -303,6 +304,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas curate <entry> [allowed\|blocked\|untested] [note]` | GM | Shows a creature's curation, AI and pools, or sets it (stored in `atlas_creature_curation`) |
 | `.atlas curate spawn <entry> [role]` | GM | Spawns a sample at your level as a run would (role stats, AI policy), to test a creature; role trash, elite (default), rare, miniboss, boss or add |
 | `.atlas map give <tier> [normal\|magic\|rare] [codes]` | GM | An Echo Sigil for the target (or you); with affix codes, exactly those |
+| `.atlas light [light] [anchor] [fade]` | GM | Shows you a client light as the sky (0 clears it); without arguments, your run's look, sent again |
 | `.atlas marker <spell>` | GM | Puts a spell's aura on the selected creature, or takes it off: auditions affix markers |
 | `.atlas loot [tier]` | GM | A map tier's gear band, epic share and sigil rules, a sample piece for the target, and the target's run quantity and rarity |
 | `.atlas map list` | GM | The target's (or your) sigils and open map run |
@@ -320,6 +322,7 @@ Every run is logged in `atlas_run_log` (characters DB) with its seed and result 
 - **Async teleport handling** — 30-second grace period after teleports to prevent false "abandoned" detection.
 - **InstanceScript neutralization** — All boss encounters are marked DONE on populate to prevent native scripts from interfering.
 - **Stock instance hygiene** — Runs happen in a real dungeon instance, so the module resets temporary Normal saves before a run, releases every bind to the run's instance afterwards (AC then deletes its saved state), and records open run instances in `atlas_open_instance` so a restart mid-run releases them at startup.
+- **Light overrides** — a run's look is sent as `SMSG_OVERRIDE_LIGHT` over an anchor light whose sphere covers any map (`Atmosphere.Anchor` 1826, `AffixAnchor` 2488), on every arrival and again 3 seconds later; the client drops it when it leaves the map. AC's own `SetZoneOverrideLight` only replaces a map's global light, which most dungeons lack.
 - **Map-run gameobjects** — rifts and the cache inside a run are summoned from that map's own update (`OnMapUpdate`), never from the world thread, and despawn by themselves once their run is gone. Sigil data lives in `atlas_map_item` (characters DB), keyed by item guid; rows whose item no longer exists are pruned at startup.
 - **Hot-path gating** — Damage, death and creature-add hooks check a lock-free "any run active?" flag and the map type before touching the session mutex.
 - **Cached lookups** — Dungeon entrances, layouts (packs, arenas), themes, pools and leaderboards are loaded once (startup, `.atlas reload`) instead of queried during play.
@@ -348,6 +351,7 @@ mod-atlas/
 │   ├── db-world/base/atlas_themes.sql    # Themes, the Scourge pool, creature curation
 │   ├── db-world/base/atlas_maps.sql      # Echo Sigils, the Lens, rifts, the cache
 │   ├── db-world/base/atlas_loot.sql      # The rewards ladder (gear by map tier)
+│   ├── db-world/base/atlas_atmosphere.sql  # Run looks: sky and fog by theme, corruption, affix
 │   ├── db-characters/base/atlas_characters_setup.sql
 │   └── db-characters/base/atlas_maps_characters.sql  # Sigil data, starter grants, first clears
 ├── tests/                            # Unit tests (AC unit_tests target)
@@ -366,6 +370,8 @@ mod-atlas/
     ├── AtlasTheme.h                  # Packs, corruption and spawn clustering (pure)
     ├── AtlasMapItem.h                # Echo Sigils: entries, rarity (pure)
     ├── AtlasLoot.h                   # Rewards ladder, sigil sustain, quantity and rarity (pure)
+    ├── AtlasAtmosphere.h             # Which look a run shows (pure)
+    ├── AtlasAtmosphere.cpp           # AtlasMgr: light overrides on entering a run
     ├── AtlasMaps.cpp                 # AtlasMgr: sigils, the Lens, rifts, the cache
     ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
     ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras

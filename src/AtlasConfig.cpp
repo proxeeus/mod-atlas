@@ -150,6 +150,10 @@ void AtlasConfig::LoadConfig(bool reload)
     }
     _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
     _affixMaxMarkers  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Affix.MaxMarkers", 2), 3);
+    _atmosphereEnabled     = sConfigMgr->GetOption<bool>  ("Atlas.Atmosphere.Enable",      true);
+    _atmosphereAnchor      = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.Anchor",      1826);
+    _atmosphereAffixAnchor = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.AffixAnchor", 2488);
+    _atmosphereFadeMs      = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.FadeMs", 2000), 60000);
     _rareMarker       = sConfigMgr->GetOption<uint32>("Atlas.Affix.RareMarker",      48019);
 
     // Maps (PLAN 1.4)

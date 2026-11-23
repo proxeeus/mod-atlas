@@ -110,6 +110,7 @@ void AtlasMgr::LoadFromDB()
     LoadLootPool();
     LoadTierGear();
     LoadLootTiers();
+    LoadAtmosphere();
     LoadAllPlayerStats();
     LoadLeaderboard();
     LoadDungeonGeometry();

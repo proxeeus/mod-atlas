@@ -47,6 +47,10 @@ public:
             static_cast<int>(session->State), session->MapId,
             session->TotalMobs, session->TotalBosses);
 
+        // The run's sky and fog, on every arrival (PLAN 1.6).
+        if (map->GetId() == session->MapId)
+            sAtlasMgr->OnPlayerEnteredRunMap(player);
+
         if (session->State != SessionState::InProgress)
             return;
 

@@ -56,6 +56,7 @@ public:
             { "map",           mapTable },
             { "loot",          HandleLoot,           SEC_GAMEMASTER,     Console::Yes },
             { "marker",        HandleMarker,         SEC_GAMEMASTER,     Console::No  },
+            { "light",         HandleLight,          SEC_GAMEMASTER,     Console::No  },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -75,6 +76,7 @@ public:
         sAtlasAffixes->Load();
         sAtlasMgr->LoadThemes();
         sAtlasMgr->LoadLootTiers();
+        sAtlasMgr->LoadAtmosphere();
         // Dungeon list or boss count may have changed: rebuild the cached
         // entrances / spawn points too (guarded by their own mutex).
         sAtlasMgr->LoadDungeonGeometry();
@@ -459,6 +461,35 @@ public:
             target->AddAura(spellId, target);
             h->PSendSysMessage("Atlas: {} ({}) put on {}.", info->SpellName[0], spellId, target->GetName());
         }
+        return true;
+    }
+
+    // .atlas light [light] [anchor] [fade ms]: shows you a light as the sky (the
+    // in-game test of PLAN 1.6; 0 clears it). Without arguments: your run's
+    // look, sent again.
+    static bool HandleLight(ChatHandler* h, Optional<uint32> light, Optional<uint32> anchor, Optional<uint32> fade)
+    {
+        Player* player = h->GetPlayer();
+        if (!player)
+            return false;
+
+        if (!light)
+        {
+            Session* s = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
+            if (!s)
+            {
+                h->SendSysMessage("Atlas: you are in no run; give a light id to try one.");
+                return false;
+            }
+            h->PSendSysMessage("Atlas: run look: {}.", sAtlasMgr->DescribeRunLook(*s));
+            sAtlasMgr->SendAtmosphere(player, *s);
+            return true;
+        }
+
+        uint32 const anchorLight = anchor.value_or(sAtlasConfig->GetAtmosphereAnchor());
+        AtlasMgr::SendLightOverride(player, anchorLight, *light, fade.value_or(sAtlasConfig->GetAtmosphereFadeMs()));
+        h->PSendSysMessage("Atlas: light {} over anchor {} (leaving the map clears it; 0 clears it now).", *light,
+            anchorLight);
         return true;
     }
 
