@@ -122,6 +122,9 @@ public:
 
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
+    // Affix visibility (PLAN 1.6): markers per creature, and the rares' own.
+    uint32 GetAffixMaxMarkers()       const { return _affixMaxMarkers; }
+    uint32 GetRareMarker()            const { return _rareMarker; }
     float  GetVisualScaleForCreatureType(uint32 type) const;
 
     // --- Timers ---
@@ -205,6 +208,8 @@ private:
     std::vector<Theme> _configThemes;
     std::vector<Theme> _databaseThemes;
     bool   _affixBotSafeOnly = true;
+    uint32 _affixMaxMarkers  = 2;
+    uint32 _rareMarker       = 48019;
     bool   _mapsEnabled      = true;
     uint8  _mapMinLevel      = 80;
     uint32 _mapPortals       = 6;

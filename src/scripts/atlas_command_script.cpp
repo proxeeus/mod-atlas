@@ -10,9 +10,12 @@
 #include "Chat.h"
 #include "ChatCommand.h"
 #include "Player.h"
+#include "Creature.h"
 #include "Group.h"
 #include "Item.h"
 #include "ObjectMgr.h"
+#include "SpellInfo.h"
+#include "SpellMgr.h"
 #include "AtlasMgr.h"
 #include "AtlasConfig.h"
 #include "AtlasAffixes.h"
@@ -52,6 +55,7 @@ public:
             { "curate",        curateTable },
             { "map",           mapTable },
             { "loot",          HandleLoot,           SEC_GAMEMASTER,     Console::Yes },
+            { "marker",        HandleMarker,         SEC_GAMEMASTER,     Console::No  },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -426,6 +430,35 @@ public:
                 h->PSendSysMessage("Atlas: {}'s run: item quantity +{}%, rarity +{}% (caps {}% / {}%).",
                     target->GetName(), AtlasMgr::RunQuantity(*s), AtlasMgr::RunRarity(*s),
                     sAtlasConfig->GetLootMaxQuantity(), sAtlasConfig->GetLootMaxRarity());
+        return true;
+    }
+
+    // .atlas marker <spell>: puts a spell's aura on the selected creature, or
+    // takes it off, to audition affix markers (atlas_affix_marker).
+    static bool HandleMarker(ChatHandler* h, uint32 spellId)
+    {
+        Creature* target = h->getSelectedCreature();
+        if (!target)
+        {
+            h->SendSysMessage("Atlas: select a creature first.");
+            return false;
+        }
+        SpellInfo const* info = sSpellMgr->GetSpellInfo(spellId);
+        if (!info)
+        {
+            h->PSendSysMessage("Atlas: no spell {}.", spellId);
+            return false;
+        }
+        if (target->HasAura(spellId))
+        {
+            target->RemoveAurasDueToSpell(spellId);
+            h->PSendSysMessage("Atlas: {} ({}) taken off {}.", info->SpellName[0], spellId, target->GetName());
+        }
+        else
+        {
+            target->AddAura(spellId, target);
+            h->PSendSysMessage("Atlas: {} ({}) put on {}.", info->SpellName[0], spellId, target->GetName());
+        }
         return true;
     }
 

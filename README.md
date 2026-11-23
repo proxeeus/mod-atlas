@@ -274,6 +274,7 @@ How they are built:
 - Monster numbers are math in the module's hooks; each creature gets its share of the run's affixes when it spawns.
 - Visible effects use stock spells (Fiery Weapon, Frozen Blows, Shadow Wrath, Fast Acting Poison for the extra hits; Blizzard, Plague Contamination, Desecration; Collapse for the burst; a creature Ice Barrier). Ground zones are at most 10 yards and last a few seconds, the shapes playerbots step out of.
 - Player affixes use the module's own passive spells (90001-90007): the server applies them, unpatched clients see no unknown aura, and they are never saved; they come off when a player leaves the run.
+- Creatures show the affixes on them: a visual-only marker aura per affix (Searing a fiery body, Frostbitten a frost one, Warded an arcane one, Necrotic a dark aura, Blighted a disease cloud, Brutal and Frenzied an enrage glow), at most `Affix.MaxMarkers` per creature; rares show the rare marker first (`Affix.RareMarker`). Markers are data (`atlas_affix_marker`, stock client spells) and come back after a creature resets. `.atlas marker <spell>` toggles a spell on the selected creature to audition others.
 - `.atlas affix list` shows them; `.atlas affix next <codes>` forces some on a character's next run, for testing.
 
 -------|--------|
@@ -302,6 +303,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas curate <entry> [allowed\|blocked\|untested] [note]` | GM | Shows a creature's curation, AI and pools, or sets it (stored in `atlas_creature_curation`) |
 | `.atlas curate spawn <entry> [role]` | GM | Spawns a sample at your level as a run would (role stats, AI policy), to test a creature; role trash, elite (default), rare, miniboss, boss or add |
 | `.atlas map give <tier> [normal\|magic\|rare] [codes]` | GM | An Echo Sigil for the target (or you); with affix codes, exactly those |
+| `.atlas marker <spell>` | GM | Puts a spell's aura on the selected creature, or takes it off: auditions affix markers |
 | `.atlas loot [tier]` | GM | A map tier's gear band, epic share and sigil rules, a sample piece for the target, and the target's run quantity and rarity |
 | `.atlas map list` | GM | The target's (or your) sigils and open map run |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |

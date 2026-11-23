@@ -132,8 +132,15 @@ public:
 
         uint8  owned   = 0;
         uint32 ownedHp = 0;
-        if (!sAtlasMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp) || !owned)
+        std::array<uint32, 3> markers{};
+        if (!sAtlasMgr->GetOwnedCreature(creature->GetGUID(), owned, ownedHp, &markers) || !owned)
             return;
+
+        // Affix markers fall off when a creature evades: back on once it is idle.
+        if (markers[0] && creature->IsAlive() && !creature->IsInCombat() && !creature->IsInEvadeMode())
+            for (uint32 spell : markers)
+                if (spell && !creature->HasAura(spell))
+                    creature->AddAura(spell, creature);
 
         if (creature->GetLevel() == owned)
             return;

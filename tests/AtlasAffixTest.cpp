@@ -141,3 +141,32 @@ TEST(AtlasAffixTest, Aggregates)
     EXPECT_EQ(fx.BossAddsPerWave, 4u);
     EXPECT_FLOAT_EQ(fx.BossHealth, 1.0f);
 }
+
+TEST(AtlasAffix, MarkersComeFromCreatureAffixesOnce)
+{
+    std::vector<AffixDefinition> defs = Pool();
+    for (AffixDefinition& d : defs)
+        d.MarkerSpell = 500 + d.Id;
+    // Two creature affixes sharing one marker, and a player affix with one.
+    defs[0].MarkerSpell = 777;
+    defs[1].MarkerSpell = 777;
+
+    std::vector<ActiveAffix> active;
+    for (AffixDefinition const& d : defs)
+        active.push_back({ d.Id, d.Values[0] });
+    AffixEffects const fx = AggregateAffixes(defs, active);
+
+    ASSERT_EQ(fx.Markers.size(), 3u);            // 777 once, 503, 504; not the Unknown affix's 505
+    EXPECT_EQ(fx.Markers[0], 777u);
+    std::set<uint32> seen(fx.Markers.begin(), fx.Markers.end());
+    EXPECT_EQ(seen.size(), fx.Markers.size());   // no repeats
+    for (uint32 spell : fx.Markers)
+    {
+        bool fromCreatureAffix = false;
+        for (AffixDefinition const& d : defs)
+            if (d.MarkerSpell == spell && IsCreatureAffix(d.Handler))
+                fromCreatureAffix = true;
+        EXPECT_TRUE(fromCreatureAffix);
+    }
+    EXPECT_TRUE(AggregateAffixes(defs, {}).Markers.empty());
+}

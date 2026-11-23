@@ -450,6 +450,17 @@ Atlas.Loot.MaxRarity = 150
 #        Default: 1
 Atlas.Affix.BotSafeOnly = 1
 
+#    Atlas.Affix.MaxMarkers
+#        Visual-only marker auras a creature shows for the affixes on it
+#        (world table atlas_affix_marker), 0 = none, at most 3.
+#        Default: 2
+Atlas.Affix.MaxMarkers = 2
+
+#    Atlas.Affix.RareMarker
+#        The marker every rare shows first (spell id, 0 = none).
+#        Default: 48019 (Arcaneform)
+Atlas.Affix.RareMarker = 48019
+
 ###############################################################################
 # ROGUELIKE MODE
 #

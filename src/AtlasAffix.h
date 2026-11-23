@@ -88,6 +88,7 @@ struct AffixDefinition
     bool         BotSafe = true;
     uint32       QuantityBonus = 0;
     uint32       RarityBonus = 0;
+    uint32       MarkerSpell = 0;      // visual-only aura on the creatures it affects (atlas_affix_marker)
 };
 
 // An affix on a run, with the value rolled for its tier.
@@ -267,6 +268,7 @@ struct AffixEffects
     std::vector<AffixExtraHit>   ExtraHits;
     std::vector<AffixPlayerAura> PlayerAuras;
     std::vector<AffixGround>     Ground;
+    std::vector<uint32>          Markers;   // creature affixes' marker spells, in affix order, no repeats
 };
 
 inline AffixEffects AggregateAffixes(std::vector<AffixDefinition> const& defs, std::vector<ActiveAffix> const& affixes)
@@ -281,6 +283,9 @@ inline AffixEffects AggregateAffixes(std::vector<AffixDefinition> const& defs, s
         float const pct = a.Value / 100.0f;
         fx.QuantityBonus += def->QuantityBonus;
         fx.RarityBonus   += def->RarityBonus;
+        if (def->MarkerSpell && IsCreatureAffix(def->Handler)
+            && std::find(fx.Markers.begin(), fx.Markers.end(), def->MarkerSpell) == fx.Markers.end())
+            fx.Markers.push_back(def->MarkerSpell);
 
         switch (def->Handler)
         {

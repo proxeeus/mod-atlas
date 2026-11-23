@@ -75,6 +75,29 @@ void AffixMgr::Load()
     else
         LOG_ERROR("module", "Atlas: table atlas_affix is empty or missing (module SQL not applied?): no affixes.");
 
+    // Affix visibility (PLAN 1.6): visual-only marker auras per affix.
+    uint32 markers = 0;
+    if (QueryResult rows = WorldDatabase.Query("SELECT affix_id, spell_id FROM atlas_affix_marker"))
+    {
+        do
+        {
+            Field* f = rows->Fetch();
+            uint32 const affixId = f[0].Get<uint32>();
+            uint32 const spellId = f[1].Get<uint32>();
+            if (!sSpellMgr->GetSpellInfo(spellId))
+            {
+                LOG_ERROR("module", "Atlas: affix {} marker spell {} doesn't exist; no marker.", affixId, spellId);
+                continue;
+            }
+            for (AffixDefinition& d : *defs)
+                if (d.Id == affixId)
+                {
+                    d.MarkerSpell = spellId;
+                    ++markers;
+                }
+        } while (rows->NextRow());
+    }
+
     std::unordered_set<uint32> spells;
     std::unordered_set<uint32> playerAuras;
     for (AffixDefinition const& d : *defs)
@@ -89,7 +112,7 @@ void AffixMgr::Load()
     _defs = std::move(defs);
     _spellIds = std::move(spells);
     _playerAuraSpells = std::move(playerAuras);
-    LOG_INFO("module", "Atlas: {} affixes loaded.", _defs->size());
+    LOG_INFO("module", "Atlas: {} affixes loaded ({} with a marker).", _defs->size(), markers);
 }
 
 std::shared_ptr<std::vector<AffixDefinition> const> AffixMgr::Definitions() const

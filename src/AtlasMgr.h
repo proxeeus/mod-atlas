@@ -195,6 +195,7 @@ public:
         uint32 SplitCount    = 0;
         uint32 AddsPerWave   = 0;
         uint8  WavesDone     = 0;
+        std::array<uint32, 3> Markers{};   // visual-only marker auras, re-applied when they fall off
     };
 
     // Tier growth (or the Endless depth curve) x the difficulty's multiplier x
@@ -224,7 +225,8 @@ public:
                                uint32 instanceId);
     // Mods and spell scale of an owned creature in one lookup (damage hooks).
     bool GetOwnedCombat(ObjectGuid guid, CreatureAffixMods& mods, float& spellScale) const;
-    bool GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const;
+    bool GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth,
+        std::array<uint32, 3>* markers = nullptr) const;
     // For the damage and heal hooks; negative when the creature isn't owned.
     float GetOwnedSpellScale(ObjectGuid guid) const;
     float GetOwnedHealScale(ObjectGuid guid) const;

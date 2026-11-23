@@ -149,6 +149,8 @@ void AtlasConfig::LoadConfig(bool reload)
         }
     }
     _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
+    _affixMaxMarkers  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Affix.MaxMarkers", 2), 3);
+    _rareMarker       = sConfigMgr->GetOption<uint32>("Atlas.Affix.RareMarker",      48019);
 
     // Maps (PLAN 1.4)
     _mapsEnabled      = sConfigMgr->GetOption<bool>  ("Atlas.Map.Enable",             true);

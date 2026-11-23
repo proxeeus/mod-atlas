@@ -263,6 +263,24 @@ void AtlasMgr::ScaleCreature(Creature* c, ScalingContext const& ctx, CreatureRol
     if (isBoss)
         mods.AddsPerWave = fx.BossAddsPerWave;
 
+    // Affix visibility (PLAN 1.6): visual-only markers, a rare's own first,
+    // then the affixes'. Evading drops them; the creature update hook puts
+    // them back once it is idle.
+    std::size_t markers = 0;
+    std::size_t const maxMarkers = std::min<std::size_t>(sAtlasConfig->GetAffixMaxMarkers(), mods.Markers.size());
+    auto addMarker = [&](uint32 spell)
+    {
+        if (!spell || markers >= maxMarkers
+            || std::find(mods.Markers.begin(), mods.Markers.begin() + markers, spell) != mods.Markers.begin() + markers)
+            return;
+        mods.Markers[markers++] = spell;
+        c->AddAura(spell, c);
+    };
+    if (role == CreatureRole::Rare)
+        addMarker(sAtlasConfig->GetRareMarker());
+    for (uint32 spell : fx.Markers)
+        addMarker(spell);
+
     RegisterOwnedCreature(c->GetGUID(), stats, mods, c->GetMap() ? c->GetMap()->GetInstanceId() : ctx.InstanceId);
 }
 
@@ -371,7 +389,8 @@ bool AtlasMgr::GetOwnedCombat(ObjectGuid guid, CreatureAffixMods& mods, float& s
     return true;
 }
 
-bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth) const
+bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth,
+    std::array<uint32, 3>* markers) const
 {
     std::lock_guard<std::mutex> lock(_ownedMutex);
 
@@ -381,6 +400,8 @@ bool AtlasMgr::GetOwnedCreature(ObjectGuid guid, uint8& level, uint32& maxHealth
 
     level     = it->second.Stats.Level;
     maxHealth = it->second.Stats.MaxHealth;
+    if (markers)
+        *markers = it->second.Mods.Markers;
     return true;
 }
 

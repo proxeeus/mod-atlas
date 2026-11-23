@@ -105,3 +105,29 @@ INSERT INTO `spell_dbc` (
 (90006, 0x000000C0, 1, 21, 1, -1, 6, 1, 0, 1, 110, 0,   0, 0, 0, 0, 0, 0,  'Atlas Affix: of Drought'),
 -- 49 SPELL_AURA_MOD_DODGE_PERCENT and 47 SPELL_AURA_MOD_PARRY_PERCENT
 (90007, 0x000000C0, 1, 21, 1, -1, 6, 1, 0, 1, 49, 0,    6, 1, 0, 1, 47, 0, 'Atlas Affix: of the Throne');
+
+-- =============================================
+-- Affix visibility (PLAN 1.6): a visual-only aura on every creature an affix
+-- affects. Stock spells whose only effect is a dummy aura with a looping
+-- visual, picked from the client's Spell.dbc; most are ones AC already puts
+-- on creatures as idle visuals. At most Atlas.Affix.MaxMarkers per creature
+-- (rares get Atlas.Affix.RareMarker first). Audition others in game with
+-- `.atlas marker <spell>` on a selected creature, edit here, `.atlas reload`.
+-- =============================================
+
+CREATE TABLE IF NOT EXISTS `atlas_affix_marker` (
+    `affix_id` INT UNSIGNED NOT NULL,
+    `spell_id` INT UNSIGNED NOT NULL,
+    `comment`  VARCHAR(100) NOT NULL DEFAULT '',
+    PRIMARY KEY (`affix_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+DELETE FROM `atlas_affix_marker` WHERE `affix_id` BETWEEN 1 AND 999;
+INSERT INTO `atlas_affix_marker` (`affix_id`, `spell_id`, `comment`) VALUES
+(1,  44427, 'Brutal: Enrage'),
+(2,  47705, 'Searing: Grand Magus Telestra (Fire) Visual'),
+(3,  47706, 'Frostbitten: Grand Magus Telestra (Frost) Visual'),
+(4,  56572, 'Necrotic: Dark Aura'),
+(5,  41290, 'Blighted: Disease Cloud'),
+(8,  44427, 'Frenzied: Enrage'),
+(13, 47704, 'Warded: Grand Magus Telestra (Arcane) Visual');
