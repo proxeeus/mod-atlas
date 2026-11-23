@@ -12,6 +12,7 @@
 #include "AtlasAffix.h"
 #include "ObjectGuid.h"
 
+#include <array>
 #include <memory>
 #include <mutex>
 #include <shared_mutex>
@@ -47,6 +48,8 @@ public:
 
     // "Brutal (Monsters deal 25% increased physical damage), of Grief (...)".
     std::string Describe(std::vector<ActiveAffix> const& affixes, bool withText) const;
+    // Code, name and text with its value, one per affix (the run HUD).
+    std::vector<std::array<std::string, 3>> DescribeRows(std::vector<ActiveAffix> const& affixes) const;
     // "M01,P01", for the run log.
     std::string Codes(std::vector<ActiveAffix> const& affixes) const;
     // Codes ("M01 P02" or "M01,P02") to affixes at a tier; unknown codes are reported.

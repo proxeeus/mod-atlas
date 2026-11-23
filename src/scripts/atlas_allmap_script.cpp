@@ -77,10 +77,7 @@ public:
             session->SessionId, player->GetName(), map->GetId(),
             session->TotalMobs, session->TotalBosses);
 
-        ChatHandler(player->GetSession()).PSendSysMessage(
-            "{} |cFFFFFFFF{}|r foes and |cFFFFFFFF{}|r master{} hold this echo (levels |cFFFFFFFF{}-{}|r).",
-            CHAT_PREFIX, session->TotalMobs, session->TotalBosses, session->TotalBosses != 1 ? "s" : "",
-            session->LevelBandMin, session->LevelBandMax);
+        ChatHandler(player->GetSession()).SendSysMessage(AtlasMgr::PopulationNotice(*session));
     }
 };
 

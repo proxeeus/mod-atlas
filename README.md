@@ -19,6 +19,8 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **10 timelines (creature themes)** — the dungeon as it was (its own inhabitants, pack by pack), a timeline the Scourge swallowed (a curated Scourge pool), or one of eight creature types: beasts, dragonkin, the Legion, elementals, giants, mortal warbands, rogue machines, or a shattered mix
 - **Scourge corruption** — the higher the tier, the more packs the plague has touched or replaced: 10% touched at tiers 1-3, mostly Scourge from tier 10, all Scourge at 16
 - **Atmosphere** — echoes and maps get their own sky and fog: a client light per theme (fel green for the Legion, nightmare purple for a shattered timeline, the Caverns' smoky bronze by default), plague greys from corruption level 3, the heaviest fog in the game when overrun, and a second look for Blizzard-swept and Plague-cloud runs. No client change (`atlas_atmosphere`)
+- **The master comes to you** — a run's master is not waiting in a room: slain foes fill its bar (elites and rares count more), and at 75% (at most 150 weighted, so huge dungeons are no full clear) it steps out of the timeways beside the party. No more searching a whole cave for the last boss, no rushing past packs
+- **Run HUD** — with the AtlasChronicle addon, a small bronze frame shows the dungeon and tier, the master's bar, foes slain, rifts left and the run's affixes as icons with their names and values on hover (`/atlashud` hides it)
 - **Packs and rares** — creatures stand in packs where the dungeon's own creatures stood; a pack's leader may be a rare from another timeline, with 2-3 modifiers of its own
 - **6 difficulty tiers** — Novice through Grandmaster with tuned HP/damage/reward multipliers
 - **Level scaling** — Scale creatures to your party's level or use the tier's natural range
@@ -244,7 +246,7 @@ Each pack is native, Scourge-touched or Scourge, by the run's tier:
 - A pack's leader is rare at `Dungeon.RareSpawnChance` (times Rare-infested), at most `Dungeon.MaxRares` per run: larger, Rare role stats, 2-3 creature affixes of its own, announced to the party.
 - Bosses follow the same table: the arena's own master, the same touched, or a Scourge champion.
 
-Themes live in the world table `atlas_theme` (module SQL `atlas_themes.sql`) beside the config's `Themes.N`; database themes use ids below 100. `atlas_creature_curation` records which creatures behave in a run: blocked ones never spawn, untested and allowed ones do. Creatures with SmartAI and no C++ script keep their own AI and spells (`Population.KeepSmartAI`); everything else, and every boss, gets Atlas's melee AI.
+Themes live in the world table `atlas_theme` (module SQL `atlas_themes.sql`) beside the config's `Themes.N`; database themes use ids below 100. `atlas_creature_curation` records which creatures behave in a run: blocked ones never spawn, untested and allowed ones do. Creatures with SmartAI and no C++ script keep their own AI and spells (`Population.KeepSmartAI`), unless that SmartAI is written for quests or events (it makes the creature invincible, hides it, sets unattackable flags or disables evading): those run copies, everything else and every boss get Atlas's melee AI. Only the module's temporary copies are affected; the stock creatures and their scripts are untouched.
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -371,7 +373,8 @@ mod-atlas/
     ├── AtlasMapItem.h                # Echo Sigils: entries, rarity (pure)
     ├── AtlasLoot.h                   # Rewards ladder, sigil sustain, quantity and rarity (pure)
     ├── AtlasAtmosphere.h             # Which look a run shows (pure)
-    ├── AtlasAtmosphere.cpp           # AtlasMgr: light overrides on entering a run
+    ├── AtlasForces.h                 # The master's bar (pure)
+    ├── AtlasAtmosphere.cpp           # AtlasMgr: light overrides and the run HUD
     ├── AtlasMaps.cpp                 # AtlasMgr: sigils, the Lens, rifts, the cache
     ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
     ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras

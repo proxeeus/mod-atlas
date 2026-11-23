@@ -757,6 +757,7 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
                 sessionId, roguelikeRunId);
 
             // Persist stats while session is still alive
+            PushRunEnded(s);
             UpdatePlayerStatsFromSession(s, success);
             LogRun(s, success);
             RemoveSessionAffixAuras(s);
@@ -821,6 +822,7 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
         SaveLeaderboardEntry(s);
 
     LogRun(s, success);
+    PushRunEnded(s);
     RemoveSessionAffixAuras(s);
     TeleportPartyOut(&s);
     ReleaseRunInstanceBinds(s);
@@ -834,7 +836,7 @@ void AtlasMgr::EndSession(uint32 sessionId, bool success)
         for (auto const& pd : s.Players)
             SetCooldown(pd.PlayerGuid);
 
-    if (mapRun && savedInstanceId)
+    if (savedInstanceId)   // rifts, caches, a master still to come
     {
         std::lock_guard<std::mutex> spawnLock(_mapSpawnMutex);
         auto sit = _mapSpawns.find(savedInstanceId);
@@ -870,6 +872,7 @@ void AtlasMgr::CleanupRoguelikeSession(uint32 sessionId, bool success)
 
     // The floor's instance is never reused (next floor or teleport home).
     LogRun(s, success);
+    PushRunEnded(s);
     RemoveSessionAffixAuras(s);
     ReleaseRunInstanceBinds(s);
 
@@ -1108,12 +1111,7 @@ void AtlasMgr::Update(uint32 diff)
                                     session.SessionId, session.MapId,
                                     session.TotalMobs, session.TotalBosses);
 
-                                std::string const ready = Acore::StringFormat(
-                                    "{} |cFFFFFFFF{}|r foes and |cFFFFFFFF{}|r master{} hold this echo "
-                                    "(levels |cFFFFFFFF{}-{}|r).",
-                                    CHAT_PREFIX, session.TotalMobs, session.TotalBosses,
-                                    session.TotalBosses != 1 ? "s" : "",
-                                    session.LevelBandMin, session.LevelBandMax);
+                                std::string const ready = PopulationNotice(session);
                                 for (auto const& pd2 : session.Players)
                                     if (Player* p2 = ObjectAccessor::FindPlayer(pd2.PlayerGuid))
                                         ChatHandler(p2->GetSession()).SendSysMessage(ready);
@@ -1166,6 +1164,9 @@ void AtlasMgr::Update(uint32 diff)
                             }
                         }
                     }
+
+                    // ---- The master's bar: called once enough forces fell ----
+                    UpdateForces(session);
 
                     // ---- Multi-phase boss resolution ----
                     // After 5 seconds, check if new creatures spawned near the boss death location.
@@ -1353,6 +1354,9 @@ void AtlasMgr::Update(uint32 diff)
             // ---- Affixes: player auras, ground timers ----
             if (session.IsActive() && !session.Affixes.empty())
                 TickSessionAffixes(session, groundRequests);
+
+            // ---- The run HUD: the header when something changed ----
+            PushRunHud(session, false);
 
             // ---- Time limit ----
             if (session.TimeLimit > 0 && session.State == SessionState::InProgress)

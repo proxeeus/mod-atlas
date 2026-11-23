@@ -299,8 +299,9 @@ public:
         std::string currentNote;
         AtlasMgr::CurationStatus const current = sAtlasMgr->GetCuration(entry, &currentNote);
         std::string const pools = sAtlasMgr->DescribePoolMembership(entry);
-        h->PSendSysMessage("Atlas: {} ({}): {}, AI {}{}, pools: {}{}{}", t->Name, entry,
+        h->PSendSysMessage("Atlas: {} ({}): {}, AI {}{}{}, pools: {}{}{}", t->Name, entry,
             AtlasMgr::CurationName(current), t->AIName.empty() ? "none" : t->AIName, t->ScriptID ? " + script" : "",
+            sAtlasMgr->HasQuestOnlyScript(entry) ? " (quest-only: Atlas AI in runs)" : "",
             pools.empty() ? "none" : pools, currentNote.empty() ? "" : " — ", currentNote);
         return true;
     }

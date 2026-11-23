@@ -2,8 +2,10 @@
 ## Title: Atlas Chronicle
 ## Notes: The Chronicle of Echoes kept by the Keepers of Time: fastest mendings, the deepest descents into the Endless Timeways, and your own record. Companion to the server module mod-atlas. /chronicle
 ## Author: mod-atlas
-## Version: 1.2
+## Version: 1.3
+## SavedVariablesPerCharacter: AtlasChronicleHUD
 ## OptionalDeps: AdiBags
 
 Chronicle.lua
 Sigils.lua
+RunHud.lua

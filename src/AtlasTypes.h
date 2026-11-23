@@ -103,6 +103,7 @@ struct SpawnedCreature
     bool        LootFilled = false;   // true once FillCreatureLoot has run post-death
     bool        KillCredited = false; // true once kill XP/count has been awarded
     uint16      PackId     = 0;       // the layout anchor it stood at, 1-based; 0 = boss or add
+    uint8       Force      = 0;       // its weight on the master's bar (AtlasForces.h)
 };
 
 struct PendingPhaseCheck
@@ -171,6 +172,22 @@ struct Session
     uint32  Wipes       = 0;
 
     Position EntrancePos;
+
+    // The master's arrival (AtlasForces.h): slain forces fill a bar; at the
+    // threshold the master steps out of the timeways beside the party.
+    struct PendingBoss
+    {
+        uint32 Entry   = 0;
+        bool   Touched = false;
+        bool   Scourge = false;
+    };
+    std::vector<PendingBoss> PendingBosses;   // chosen at populate, summoned at the threshold
+    uint32  ForcesTotal     = 0;
+    uint32  ForcesThreshold = 0;              // 0: masters wait at their own spots
+    uint32  ForcesKilled    = 0;
+    uint8   ForcesStep      = 0;              // quarter of the bar last announced
+    bool    BossCalled      = false;
+    uint64  HudStamp        = 0;              // the run HUD last pushed (changes trigger a push)
 
     // Map runs (PLAN 1.4): opened by placing an Echo Sigil in the Timeways
     // Lens. Entering through its rift is free the first time for each member;

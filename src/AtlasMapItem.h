@@ -37,6 +37,7 @@ constexpr uint32 GO_ATLAS_LENS      = 900000;   // the Timeways Lens, Dalaran
 constexpr uint32 GO_ATLAS_RIFT      = 900001;   // Rift in Time, beside the Lens
 constexpr uint32 GO_ATLAS_RIFT_HOME = 900002;   // Rift to Dalaran, inside a run
 constexpr uint32 GO_ATLAS_CACHE     = 900003;   // Cache of the Keepers
+constexpr uint32 GO_ATLAS_MASTER_RIFT = 900004; // where a run's master steps out (decoration)
 
 enum class MapRarity : uint8
 {

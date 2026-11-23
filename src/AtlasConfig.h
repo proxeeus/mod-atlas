@@ -12,6 +12,7 @@
 #include "AtlasScalingMath.h"
 #include "AtlasTheme.h"
 #include "AtlasLoot.h"
+#include "AtlasForces.h"
 #include <array>
 #include <vector>
 #include <unordered_map>
@@ -120,6 +121,12 @@ public:
     uint32 GetLootMaxQuantity()       const { return _lootMaxQuantity; }
     uint32 GetLootMaxRarity()         const { return _lootMaxRarity; }
 
+    // --- The master's arrival (forces bar) ---
+    uint32 GetBossSummonAtForces()    const { return _bossSummonAtForces; }   // %, 0 = masters wait in place
+    ForceWeights const& GetForceWeights() const { return _forceWeights; }
+    uint32 GetBossSummonDelay()       const { return _bossSummonDelay; }
+    uint32 GetBossForcesCap()         const { return _bossForcesCap; }        // 0 = none
+
     // --- Atmosphere (PLAN 1.6) ---
     bool   IsAtmosphereEnabled()      const { return _atmosphereEnabled; }
     uint32 GetAtmosphereAnchor()      const { return _atmosphereAnchor; }
@@ -215,6 +222,10 @@ private:
     std::vector<Theme> _databaseThemes;
     bool   _affixBotSafeOnly = true;
     uint32 _affixMaxMarkers  = 2;
+    uint32 _bossSummonAtForces    = 75;
+    ForceWeights _forceWeights;
+    uint32 _bossSummonDelay       = 5;
+    uint32 _bossForcesCap         = 150;
     bool   _atmosphereEnabled     = true;
     uint32 _atmosphereAnchor      = 1826;
     uint32 _atmosphereAffixAnchor = 2488;

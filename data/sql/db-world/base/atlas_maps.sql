@@ -1,6 +1,6 @@
 -- mod-atlas — Echo Sigils, the Timeways Lens, rifts and the Keepers' cache (PLAN 1.4).
 --
--- Reserved IDs (DESIGN §19): items 90001-90216, gameobject entries 900000-900003,
+-- Reserved IDs (DESIGN §19): items 90001-90216, gameobject entries 900000-900004,
 -- gameobject guid 8000101, npc_text 500001-500003. Every DELETE matches the
 -- module's own rows only, so re-applying this file is safe.
 --
@@ -68,14 +68,17 @@ INSERT INTO `item_template` (`entry`, `class`, `subclass`, `name`, `displayid`, 
 -- The Timeways Lens, the rifts and the cache. Models by their size in the
 -- client's GameObjectDisplayInfo.dbc (bounding boxes): the scrying orb on its
 -- stand (7150, about 2 yd), the mage portals to the Caverns of Time (8475) and
--- to Dalaran (8111, about 3.4 yd), the titan chest (1387). The Caverns'
+-- to Dalaran (8111, about 3.4 yd), the titan chest (1387). 900004 is the
+-- non-interactive rift a run's master steps out of (generic gameobject). The Caverns'
 -- hourglass and time rift are landmarks of 150 and 50 yd: never use them here.
-DELETE FROM `gameobject_template` WHERE `entry` BETWEEN 900000 AND 900003 AND `ScriptName` LIKE 'go_atlas_%';
+DELETE FROM `gameobject_template` WHERE `entry` BETWEEN 900000 AND 900004
+    AND (`ScriptName` LIKE 'go_atlas_%' OR `name` = 'Rift of the Master');
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `size`, `ScriptName`) VALUES
 (900000,  2, 7150, 'The Timeways Lens',         'Speak',    1.0, 'go_atlas_lens'),
 (900001, 10, 8475, 'Rift in Time',              'Interact', 1.0, 'go_atlas_rift'),
 (900002, 10, 8111, 'Rift to Dalaran',           'Interact', 1.0, 'go_atlas_rift_home'),
-(900003, 10, 1387, 'Cache of the Keepers',      'Interact', 0.8, 'go_atlas_cache');
+(900003, 10, 1387, 'Cache of the Keepers',      'Interact', 0.8, 'go_atlas_cache'),
+(900004,  5, 8475, 'Rift of the Master',        '',         1.4, '');
 
 -- The Lens stands beside Chronicler Esmadormu in Dalaran (creature guid 8000010).
 DELETE FROM `gameobject` WHERE `guid` = 8000101 AND `id` = 900000;

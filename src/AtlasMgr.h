@@ -260,7 +260,10 @@ public:
     // Which themes and pack roles list an entry ("51:melee 51:leader").
     std::string    DescribePoolMembership(uint32 entry) const;
     // SmartAI creatures keep their own AI (Atlas.Population.KeepSmartAI).
+    // Not when that SmartAI is written for quests or events (invincible,
+    // hidden, unattackable, never evading): run copies get AtlasCreatureAI.
     static bool    KeepsStockAI(Creature const* creature);
+    bool           HasQuestOnlyScript(uint32 entry) const;
     // A creature spawned as a run would spawn it, at a GM's side (`.atlas curate spawn`).
     Creature*      SpawnCurationSample(Player* gm, uint32 entry, CreatureRole role);
 
@@ -318,10 +321,18 @@ public:
     };
     void        LoadAtmosphere();   // atlas_atmosphere (also `.atlas reload`)
     RunLook     GetRunLook(Session const& session) const;
-    void        SendAtmosphere(Player* player, Session const& session);
+    void        SendAtmosphere(Player* player, Session const& session, bool log = false);
     // From the allmap script: a run member arrived on the run's map.
     void        OnPlayerEnteredRunMap(Player* player);
     std::string DescribeRunLook(Session const& session) const;
+    // The run HUD (AtlasAtmosphere.cpp, PLAN 1.7): pushed to the players of a
+    // run who have the addon. Full on arrival and on hello, the header when
+    // it changes (from Update), ended when the run ends.
+    void        PushRunHud(Session& session, bool full);
+    void        PushRunHud(Player* player);   // full, for one player (hello)
+    void        PushRunEnded(Session const& session);
+    // "N foes hold this echo..." once it is populated.
+    static std::string PopulationNotice(Session const& session);
     // SMSG_OVERRIDE_LIGHT: `lightId` replaces `anchorLight` (0 clears it).
     static void SendLightOverride(Player* player, uint32 anchorLight, uint32 lightId, uint32 fadeMs);
 
@@ -425,6 +436,11 @@ private:
     // Map runs (AtlasMaps.cpp): a cleared pack's sigil chance, first clears.
     void   RollPackSigils(Session& session);
     void   MarkFirstClears(Session& session);
+
+    // The master's arrival (AtlasPopulation.cpp): the bar, and the summon.
+    void      UpdateForces(Session& session);
+    Creature* SummonRunBoss(Session& session, Map* map, Session::PendingBoss const& boss, Position const& pos);
+    void      SummonPendingBosses(Session& session, Map* map);
     void LoadLeaderboard();
     void CleanupSession(Session& session);
 
@@ -476,6 +492,8 @@ private:
         uint32   Entry       = 0;
         Position Pos;
         uint32   LifetimeSec = 0;
+        uint32   SessionId   = 0;   // > 0: summon that run's pending masters beside its party
+        uint64   Due         = 0;   // game time it may happen at
     };
     std::unordered_map<uint32, std::vector<MapSpawnRequest>> _mapSpawns;   // by instance id
     std::mutex            _mapSpawnMutex;
@@ -499,6 +517,7 @@ private:
     };
     std::map<uint32, ThemePool> _themePools;
     std::unordered_map<uint32, std::pair<CurationStatus, std::string>> _curation;
+    std::unordered_set<uint32> _questScripts;   // SmartAI for quests and events only (LoadThemes)
     mutable std::mutex _themeMutex;
 
     // Where runs happen (DESIGN §5). V0 runs in stock dungeons; clone layouts

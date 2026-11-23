@@ -178,6 +178,16 @@ std::string AffixMgr::Describe(std::vector<ActiveAffix> const& affixes, bool wit
     return out;
 }
 
+std::vector<std::array<std::string, 3>> AffixMgr::DescribeRows(std::vector<ActiveAffix> const& affixes) const
+{
+    auto defs = Definitions();
+    std::vector<std::array<std::string, 3>> rows;
+    for (ActiveAffix const& a : affixes)
+        if (AffixDefinition const* def = FindAffix(*defs, a.Id))
+            rows.push_back({ def->Code, def->Name, FormatAffix(*def, a.Value) });
+    return rows;
+}
+
 std::string AffixMgr::Codes(std::vector<ActiveAffix> const& affixes) const
 {
     auto defs = Definitions();

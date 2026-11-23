@@ -779,6 +779,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         sc.Guid = c->GetGUID(); sc.Entry = entry;
         sc.IsElite = role != CreatureRole::Trash; sc.IsBoss = false; sc.IsRare = asRare;
         sc.PackId = packId;
+        ForceWeights const& weights = sAtlasConfig->GetForceWeights();
+        sc.Force = static_cast<uint8>(std::min<uint32>(255,
+            asRare ? weights.Rare : sc.IsElite ? weights.Elite : weights.Trash));
+        session->ForcesTotal += sc.Force;
         session->SpawnedCreatures.push_back(sc);
         if (uint32 recentLimit = sAtlasConfig->GetRecentCreatureEntries(); recentLimit > 0)
         {
@@ -801,6 +805,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     // then the members the run's affixes add (Teeming, Swarming), up to the
     // live-creature cap. A pack's leader may be a rare.
     session->PacksDone.assign(layout->Anchors.size(), false);
+    session->ForcesTotal = 0;
     for (LayoutAnchor const& anchor : layout->Anchors)
     {
         ++packId;
@@ -837,8 +842,15 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
                         CHAT_PREFIX, notes);
     }
 
-    // Bosses: the arena's own master (native), the same touched by the
-    // plague, or a Scourge champion, by the same corruption table.
+    // Masters: the arena's own (native), the same touched by the plague, or a
+    // Scourge champion, by the same corruption table. With a forces bar
+    // (Atlas.Boss.SummonAtForces) they are only chosen now and step out beside
+    // the party once enough of the echo's forces have fallen; else they wait
+    // at their arenas as before.
+    uint32 const summonAt = sAtlasConfig->GetBossSummonAtForces();
+    session->PendingBosses.clear();
+    session->BossCalled = false;
+    session->ForcesStep = 0;
     uint32 bossesSpawned = 0;
     for (LayoutArena const& arena : layout->Arenas)
     {
@@ -857,27 +869,23 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             entry = SelectDungeonBoss(theme, session->Rng);
         if (!entry) { LOG_WARN("module", "Atlas: No boss candidate."); continue; }
 
-        bool const touched = kind == PackKind::Touched;
-        Creature* b = map->SummonCreature(entry, arena.Centre);
-        if (!b) continue;
-
-        prepareHostile(b);
-        b->SetCorpseDelay(600);          // 10 min corpse for bosses
-
-        applyLevelAndStats(b, CreatureRole::Boss, true, touched ? touchedAffixes : std::vector<ActiveAffix>());
-        if (touched && touchedAura)
-            b->AddAura(touchedAura, b);
-
-        SpawnedCreature sc;
-        sc.Guid = b->GetGUID(); sc.Entry = entry;
-        sc.IsElite = true; sc.IsBoss = true;
-        session->SpawnedCreatures.push_back(sc);
-        ++bossesSpawned;
-
-        LOG_INFO("module", "Atlas: Boss spawned — entry {}, name '{}', {}, AI: AtlasCreatureAI (auto-attack), "
-            "Level: {}", b->GetEntry(), b->GetName(),
-            kind == PackKind::Scourge ? "Scourge" : touched ? "Scourge-touched" : "native", b->GetLevel());
+        Session::PendingBoss boss;
+        boss.Entry   = entry;
+        boss.Touched = kind == PackKind::Touched;
+        boss.Scourge = kind == PackKind::Scourge;
+        if (summonAt)
+        {
+            session->PendingBosses.push_back(boss);
+            ++bossesSpawned;
+        }
+        else if (SummonRunBoss(*session, map, boss, arena.Centre))
+            ++bossesSpawned;
     }
+    session->ForcesThreshold = summonAt
+        ? ForcesThreshold(session->ForcesTotal, summonAt, sAtlasConfig->GetBossForcesCap()) : 0;
+    if (summonAt)
+        LOG_INFO("module", "Atlas: Session {} — {} master{} wait for {} of {} forces ({}%).", session->SessionId,
+            bossesSpawned, bossesSpawned != 1 ? "s" : "", session->ForcesThreshold, session->ForcesTotal, summonAt);
     session->TotalBosses = bossesSpawned;
 
     // A map run's way home stands at its entrance (summoned from this map's
@@ -1046,17 +1054,32 @@ void AtlasMgr::LoadThemes()
         } while (r->NextRow());
     }
 
+    // SmartAI written for quests and events, unfit in a run: invincible at
+    // some health (42), hiding (47), setting unit flags such as unattackable
+    // (18), never evading (117). Run copies of these get AtlasCreatureAI; the
+    // stock creatures and their scripts are untouched.
+    std::unordered_set<uint32> questScripts;
+    if (QueryResult r = WorldDatabase.Query("SELECT DISTINCT entryorguid FROM smart_scripts "
+        "WHERE source_type = 0 AND entryorguid > 0 AND action_type IN (18, 42, 47, 117)"))
+    {
+        do
+            questScripts.insert(r->Fetch()[0].Get<uint32>());
+        while (r->NextRow());
+    }
+
     std::size_t const themeCount = themes.size();
     std::size_t const curationCount = curation.size();
+    std::size_t const questScriptCount = questScripts.size();
     {
         std::lock_guard<std::mutex> lock(_themeMutex);
         _themePools = std::move(pools);
         _curation = std::move(curation);
+        _questScripts = std::move(questScripts);
     }
     sAtlasConfig->SetDatabaseThemes(std::move(themes));
 
-    LOG_INFO("module", "Atlas: {} database themes, {} pool entries ({} unfit to spawn, skipped), {} curation rows.",
-        themeCount, poolRows, unfit, curationCount);
+    LOG_INFO("module", "Atlas: {} database themes, {} pool entries ({} unfit to spawn, skipped), {} curation rows, "
+        "{} creatures whose SmartAI is for quests only.", themeCount, poolRows, unfit, curationCount, questScriptCount);
 }
 
 AtlasMgr::CurationStatus AtlasMgr::GetCuration(uint32 entry, std::string* note) const
@@ -1133,7 +1156,174 @@ bool AtlasMgr::KeepsStockAI(Creature const* creature)
     if (!creature || !sAtlasConfig->KeepsSmartAI())
         return false;
     CreatureTemplate const* t = creature->GetCreatureTemplate();
-    return t && t->AIName == "SmartAI" && !t->ScriptID;
+    return t && t->AIName == "SmartAI" && !t->ScriptID && !sAtlasMgr->HasQuestOnlyScript(t->Entry);
+}
+
+bool AtlasMgr::HasQuestOnlyScript(uint32 entry) const
+{
+    std::lock_guard<std::mutex> lock(_themeMutex);
+    return _questScripts.count(entry) != 0;
+}
+
+Creature* AtlasMgr::SummonRunBoss(Session& session, Map* map, Session::PendingBoss const& boss, Position const& pos)
+{
+    if (!map || !boss.Entry)
+        return nullptr;
+
+    OwnSpawnScope const own;
+    Creature* b = map->SummonCreature(boss.Entry, pos);
+    if (!b)
+        return nullptr;
+
+    b->SetFaction(14);
+    b->SetReactState(REACT_AGGRESSIVE);
+    b->RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NON_ATTACKABLE | UNIT_FLAG_IMMUNE_TO_PC | UNIT_FLAG_IMMUNE_TO_NPC
+        | UNIT_FLAG_PACIFIED | UNIT_FLAG_STUNNED | UNIT_FLAG_FLEEING | UNIT_FLAG_NOT_SELECTABLE);
+    b->SetUInt32Value(UNIT_FIELD_FLAGS_2, 0);
+    b->SetImmuneToPC(false);
+    b->SetImmuneToNPC(false);
+    b->setActive(true);
+    b->SetCorpseDelay(600);          // 10 min corpse for bosses
+
+    // As every run creature: the template's spawn auras off, level, size, role
+    // stats with the run's affixes (and the plague's, when touched).
+    b->RemoveAllAuras();
+    b->SetLevel(session.EffectiveLevel);
+    b->SetObjectScale(1.3f);
+    std::vector<ActiveAffix> ownAffixes;
+    if (boss.Touched)
+    {
+        std::string unknown;
+        ownAffixes = sAtlasAffixes->Parse(sAtlasConfig->GetTouchedAffixCode(), session.Tier, unknown);
+    }
+    ScaleCreature(b, ContextOf(session), CreatureRole::Boss, ownAffixes);
+    for (uint32 mech = 1; mech < MAX_MECHANIC; ++mech)
+        b->ApplySpellImmune(0, IMMUNITY_MECHANIC, mech, false);
+    b->ApplySpellImmune(0, IMMUNITY_SCHOOL, SPELL_SCHOOL_MASK_ALL, false);
+    b->SetWanderDistance(0.0f);
+    b->SetDefaultMovementType(IDLE_MOTION_TYPE);
+
+    // Bosses always take AtlasCreatureAI (see applyLevelAndStats in PopulateDungeon).
+    b->m_Events.KillAllEvents(false);
+    CreatureAI* ai = new AtlasCreatureAI(b);
+    if (!b->AIM_Initialize(ai))
+        delete ai;
+
+    if (boss.Touched)
+        if (uint32 aura = sAtlasConfig->GetTouchedAura())
+            b->AddAura(aura, b);
+    b->UpdateObjectVisibility(true);
+
+    _instanceCreatureGuids[map->GetInstanceId()].push_back(b->GetGUID());
+    SpawnedCreature sc;
+    sc.Guid = b->GetGUID();
+    sc.Entry = boss.Entry;
+    sc.IsElite = true;
+    sc.IsBoss = true;
+    session.SpawnedCreatures.push_back(sc);
+
+    LOG_INFO("module", "Atlas: Boss spawned — entry {}, name '{}', {}, at ({:.1f}, {:.1f}, {:.1f}), level {}",
+        b->GetEntry(), b->GetName(), boss.Scourge ? "Scourge" : boss.Touched ? "Scourge-touched" : "native",
+        pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), b->GetLevel());
+    return b;
+}
+
+void AtlasMgr::UpdateForces(Session& session)
+{
+    if (session.BossCalled || session.PendingBosses.empty())
+        return;
+
+    uint32 killed = 0;
+    for (SpawnedCreature const& sc : session.SpawnedCreatures)
+        if (sc.IsDead)
+            killed += sc.Force;
+    session.ForcesKilled = killed;
+
+    uint32 const progress = ForcesProgress(killed, session.ForcesThreshold);
+    uint8 const step = ForcesStep(progress);
+    if (step <= session.ForcesStep)
+        return;
+    session.ForcesStep = step;
+
+    std::string const text = step < 4
+        ? Acore::StringFormat("{} The echo's defenders fall. Its master stirs: |cFFFFFFFF{}%|r.",
+            session.RoguelikeRunId ? CHAT_PREFIX_ENDLESS : CHAT_PREFIX, step * 25)
+        : Acore::StringFormat("{} Enough! The echo's master comes for you.",
+            session.RoguelikeRunId ? CHAT_PREFIX_ENDLESS : CHAT_PREFIX);
+    for (PlayerSessionData const& pd : session.Players)
+        if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+            if (p->GetSession())
+                ChatHandler(p->GetSession()).SendSysMessage(text);
+
+    if (step < 4)
+        return;
+
+    session.BossCalled = true;
+    MapSpawnRequest request;
+    request.SessionId = session.SessionId;
+    request.Due = GameTime::GetGameTime().count() + sAtlasConfig->GetBossSummonDelay();
+    {
+        std::lock_guard<std::mutex> lock(_mapSpawnMutex);
+        _mapSpawns[session.InstanceId].push_back(request);
+        _mapSpawnCount.fetch_add(1, std::memory_order_relaxed);
+    }
+    LOG_INFO("module", "Atlas: Session {} — {} of {} forces slain: the master is called.", session.SessionId,
+        killed, session.ForcesTotal);
+}
+
+void AtlasMgr::SummonPendingBosses(Session& session, Map* map)
+{
+    // Beside the party: the leader if it stands here alive, else a player,
+    // else anyone of the run.
+    Player* anchor = nullptr;
+    int anchorRank = 0;
+    for (PlayerSessionData const& pd : session.Players)
+    {
+        Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
+        if (!p || !p->IsAlive() || p->GetMap() != map)
+            continue;
+        int const rank = pd.PlayerGuid == session.LeaderGuid ? 3 : IsRealPlayer(p) ? 2 : 1;
+        if (rank > anchorRank)
+        {
+            anchor = p;
+            anchorRank = rank;
+        }
+    }
+    if (!anchor)
+        return;
+
+    std::vector<Session::PendingBoss> const bosses = std::move(session.PendingBosses);
+    session.PendingBosses.clear();
+
+    for (std::size_t i = 0; i < bosses.size(); ++i)
+    {
+        Position pos = anchor->GetNearPosition(8.0f, float(i) * 0.6f);
+        pos.SetOrientation(pos.GetAbsoluteAngle(anchor));
+        float const o = pos.GetOrientation();
+        map->SummonGameObject(GO_ATLAS_MASTER_RIFT, pos.GetPositionX(), pos.GetPositionY(), pos.GetPositionZ(), o,
+            0.0f, 0.0f, std::sin(o / 2.0f), std::cos(o / 2.0f), 20);
+        if (Creature* b = SummonRunBoss(session, map, bosses[i], pos))
+        {
+            std::string const text = Acore::StringFormat("{} |cFFFF4040{}|r steps out of the timeways!",
+                session.RoguelikeRunId ? CHAT_PREFIX_ENDLESS : CHAT_PREFIX, b->GetName());
+            for (PlayerSessionData const& pd : session.Players)
+                if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                    if (p->GetSession())
+                        ChatHandler(p->GetSession()).SendSysMessage(text);
+        }
+    }
+}
+
+std::string AtlasMgr::PopulationNotice(Session const& session)
+{
+    char const* prefix = session.RoguelikeRunId ? CHAT_PREFIX_ENDLESS : CHAT_PREFIX;
+    if (session.ForcesThreshold)
+        return Acore::StringFormat("{} |cFFFFFFFF{}|r foes hold this echo (levels |cFFFFFFFF{}-{}|r). Slay enough "
+            "of them and its master will come for you.", prefix, session.TotalMobs, session.LevelBandMin,
+            session.LevelBandMax);
+    return Acore::StringFormat("{} |cFFFFFFFF{}|r foes and |cFFFFFFFF{}|r master{} hold this echo (levels "
+        "|cFFFFFFFF{}-{}|r).", prefix, session.TotalMobs, session.TotalBosses, session.TotalBosses != 1 ? "s" : "",
+        session.LevelBandMin, session.LevelBandMax);
 }
 
 Creature* AtlasMgr::SpawnCurationSample(Player* gm, uint32 entry, CreatureRole role)

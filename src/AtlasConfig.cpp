@@ -150,6 +150,24 @@ void AtlasConfig::LoadConfig(bool reload)
     }
     _affixBotSafeOnly = sConfigMgr->GetOption<bool>("Atlas.Affix.BotSafeOnly",       true);
     _affixMaxMarkers  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Affix.MaxMarkers", 2), 3);
+    _bossSummonAtForces    = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Boss.SummonAtForces", 75), 100);
+    _bossSummonDelay       = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Boss.SummonDelay", 5), 60);
+    _bossForcesCap         = sConfigMgr->GetOption<uint32>("Atlas.Boss.ForcesCap", 150);
+    _forceWeights = ForceWeights();
+    {
+        auto parts = SplitString(StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Boss.ForceWeights",
+            "1,3,10")), ',');
+        try
+        {
+            if (parts.size() == 3)
+                _forceWeights = { static_cast<uint32>(std::stoul(parts[0])),
+                    static_cast<uint32>(std::stoul(parts[1])), static_cast<uint32>(std::stoul(parts[2])) };
+        }
+        catch (...)
+        {
+            LOG_ERROR("module", "Atlas: Bad Atlas.Boss.ForceWeights; using 1,3,10.");
+        }
+    }
     _atmosphereEnabled     = sConfigMgr->GetOption<bool>  ("Atlas.Atmosphere.Enable",      true);
     _atmosphereAnchor      = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.Anchor",      1826);
     _atmosphereAffixAnchor = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.AffixAnchor", 2488);

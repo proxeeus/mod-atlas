@@ -889,24 +889,62 @@ void AtlasMgr::ProcessMapSpawns(Map* map)
     if (!_mapSpawnCount.load(std::memory_order_relaxed) || !map || !map->IsDungeon())
         return;
 
+    uint64 const now = GameTime::GetGameTime().count();
     std::vector<MapSpawnRequest> requests;
     {
         std::lock_guard<std::mutex> lock(_mapSpawnMutex);
         auto it = _mapSpawns.find(map->GetInstanceId());
         if (it == _mapSpawns.end())
             return;
-        requests = std::move(it->second);
-        _mapSpawns.erase(it);
+        // Due ones only; the rest wait in the queue.
+        std::vector<MapSpawnRequest> waiting;
+        for (MapSpawnRequest& r : it->second)
+            (r.Due > now ? waiting : requests).push_back(std::move(r));
+        if (requests.empty())
+        {
+            it->second = std::move(waiting);
+            return;
+        }
         _mapSpawnCount.fetch_sub(static_cast<uint32>(requests.size()), std::memory_order_relaxed);
+        if (waiting.empty())
+            _mapSpawns.erase(it);
+        else
+            it->second = std::move(waiting);
     }
 
+    std::vector<MapSpawnRequest> retry;
     for (MapSpawnRequest const& r : requests)
     {
+        // A run's masters, beside its party (UpdateForces called them).
+        if (r.SessionId)
+        {
+            std::lock_guard<std::mutex> lock(_sessionMutex);
+            auto it = _activeSessions.find(r.SessionId);
+            if (it == _activeSessions.end() || !it->second.IsActive() || it->second.PendingBosses.empty())
+                continue;
+            SummonPendingBosses(it->second, map);
+            if (!it->second.PendingBosses.empty())   // nobody alive inside yet: try again shortly
+            {
+                MapSpawnRequest again = r;
+                again.Due = now + 2;
+                retry.push_back(again);
+            }
+            continue;
+        }
+
         float const o = r.Pos.GetOrientation();
         if (!map->SummonGameObject(r.Entry, r.Pos.GetPositionX(), r.Pos.GetPositionY(), r.Pos.GetPositionZ(), o,
             0.0f, 0.0f, std::sin(o / 2.0f), std::cos(o / 2.0f), r.LifetimeSec))
             LOG_ERROR("module", "Atlas: could not summon gameobject {} in instance {}.", r.Entry,
                 map->GetInstanceId());
+    }
+
+    if (!retry.empty())
+    {
+        std::lock_guard<std::mutex> lock(_mapSpawnMutex);
+        auto& queue = _mapSpawns[map->GetInstanceId()];
+        queue.insert(queue.end(), retry.begin(), retry.end());
+        _mapSpawnCount.fetch_add(static_cast<uint32>(retry.size()), std::memory_order_relaxed);
     }
 }
 

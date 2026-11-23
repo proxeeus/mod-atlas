@@ -18,6 +18,10 @@
  *                               0 backpack, 1-4 bags, -1 bank, 5-11 bank bags)
  *           -> MH:<req>:bag,slot,entry,tier,rarity,dungeon,theme   (only for a sigil)
  *              MA:<req>:affix;affix;...   MZ:<req>
+ *   server  UH:0:kind,tier,rarity,portals,forces,master,slain,total,dungeon,theme
+ *                               the run HUD (pushed: on arrival, on hello, on change)
+ *           UA:0:code,name,text;...   UZ:0     the run's affixes, after a full UH
+ *           UX:0                the run is over
  *   server  O                   open the window (sent by the Chronicler)
  *           OFF                 the module is disabled
  * Text fields escape , ; : | % as %XX.
@@ -159,6 +163,9 @@ namespace
         SendRows(player, "DF:" + req, tiers);
 
         Send(player, "HZ:" + req);
+
+        // Already in a run (a /reload): its HUD at once.
+        sAtlasMgr->PushRunHud(player);
     }
 
     void HandleEchoes(Player* player, std::string const& req, uint32 mapId)
@@ -342,6 +349,27 @@ namespace Atlas::Chronicle
     void Open(Player* player)
     {
         Send(player, "O");
+    }
+
+    void SendRun(Player* player, RunHud const& hud, std::vector<std::array<std::string, 3>> const* affixes)
+    {
+        if (!player || !HasAddon(player->GetGUID()))
+            return;
+        Send(player, Acore::StringFormat("UH:0:{},{},{},{},{},{},{},{},{},{}", hud.Kind, hud.Tier, hud.Rarity,
+            hud.Portals, hud.Forces, hud.Master, hud.Slain, hud.Total, Escape(hud.Dungeon), Escape(hud.Theme)));
+        if (!affixes)
+            return;
+        std::vector<std::string> rows;
+        for (auto const& a : *affixes)
+            rows.push_back(Escape(a[0]) + "," + Escape(a[1]) + "," + Escape(a[2]));
+        SendRows(player, "UA:0", rows);
+        Send(player, "UZ:0");
+    }
+
+    void SendRunEnded(Player* player)
+    {
+        if (player && HasAddon(player->GetGUID()))
+            Send(player, "UX:0");
     }
 }
 
