@@ -3,15 +3,16 @@
 --    holds (dungeon, timeline, instabilities) is asked of the server
 --    (M:<req>:<bag>:<slot>, see atlas_chronicle_script.cpp).
 --  * Icons: the unpatched client has no Item.dbc rows for sigils and shows a
---    question mark on the bag button; this puts the sigil's rune there, on
+--    question mark on the bag button; this puts the sigil's watch there, on
 --    Blizzard's bags, the bank and AdiBags.
 
 local PREFIX = "ATLAS"
 local SIGIL_BASE = 90000
+-- The Keepers' pocket watches (never INV_Misc_Rune_01: the Hearthstone's).
 local ICONS = {
-    [0] = "Interface\\Icons\\INV_Misc_Rune_01",   -- normal
-    [1] = "Interface\\Icons\\INV_Misc_Rune_04",   -- magic
-    [2] = "Interface\\Icons\\INV_Misc_Rune_09",   -- rare
+    [0] = "Interface\\Icons\\INV_Misc_PocketWatch_01",   -- normal
+    [1] = "Interface\\Icons\\INV_Misc_PocketWatch_02",   -- magic
+    [2] = "Interface\\Icons\\INV_Misc_PocketWatch_03",   -- rare
 }
 local BRONZE = { 0.80, 0.50, 0.20 }
 local SOFT = { 0.75, 0.75, 0.75 }

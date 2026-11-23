@@ -137,7 +137,7 @@ Echoes run on **Normal** dungeon difficulty only (a heroic run could lock the gr
 
 Maps cost a sigil instead of a cooldown. Their tier sets the creatures' strength (tier growth), the corruption of the packs and the tier of the sigils they drop. Sigils open tiers 1-5 in Classic dungeons, 6-10 in The Burning Crusade, 11-16 in Wrath of the Lich King (the Frozen Halls excepted). Same sigil, same echo: the seed is stored with it.
 
-Sigil tooltips need the AtlasChronicle addon (an item link carries only the tier and rarity); the Lens lists every sigil's echo in its menu. An unpatched client also shows sigils with a question-mark icon; the addon puts their rune on the bag button.
+Sigil tooltips need the AtlasChronicle addon (an item link carries only the tier and rarity); the Lens lists every sigil's echo in its menu. An unpatched client also shows sigils with a question-mark icon; the addon puts their pocket-watch icon on the bag button.
 
 ### The Endless Timeways
 
