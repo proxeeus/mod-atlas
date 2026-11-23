@@ -404,18 +404,20 @@ Atlas.Map.StarterSigils = 3
 Atlas.Map.ExcludeSources = "632,658,668"
 
 #    SIGIL SUSTAIN (PLAN 1.5): a mended run's cache holds one sigil for each
-#    player, a second at ExtraDropChance %; each cleared pack drops one at
-#    PackDropChance % (for each player inside); an account's first clear of a
-#    dungeon at a tier adds one of the next tier. Each sigil's tier shifts by
-#    DropTierShift weights: one lower, the same, one higher, two higher. The
-#    defaults sustain a tier about two runs in three; affix quantity raises the
-#    chances. `.atlas loot [tier]` shows the ladder.
+#    player, a second at ExtraDropChance %. Each cleared pack drops one (for
+#    each player inside) at SigilChancePerForce % per force point it held
+#    (Atlas.Boss.ForceWeights), so lone creatures drop no more than packs of
+#    the same weight: about 0.2 a run at 150 forces. An account's first clear
+#    of a dungeon at a tier adds one of the next tier. Each sigil's tier
+#    shifts by DropTierShift weights: one lower, the same, one higher, two
+#    higher. The defaults sustain a tier about two runs in three; affix
+#    quantity raises the chances. `.atlas loot [tier]` shows the ladder.
 
 #    Atlas.Map.ExtraDropChance (%)        Default: 20
 Atlas.Map.ExtraDropChance = 20
 
-#    Atlas.Map.PackDropChance (%, decimals allowed)   Default: 1.0
-Atlas.Map.PackDropChance = 1.0
+#    Atlas.Map.SigilChancePerForce (%, decimals allowed)   Default: 0.13
+Atlas.Map.SigilChancePerForce = 0.13
 
 #    Atlas.Map.DropTierShift              Default: "45,45,9,1"
 Atlas.Map.DropTierShift = "45,45,9,1"

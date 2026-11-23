@@ -898,8 +898,9 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
             e.GetPositionY() + std::sin(back) * 3.0f, e.GetPositionZ(), e.GetOrientation() }, 4 * 3600);
     }
 
-    LOG_INFO("module", "Atlas: Session {} — {} mobs, {} bosses spawned.",
-        session->SessionId, session->TotalMobs, session->TotalBosses);
+    LOG_INFO("module", "Atlas: Session {} — {} mobs spawned, {} master{} {}.", session->SessionId, session->TotalMobs,
+        session->TotalBosses, session->TotalBosses != 1 ? "s" : "",
+        session->PendingBosses.empty() ? "at their spots" : "waiting for the forces bar");
 
     // --- Reset encounter states to NOT_STARTED so boss AIs can engage properly ---
     // We set all encounters to DONE earlier (line ~1049) to clear original dungeon

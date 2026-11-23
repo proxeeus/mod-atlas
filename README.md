@@ -44,7 +44,7 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Rifts** — each member's first crossing is free, and bots cross with the player who uses the rift; every later crossing, and every wipe, spends one of the run's 6 rifts. With none left and nobody inside, the echo is lost
 - **Cache of the Keepers** — where the master falls: each player's share of gold and gear, and new sigils; bots are paid at the kill
 - **Rewards ladder** — map gear comes from the tier's item-level band: 200 at tiers 1-3, 213 at tier 6, up to 251-264 at tier 16, epics more often as tiers rise (`atlas_loot_tier`)
-- **Sustain** — the master's sigil (mostly the run's tier or one lower), sometimes a second, a small chance from each cleared pack, and a sigil of the next tier for an account's first clear of a dungeon at a tier: a tier sustains itself about two runs in three
+- **Sustain** — the master's sigil (mostly the run's tier or one lower), sometimes a second, a chance from each cleared pack that grows with the forces it held, and a sigil of the next tier for an account's first clear of a dungeon at a tier: a tier sustains itself about two runs in three
 - **Quantity and rarity** — affixes raise the gear and sigil counts and chances (quantity) and the epics and sigil rarity (rarity), capped by config
 - **Starter sigils** — the Chronicler gives three tier-1 sigils once to each level-80 character
 

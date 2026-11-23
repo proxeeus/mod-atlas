@@ -774,27 +774,29 @@ void AtlasMgr::RollPackSigils(Session& session)
     if (session.PacksDone.empty())
         return;
 
-    // Members alive per pack; a pack whose members have all fallen rolls its
-    // sigil chance once, for each player inside.
-    std::vector<uint16> total(session.PacksDone.size(), 0);
+    // Members alive and forces per pack; a pack whose members have all fallen
+    // rolls once, for each player inside, a chance that grows with the forces
+    // it held: lone creatures drop no more than packs of the same weight.
     std::vector<uint16> alive(session.PacksDone.size(), 0);
+    std::vector<uint32> forces(session.PacksDone.size(), 0);
     for (SpawnedCreature const& sc : session.SpawnedCreatures)
     {
         if (!sc.PackId || sc.PackId > session.PacksDone.size())
             continue;
-        ++total[sc.PackId - 1];
+        forces[sc.PackId - 1] += std::max<uint32>(sc.Force, 1);
         if (!sc.IsDead)
             ++alive[sc.PackId - 1];
     }
 
     SigilDropRules const& rules = sAtlasConfig->GetSigilDropRules();
-    uint32 const chance = ScaleChance(rules.PackPermille, RunQuantity(session));
+    uint32 const quantity = RunQuantity(session);
     std::array<uint32, 3> const weights = ScaleRarityWeights(sAtlasConfig->GetMapRarityWeights(), RunRarity(session));
     for (std::size_t i = 0; i < session.PacksDone.size(); ++i)
     {
-        if (session.PacksDone[i] || !total[i] || alive[i])
+        if (session.PacksDone[i] || !forces[i] || alive[i])
             continue;
         session.PacksDone[i] = true;
+        uint32 const chance = PackSigilChance(forces[i], rules.ForcePer100k, quantity);
         if (!chance)
             continue;
 
@@ -802,12 +804,14 @@ void AtlasMgr::RollPackSigils(Session& session)
         for (PlayerSessionData const& pd : session.Players)
         {
             Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
-            if (!p || !IsRealPlayer(p) || p->GetMapId() != session.MapId || !RollPermille(chance, rng))
+            if (!p || !IsRealPlayer(p) || p->GetMapId() != session.MapId || !RollPer100k(chance, rng))
                 continue;
             uint8 const tier = RollSigilTier(static_cast<uint8>(session.Tier), rules.TierShift, rng);
             GiveMapItem(p, RollMapItem(tier, RollMapRarity(weights, rng), rng));
             Tell(p, Acore::StringFormat("{} Among the fallen, a sigil hums: an echo of tier {}.", CHAT_PREFIX,
                 tier));
+            LOG_INFO("module", "Atlas: Map run {} — pack {} ({} forces, chance {:.2f}%) dropped a tier {} sigil "
+                "for {}.", session.SessionId, i + 1, forces[i], chance / 1000.0f, tier, p->GetName());
         }
     }
 }

@@ -3,8 +3,8 @@
 -- the dungeon and tier, the master's bar (slay enough of the echo's forces and
 -- its master comes for you), foes slain, rifts left, and the run's affixes as
 -- icons with their real names and values on hover. The server pushes it
--- (UH / UA / UZ / UX, see atlas_chronicle_script.cpp). Drag to move; /atlashud
--- hides or shows it.
+-- (UH / UA / UZ / UX, see atlas_chronicle_script.cpp); it closes by itself
+-- outside a dungeon instance. Drag to move; /atlashud hides or shows it.
 
 local PREFIX = "ATLAS"
 local ICON_SIZE = 22
@@ -212,7 +212,19 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("CHAT_MSG_ADDON")
 events:RegisterEvent("PLAYER_LOGIN")
+events:RegisterEvent("PLAYER_ENTERING_WORLD")
 events:SetScript("OnEvent", function (self, event, prefix, message, channel, sender)
+    -- Out of the dungeon (a rift home, a hearthstone, the echo closing): the
+    -- HUD goes. The server pushes it again on every arrival in the run, and
+    -- its "run over" message may be lost during a loading screen.
+    if event == "PLAYER_ENTERING_WORLD" then
+        local inInstance, instanceType = IsInInstance()
+        if not inInstance or instanceType ~= "party" then
+            state.header, state.affixes, state.collecting = nil, {}, nil
+            hud:Hide()
+        end
+        return
+    end
     if event == "PLAYER_LOGIN" then
         local p = AtlasChronicleHUD and AtlasChronicleHUD.point
         if p then

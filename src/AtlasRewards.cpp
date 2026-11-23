@@ -979,9 +979,9 @@ std::vector<std::string> AtlasMgr::DescribeLootTier(uint8 tier, Player const* pl
 
     SigilDropRules const& rules = sAtlasConfig->GetSigilDropRules();
     lines.push_back(Acore::StringFormat("Atlas: sigils: one from the master (tier shift {}/{}/{}/{}: lower, same, "
-        "+1, +2), a second {:.1f}%, each cleared pack {:.1f}%, first clear +1 of the next tier: {}.",
-        rules.TierShift[0], rules.TierShift[1], rules.TierShift[2], rules.TierShift[3],
-        rules.ExtraPermille / 10.0f, rules.PackPermille / 10.0f,
+        "+1, +2), a second {:.1f}%, each cleared pack {:.2f}% per force point it held, first clear +1 of the "
+        "next tier: {}.", rules.TierShift[0], rules.TierShift[1], rules.TierShift[2], rules.TierShift[3],
+        rules.ExtraPermille / 10.0f, rules.ForcePer100k / 1000.0f,
         sAtlasConfig->IsMapFirstClearBonus() ? "on" : "off"));
 
     if (player)

@@ -77,15 +77,17 @@ TEST(AtlasLoot, SigilTiersStayInRange)
 }
 
 // PLAN 1.5: clearing tier-N maps sustains tier N about two times out of three.
+// A run slays about 150 forces before its master falls (Atlas.Boss.ForcesCap).
 TEST(AtlasLoot, DefaultsSustainAboutTwoInThree)
 {
     SigilDropRules const rules;
+    std::vector<uint32> const packs(50, 3);   // 150 forces
     RunRng rng(2026);
     uint32 sustained = 0;
     uint32 const runs = 20000;
     for (uint32 i = 0; i < runs; ++i)
     {
-        std::vector<uint8> const tiers = RollRunSigils(8, 20, 0, rules, rng);
+        std::vector<uint8> const tiers = RollRunSigils(8, packs, 0, rules, rng);
         if (std::any_of(tiers.begin(), tiers.end(), [](uint8 t) { return t >= 8; }))
             ++sustained;
     }
@@ -97,7 +99,7 @@ TEST(AtlasLoot, DefaultsSustainAboutTwoInThree)
     uint32 boosted = 0;
     for (uint32 i = 0; i < runs; ++i)
     {
-        std::vector<uint8> const tiers = RollRunSigils(8, 20, 100, rules, rng);
+        std::vector<uint8> const tiers = RollRunSigils(8, packs, 100, rules, rng);
         if (std::any_of(tiers.begin(), tiers.end(), [](uint8 t) { return t >= 8; }))
             ++boosted;
     }
@@ -108,8 +110,35 @@ TEST(AtlasLoot, BossSigilAlwaysDrops)
 {
     SigilDropRules rules;
     rules.ExtraPermille = 0;
-    rules.PackPermille = 0;
+    rules.ForcePer100k = 0;
     RunRng rng(1);
     for (int i = 0; i < 100; ++i)
-        EXPECT_EQ(RollRunSigils(5, 30, 0, rules, rng).size(), 1u);
+        EXPECT_EQ(RollRunSigils(5, std::vector<uint32>(30, 4), 0, rules, rng).size(), 1u);
+}
+
+// The same forces drop about the same sigils in lone creatures or in big packs
+// (Maraudon's many lone spawns dropped far more under a flat chance per pack).
+TEST(AtlasLoot, PackSigilsFollowForcesNotPackCount)
+{
+    SigilDropRules rules;
+    rules.ExtraPermille = 0;
+    std::vector<uint32> const lone(150, 1);
+    std::vector<uint32> const big(30, 5);
+    RunRng rng(77);
+    uint32 fromLone = 0;
+    uint32 fromBig = 0;
+    uint32 const runs = 20000;
+    for (uint32 i = 0; i < runs; ++i)
+    {
+        fromLone += static_cast<uint32>(RollRunSigils(8, lone, 0, rules, rng).size()) - 1;
+        fromBig  += static_cast<uint32>(RollRunSigils(8, big, 0, rules, rng).size()) - 1;
+    }
+    double const perRunLone = double(fromLone) / runs;
+    double const perRunBig = double(fromBig) / runs;
+    EXPECT_NEAR(perRunLone, 0.195, 0.02);   // 150 x 0.13%
+    EXPECT_NEAR(perRunBig, 0.195, 0.02);
+
+    EXPECT_EQ(PackSigilChance(4, 130, 0), 520u);
+    EXPECT_EQ(PackSigilChance(4, 130, 50), 780u);
+    EXPECT_EQ(PackSigilChance(100000, 130, 0), 100000u);
 }

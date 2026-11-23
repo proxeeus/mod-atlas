@@ -184,12 +184,13 @@ void AtlasConfig::LoadConfig(bool reload)
     _mapCompletedTimeoutMin =
         std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.CompletedTimeout", 10), 1, 25);
     _mapStarterCount  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.StarterSigils", 3), 10);
-    // Sigil drops (PLAN 1.5); chances in % (packs in tenths), kept in per mille.
+    // Sigil drops (PLAN 1.5); chances in %, kept in per mille (the cache's
+    // extra) and per 100,000 (a pack's, per force point it held).
     _sigilRules = SigilDropRules();
     _sigilRules.ExtraPermille = static_cast<uint32>(std::clamp(
         sConfigMgr->GetOption<float>("Atlas.Map.ExtraDropChance", 20.0f), 0.0f, 100.0f) * 10.0f + 0.5f);
-    _sigilRules.PackPermille = static_cast<uint32>(std::clamp(
-        sConfigMgr->GetOption<float>("Atlas.Map.PackDropChance", 1.0f), 0.0f, 100.0f) * 10.0f + 0.5f);
+    _sigilRules.ForcePer100k = static_cast<uint32>(std::clamp(
+        sConfigMgr->GetOption<float>("Atlas.Map.SigilChancePerForce", 0.13f), 0.0f, 100.0f) * 1000.0f + 0.5f);
     {
         auto parts = SplitString(StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Map.DropTierShift",
             "45,45,9,1")), ',');

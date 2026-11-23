@@ -7,7 +7,9 @@
  * Gear: each tier draws from an item-level band of the existing WotLK gear
  * (200 at tiers 1-3 up to 251-264 at 16), epics more often as tiers rise.
  * Sigils: the boss gives one (mostly the run's tier or one lower), the cache
- * sometimes a second, each cleared pack a small chance; an account's first
+ * sometimes a second, each cleared pack a chance that grows with the forces
+ * it held (so a dungeon of lone creatures drops no more than one of big
+ * packs); an account's first
  * clear of a dungeon at a tier adds one of the next tier. Quantity and rarity
  * (affix bonuses, capped by config) scale counts, chances, epics and sigil
  * rarity.
@@ -116,23 +118,36 @@ inline uint8 RollSigilTier(uint8 runTier, std::array<uint32, 4> const& shift, Ru
 struct SigilDropRules
 {
     std::array<uint32, 4> TierShift{ { 45, 45, 9, 1 } };
-    uint32 ExtraPermille = 200;   // a second sigil in the cache
-    uint32 PackPermille  = 10;    // each cleared pack
+    uint32 ExtraPermille  = 200;   // a second sigil in the cache
+    uint32 ForcePer100k   = 130;   // a cleared pack's chance per force point it held (0.13%)
 };
 
+// A cleared pack's sigil chance, per 100,000: its forces times the chance per
+// force point, raised by quantity, at most certain.
+inline uint32 PackSigilChance(uint32 packForce, uint32 forcePer100k, uint32 quantityPct)
+{
+    uint64 const chance = uint64(packForce) * forcePer100k * (100 + quantityPct) / 100;
+    return static_cast<uint32>(std::min<uint64>(chance, 100000));
+}
+
+inline bool RollPer100k(uint32 chance, RunRng& rng)
+{
+    return chance && rng.Range(1, 100000) <= chance;
+}
+
 // Tiers of the sigils one player takes from a cleared run (the boss's, the
-// cache's extra, the packs'), before the first-clear bonus. For tests and the
-// sustain target; the server rolls the same pieces as they happen.
-inline std::vector<uint8> RollRunSigils(uint8 runTier, uint32 packs, uint32 quantityPct, SigilDropRules const& rules,
-    RunRng& rng)
+// cache's extra, the packs', each pack given by the forces it held), before
+// the first-clear bonus. For tests and the sustain target; the server rolls
+// the same pieces as they happen.
+inline std::vector<uint8> RollRunSigils(uint8 runTier, std::vector<uint32> const& packForces, uint32 quantityPct,
+    SigilDropRules const& rules, RunRng& rng)
 {
     std::vector<uint8> tiers;
     tiers.push_back(RollSigilTier(runTier, rules.TierShift, rng));
     if (RollPermille(ScaleChance(rules.ExtraPermille, quantityPct), rng))
         tiers.push_back(RollSigilTier(runTier, rules.TierShift, rng));
-    uint32 const packChance = ScaleChance(rules.PackPermille, quantityPct);
-    for (uint32 i = 0; i < packs; ++i)
-        if (RollPermille(packChance, rng))
+    for (uint32 force : packForces)
+        if (RollPer100k(PackSigilChance(force, rules.ForcePer100k, quantityPct), rng))
             tiers.push_back(RollSigilTier(runTier, rules.TierShift, rng));
     return tiers;
 }
