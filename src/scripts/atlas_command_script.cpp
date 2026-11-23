@@ -51,6 +51,7 @@ public:
             { "affix",         affixTable },
             { "curate",        curateTable },
             { "map",           mapTable },
+            { "loot",          HandleLoot,           SEC_GAMEMASTER,     Console::Yes },
             { "reload",        HandleReload,        SEC_ADMINISTRATOR,  Console::Yes },
             { "status",        HandleStatus,        SEC_GAMEMASTER,     Console::Yes },
             { "list",          HandleList,           SEC_GAMEMASTER,     Console::Yes },
@@ -69,6 +70,7 @@ public:
         sAtlasConfig->LoadConfig(true);
         sAtlasAffixes->Load();
         sAtlasMgr->LoadThemes();
+        sAtlasMgr->LoadLootTiers();
         // Dungeon list or boss count may have changed: rebuild the cached
         // entrances / spawn points too (guarded by their own mutex).
         sAtlasMgr->LoadDungeonGeometry();
@@ -398,6 +400,32 @@ public:
             h->PSendSysMessage("  {}", sAtlasMgr->DescribeMapItem(sAtlasMgr->GetMapItemData(item), true));
         if (std::string const run = sAtlasMgr->DescribeMapRun(target->GetGUID()); !run.empty())
             h->PSendSysMessage("Atlas: open map run — {}", run);
+        return true;
+    }
+
+    // .atlas loot [tier]: the rewards ladder of a map tier (default: the
+    // target's open map run, else 1), with a sample piece for the target.
+    static bool HandleLoot(ChatHandler* h, Optional<uint32> tier)
+    {
+        Player* target = h->GetSession() ? TargetOrSelf(h) : nullptr;
+        uint32 t = tier.value_or(1);
+        if (!tier && target)
+            if (Session* s = sAtlasMgr->GetSessionByPlayer(target->GetGUID()); s && s->IsMapRun)
+                t = s->Tier;
+        if (t < 1 || t > MAP_MAX_TIER)
+        {
+            h->PSendSysMessage("Atlas: the tier is 1 to {}.", MAP_MAX_TIER);
+            return false;
+        }
+
+        for (std::string const& line : sAtlasMgr->DescribeLootTier(static_cast<uint8>(t), target))
+            h->SendSysMessage(line);
+
+        if (target)
+            if (Session* s = sAtlasMgr->GetSessionByPlayer(target->GetGUID()); s && s->IsMapRun)
+                h->PSendSysMessage("Atlas: {}'s run: item quantity +{}%, rarity +{}% (caps {}% / {}%).",
+                    target->GetName(), AtlasMgr::RunQuantity(*s), AtlasMgr::RunRarity(*s),
+                    sAtlasConfig->GetLootMaxQuantity(), sAtlasConfig->GetLootMaxRarity());
         return true;
     }
 

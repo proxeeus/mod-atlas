@@ -102,6 +102,7 @@ struct SpawnedCreature
     bool        IsDead     = false;
     bool        LootFilled = false;   // true once FillCreatureLoot has run post-death
     bool        KillCredited = false; // true once kill XP/count has been awarded
+    uint16      PackId     = 0;       // the layout anchor it stood at, 1-based; 0 = boss or add
 };
 
 struct PendingPhaseCheck
@@ -181,6 +182,8 @@ struct Session
     uint64      LastOccupied = 0;           // last time someone was inside
     std::vector<ObjectGuid> Entered;        // went in at least once
     std::vector<ObjectGuid> CacheClaimed;   // rewarded: opened the cache, or a bot paid at the kill
+    std::vector<ObjectGuid> FirstClears;    // players whose account first mended this dungeon at this tier
+    std::vector<bool>       PacksDone;      // per layout anchor: cleared and its sigil chance rolled
 
     static bool Contains(std::vector<ObjectGuid> const& list, ObjectGuid guid)
     {
@@ -241,6 +244,7 @@ struct RewardItem
     uint32 Class         = 0;       // 2=Weapon, 4=Armor
     uint32 SubClass      = 0;
     int32  AllowableClass = -1;
+    int32  AllowableRace  = -1;
 };
 
 struct LootPoolItem

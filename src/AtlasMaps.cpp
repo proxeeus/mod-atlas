@@ -129,10 +129,22 @@ void AtlasMgr::LoadMapItems()
         while (result->NextRow());
     }
 
+    std::unordered_map<uint64, uint32> progress;
+    if (QueryResult result = CharacterDatabase.Query("SELECT account, source_map, tiers FROM atlas_account_progress"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            progress[(uint64(f[0].Get<uint32>()) << 32) | f[1].Get<uint32>()] = f[2].Get<uint32>();
+        } while (result->NextRow());
+    }
+
     std::lock_guard<std::mutex> lock(_mapItemsMutex);
     _mapItems = std::move(items);
     _mapGrants = std::move(grants);
-    LOG_INFO("module", "Atlas: {} Echo Sigils, {} starter grants loaded.", _mapItems.size(), _mapGrants.size());
+    _accountProgress = std::move(progress);
+    LOG_INFO("module", "Atlas: {} Echo Sigils, {} starter grants, {} dungeon records loaded.", _mapItems.size(),
+        _mapGrants.size(), _accountProgress.size());
 }
 
 void AtlasMgr::PersistMapItem(MapItemData const& data)
@@ -699,18 +711,105 @@ void AtlasMgr::GiveMapCompletionReward(Session const& session, Player* player)
 {
     GiveRunReward(session, player);
 
-    // Sustain (DESIGN §14): a sigil of the run's tier, sometimes two, each
-    // sometimes a tier higher. Only for real players.
+    // Sustain (DESIGN §14, PLAN 1.5): the master's sigil, mostly the run's tier
+    // or one lower; a second one sometimes; one of the next tier for a first
+    // clear. Packs dropped theirs as they fell (RollPackSigils). Real players only.
+    SigilDropRules const& rules = sAtlasConfig->GetSigilDropRules();
+    uint32 const quantity = RunQuantity(session);
+    std::array<uint32, 3> const weights = ScaleRarityWeights(sAtlasConfig->GetMapRarityWeights(), RunRarity(session));
+    uint8 const tier = static_cast<uint8>(session.Tier);
     RunRng rng(RunRng::MakeSeed());
-    uint32 const count = 1 + (rng.Chance(sAtlasConfig->GetMapExtraDropChance()) ? 1 : 0);
-    for (uint32 i = 0; i < count; ++i)
-    {
-        uint8 const tier = RollDropTier(static_cast<uint8>(session.Tier), sAtlasConfig->GetMapHigherTierChance(),
-            rng);
-        GiveMapItem(player, RollMapItem(tier, RollMapRarity(sAtlasConfig->GetMapRarityWeights(), rng), rng));
-    }
+
+    std::vector<uint8> tiers{ RollSigilTier(tier, rules.TierShift, rng) };
+    if (RollPermille(ScaleChance(rules.ExtraPermille, quantity), rng))
+        tiers.push_back(RollSigilTier(tier, rules.TierShift, rng));
+    bool const firstClear = Session::Contains(session.FirstClears, player->GetGUID());
+    if (firstClear)
+        tiers.push_back(std::min<uint8>(MAP_MAX_TIER, tier + 1));
+
+    for (uint8 t : tiers)
+        GiveMapItem(player, RollMapItem(t, RollMapRarity(weights, rng), rng));
+
     Tell(player, Acore::StringFormat("{} The cache opens. The Keepers press {} sigil{} into your hands.",
-        CHAT_PREFIX, count, count != 1 ? "s" : ""));
+        CHAT_PREFIX, tiers.size(), tiers.size() != 1 ? "s" : ""));
+    if (firstClear)
+    {
+        DungeonInfo const* dg = sAtlasConfig->GetDungeon(session.MapId);
+        Tell(player, Acore::StringFormat("{} The Keepers mark your first mending of {} at tier {}: one sigil "
+            "reaches further.", CHAT_PREFIX, dg ? dg->Name : "this echo", tier));
+    }
+}
+
+void AtlasMgr::MarkFirstClears(Session& session)
+{
+    if (!sAtlasConfig->IsMapFirstClearBonus())
+        return;
+
+    uint32 const bit = 1u << (std::clamp<uint32>(session.Tier, 1, MAP_MAX_TIER) - 1);
+    for (PlayerSessionData const& pd : session.Players)
+    {
+        Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
+        if (!p || !IsRealPlayer(p) || Session::Contains(session.FirstClears, pd.PlayerGuid))
+            continue;
+
+        uint32 const account = p->GetSession()->GetAccountId();
+        bool first = false;
+        {
+            std::lock_guard<std::mutex> lock(_mapItemsMutex);
+            uint32& tiers = _accountProgress[(uint64(account) << 32) | session.MapId];
+            first = !(tiers & bit);
+            tiers |= bit;
+        }
+        if (!first)
+            continue;
+
+        session.FirstClears.push_back(pd.PlayerGuid);
+        CharacterDatabase.Execute("INSERT INTO atlas_account_progress (account, source_map, tiers) VALUES "
+            "({}, {}, {}) ON DUPLICATE KEY UPDATE tiers = tiers | {}", account, session.MapId, bit, bit);
+    }
+}
+
+void AtlasMgr::RollPackSigils(Session& session)
+{
+    if (session.PacksDone.empty())
+        return;
+
+    // Members alive per pack; a pack whose members have all fallen rolls its
+    // sigil chance once, for each player inside.
+    std::vector<uint16> total(session.PacksDone.size(), 0);
+    std::vector<uint16> alive(session.PacksDone.size(), 0);
+    for (SpawnedCreature const& sc : session.SpawnedCreatures)
+    {
+        if (!sc.PackId || sc.PackId > session.PacksDone.size())
+            continue;
+        ++total[sc.PackId - 1];
+        if (!sc.IsDead)
+            ++alive[sc.PackId - 1];
+    }
+
+    SigilDropRules const& rules = sAtlasConfig->GetSigilDropRules();
+    uint32 const chance = ScaleChance(rules.PackPermille, RunQuantity(session));
+    std::array<uint32, 3> const weights = ScaleRarityWeights(sAtlasConfig->GetMapRarityWeights(), RunRarity(session));
+    for (std::size_t i = 0; i < session.PacksDone.size(); ++i)
+    {
+        if (session.PacksDone[i] || !total[i] || alive[i])
+            continue;
+        session.PacksDone[i] = true;
+        if (!chance)
+            continue;
+
+        RunRng rng(RunRng::MakeSeed());
+        for (PlayerSessionData const& pd : session.Players)
+        {
+            Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid);
+            if (!p || !IsRealPlayer(p) || p->GetMapId() != session.MapId || !RollPermille(chance, rng))
+                continue;
+            uint8 const tier = RollSigilTier(static_cast<uint8>(session.Tier), rules.TierShift, rng);
+            GiveMapItem(p, RollMapItem(tier, RollMapRarity(weights, rng), rng));
+            Tell(p, Acore::StringFormat("{} Among the fallen, a sigil hums: an echo of tier {}.", CHAT_PREFIX,
+                tier));
+        }
+    }
 }
 
 void AtlasMgr::CompleteMapRun(Session& session, Position const& bossPos)
@@ -724,6 +823,8 @@ void AtlasMgr::CompleteMapRun(Session& session, Position const& bossPos)
     RequestMapSpawn(session.InstanceId, GO_ATLAS_CACHE, Offset(at, at.GetOrientation(), 2.0f), lifetime);
     RequestMapSpawn(session.InstanceId, GO_ATLAS_RIFT_HOME, Offset(at, at.GetOrientation() + float(M_PI) / 2.0f,
         5.0f), lifetime);
+
+    MarkFirstClears(session);
 
     // Bots take their share at once; they have no use for sigils.
     for (PlayerSessionData const& pd : session.Players)

@@ -403,17 +403,39 @@ Atlas.Map.StarterSigils = 3
 #        Default: "632,658,668"
 Atlas.Map.ExcludeSources = "632,658,668"
 
-#    Atlas.Map.ExtraDropChance / Atlas.Map.HigherTierChance
-#        A mended run's cache holds one sigil, a second at ExtraDropChance %;
-#        each is a tier higher at HigherTierChance %.
-#        Default: 35 / 20
-Atlas.Map.ExtraDropChance = 35
-Atlas.Map.HigherTierChance = 20
+#    SIGIL SUSTAIN (PLAN 1.5): a mended run's cache holds one sigil for each
+#    player, a second at ExtraDropChance %; each cleared pack drops one at
+#    PackDropChance % (for each player inside); an account's first clear of a
+#    dungeon at a tier adds one of the next tier. Each sigil's tier shifts by
+#    DropTierShift weights: one lower, the same, one higher, two higher. The
+#    defaults sustain a tier about two runs in three; affix quantity raises the
+#    chances. `.atlas loot [tier]` shows the ladder.
+
+#    Atlas.Map.ExtraDropChance (%)        Default: 20
+Atlas.Map.ExtraDropChance = 20
+
+#    Atlas.Map.PackDropChance (%, decimals allowed)   Default: 1.0
+Atlas.Map.PackDropChance = 1.0
+
+#    Atlas.Map.DropTierShift              Default: "45,45,9,1"
+Atlas.Map.DropTierShift = "45,45,9,1"
+
+#    Atlas.Map.FirstClearBonus            Default: 1
+Atlas.Map.FirstClearBonus = 1
 
 #    Atlas.Map.RarityWeights
 #        Normal, magic (1-2 affixes) and rare (3-4) weights for dropped sigils.
 #        Default: "60,30,10"
 Atlas.Map.RarityWeights = "60,30,10"
+
+#    GEAR (PLAN 1.5): map runs give gear of their tier's item-level band (world
+#    table atlas_loot_tier: 200 at tiers 1-3, 213 at 6, up to 251-264 at 16;
+#    edit it and `.atlas reload`). Echoes keep the Rewards pool and its
+#    MaxItemLevel ceiling. Affixes add item quantity (more gear, sigil
+#    chances) and rarity (epics, magic and rare sigils), capped here (%).
+#    Default: 100 / 150
+Atlas.Loot.MaxQuantity = 100
+Atlas.Loot.MaxRarity = 150
 
 ###############################################################################
 # AFFIXES (DESIGN section 10)

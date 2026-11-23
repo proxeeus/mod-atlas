@@ -149,6 +149,96 @@ void AtlasMgr::LoadLootPool()
 }
 
 // Rewards
+// Map-run gear (PLAN 1.5): the WotLK gear of item level 187 and up, epic and
+// rare. PvP gear (resilience) and reputation or honour rewards stay out.
+void AtlasMgr::LoadTierGear()
+{
+    _tierGear.clear();
+
+    QueryResult result = WorldDatabase.Query(
+        "SELECT entry, RequiredLevel, Quality, InventoryType, class, subclass, AllowableClass, AllowableRace, "
+        "ItemLevel FROM item_template "
+        "WHERE Quality IN (3, 4) AND ItemLevel BETWEEN 187 AND 284 "
+        "AND RequiredLevel BETWEEN 1 AND 80 "
+        "AND class IN (2, 4) AND InventoryType > 0 AND InventoryType NOT IN (4, 18, 19, 24) "
+        "AND AllowableClass != 0 AND AllowableRace != 0 "
+        "AND RequiredReputationFaction = 0 AND RequiredHonorRank = 0 AND requiredspell = 0 "
+        "AND 35 NOT IN (stat_type1, stat_type2, stat_type3, stat_type4, stat_type5, "
+        "stat_type6, stat_type7, stat_type8, stat_type9, stat_type10) "
+        "AND name NOT LIKE '%Test%' AND name NOT LIKE '%Deprecated%' AND name NOT LIKE '%[PH]%' "
+        "AND name NOT LIKE '%Monster -%' "
+        "ORDER BY ItemLevel, entry");
+
+    if (result)
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            RewardItem ri;
+            ri.Entry          = f[0].Get<uint32>();
+            ri.MinLevel       = f[1].Get<uint8>();
+            ri.MaxLevel       = 80;
+            ri.Quality        = f[2].Get<uint8>();
+            ri.InventoryType  = f[3].Get<uint32>();
+            ri.Class          = f[4].Get<uint32>();
+            ri.SubClass       = f[5].Get<uint32>();
+            ri.AllowableClass = f[6].Get<int32>();
+            ri.AllowableRace  = f[7].Get<int32>();
+            ri.ItemLevel      = f[8].Get<uint16>();
+            _tierGear.push_back(ri);
+        } while (result->NextRow());
+    }
+
+    LOG_INFO("module", "Atlas: {} map-run gear items cached (item level 187+).", _tierGear.size());
+}
+
+void AtlasMgr::LoadLootTiers()
+{
+    std::array<LootTier, MAP_MAX_TIER> tiers;
+    for (uint8 t = 1; t <= MAP_MAX_TIER; ++t)
+        tiers[t - 1] = DefaultLootTier(t);
+
+    uint32 rows = 0;
+    if (QueryResult result = WorldDatabase.Query("SELECT tier, min_item_level, max_item_level, epic_share, "
+        "gear_count FROM atlas_loot_tier"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            uint8 const tier = f[0].Get<uint8>();
+            if (tier < 1 || tier > MAP_MAX_TIER)
+                continue;
+            LootTier& lt = tiers[tier - 1];
+            lt.MinItemLevel = f[1].Get<uint16>();
+            lt.MaxItemLevel = std::max<uint16>(lt.MinItemLevel, f[2].Get<uint16>());
+            lt.EpicShare    = std::min<uint32>(f[3].Get<uint8>(), 100);
+            lt.GearCount    = std::min<uint32>(f[4].Get<uint8>(), 10);
+            ++rows;
+        } while (result->NextRow());
+    }
+    else
+        LOG_ERROR("module", "Atlas: table atlas_loot_tier is empty or missing (module SQL not applied?): "
+            "the default ladder applies.");
+
+    _lootTiers = tiers;
+    LOG_INFO("module", "Atlas: rewards ladder loaded ({} of {} tiers from atlas_loot_tier).", rows, MAP_MAX_TIER);
+}
+
+LootTier AtlasMgr::GetLootTier(uint8 tier) const
+{
+    return _lootTiers[std::clamp<uint8>(tier, 1, MAP_MAX_TIER) - 1];
+}
+
+uint32 AtlasMgr::RunQuantity(Session const& session)
+{
+    return std::min(session.Effects.QuantityBonus, sAtlasConfig->GetLootMaxQuantity());
+}
+
+uint32 AtlasMgr::RunRarity(Session const& session)
+{
+    return std::min(session.Effects.RarityBonus, sAtlasConfig->GetLootMaxRarity());
+}
+
 void AtlasMgr::DistributeRewards(Session* session)
 {
     if (!session) return;
@@ -185,6 +275,17 @@ void AtlasMgr::GiveRunReward(Session const& session, Player* player)
 
     // Gold goes directly to wallet
     GiveGoldReward(player, perPlayer);
+
+    // Map runs: the tier's gear (PLAN 1.5), always, more with quantity.
+    if (session.IsMapRun)
+    {
+        uint8 const tier = static_cast<uint8>(session.Tier);
+        LootTier const lt = GetLootTier(tier);
+        RunRng rng(RunRng::MakeSeed());
+        GiveTierGear(player, tier, RollQuantity(lt.GearCount, RunQuantity(session), rng),
+            ScaleEpicShare(lt.EpicShare, RunRarity(session)));
+        return;
+    }
 
     // Completion item (Atlas.Rewards.ItemChance): roll epic first, then
     // rare, fallback green. Goes to the bags, by mail if they are full.
@@ -787,6 +888,114 @@ uint32 AtlasMgr::SelectLootItem(uint8 level, uint8 minQuality, uint8 maxQuality,
     return 0;
 }
 
+uint32 AtlasMgr::SelectTierItem(uint8 tier, uint32 epicShare, Player const* player) const
+{
+    uint32 const playerClass = player ? player->getClass() : 0;
+    uint8  const maxArmor    = playerClass ? GetMaxArmorSubclass(playerClass) : 4;
+    uint32 const classMask   = playerClass ? GetClassBitmask(playerClass) : 0x7FF;
+    uint32 const raceMask    = player ? player->getRaceMask() : 0xFFFFFFFF;
+    LootTier const lt = GetLootTier(tier);
+
+    auto candidates = [&](uint8 quality, uint16 minLevel, uint16 maxLevel)
+    {
+        std::vector<uint32> out;
+        for (RewardItem const& ri : _tierGear)
+        {
+            if (ri.Quality != quality || ri.ItemLevel < minLevel || ri.ItemLevel > maxLevel)
+                continue;
+            if (ri.AllowableClass != -1 && !(uint32(ri.AllowableClass) & classMask))
+                continue;
+            if (ri.AllowableRace != -1 && !(uint32(ri.AllowableRace) & raceMask))
+                continue;
+            if (ri.Class == 4 && ri.SubClass > 0 && ri.SubClass <= 4 && ri.SubClass > maxArmor)
+                continue;
+            out.push_back(ri.Entry);
+        }
+        return out;
+    };
+
+    // Epic or rare by the tier's share, the other quality when the band has
+    // none; then a band widened downwards, 7 item levels at a time.
+    uint8 const first = RandInt<uint32>(1, 100) <= epicShare ? 4 : 3;
+    uint8 const second = first == 4 ? 3 : 4;
+    std::vector<uint32> cands;
+    for (uint16 widen = 0; widen <= 21 && cands.empty(); widen += 7)
+    {
+        uint16 const lo = lt.MinItemLevel > widen ? lt.MinItemLevel - widen : 0;
+        cands = candidates(first, lo, lt.MaxItemLevel);
+        if (cands.empty())
+            cands = candidates(second, lo, lt.MaxItemLevel);
+    }
+    if (cands.empty())
+        return 0;
+
+    // Bias toward the player's primary stat, as the other pools do.
+    if (playerClass && cands.size() > 3 && RandInt<uint32>(1, 100) <= 75)
+    {
+        std::vector<std::pair<uint32, float>> scored;
+        scored.reserve(cands.size());
+        for (uint32 entry : cands)
+            scored.push_back({ entry, ScoreItemForClass(entry, playerClass) });
+        std::stable_sort(scored.begin(), scored.end(),
+            [](auto const& a, auto const& b) { return a.second > b.second; });
+        std::size_t const topN = std::max<std::size_t>(3, scored.size() / 3);
+        return scored[RandInt<std::size_t>(0, topN - 1)].first;
+    }
+    return cands[RandInt<std::size_t>(0, cands.size() - 1)];
+}
+
+void AtlasMgr::GiveTierGear(Player* player, uint8 tier, uint32 count, uint32 epicShare)
+{
+    if (!player)
+        return;
+
+    for (uint32 i = 0; i < count; ++i)
+    {
+        uint32 entry = SelectTierItem(tier, epicShare, player);
+        if (!entry)   // an empty band (custom ladder): the echo pool at level 80
+            entry = SelectRewardItem(80, RandInt<uint32>(1, 100) <= epicShare ? 4 : 3, player->getClass());
+        if (!entry)
+            continue;
+
+        PendingReward reward;
+        reward.Entry = entry;
+        QueueReward(player, std::move(reward));
+    }
+}
+
+std::vector<std::string> AtlasMgr::DescribeLootTier(uint8 tier, Player const* player) const
+{
+    LootTier const lt = GetLootTier(tier);
+    uint32 epics = 0;
+    uint32 rares = 0;
+    for (RewardItem const& ri : _tierGear)
+        if (ri.ItemLevel >= lt.MinItemLevel && ri.ItemLevel <= lt.MaxItemLevel)
+            ++(ri.Quality == 4 ? epics : rares);
+
+    std::vector<std::string> lines;
+    lines.push_back(Acore::StringFormat("Atlas: tier {} gear: item level {}-{}, {}% epic, {} piece{} per share "
+        "({} epic and {} rare items in the band).", tier, lt.MinItemLevel, lt.MaxItemLevel, lt.EpicShare,
+        lt.GearCount, lt.GearCount != 1 ? "s" : "", epics, rares));
+
+    SigilDropRules const& rules = sAtlasConfig->GetSigilDropRules();
+    lines.push_back(Acore::StringFormat("Atlas: sigils: one from the master (tier shift {}/{}/{}/{}: lower, same, "
+        "+1, +2), a second {:.1f}%, each cleared pack {:.1f}%, first clear +1 of the next tier: {}.",
+        rules.TierShift[0], rules.TierShift[1], rules.TierShift[2], rules.TierShift[3],
+        rules.ExtraPermille / 10.0f, rules.PackPermille / 10.0f,
+        sAtlasConfig->IsMapFirstClearBonus() ? "on" : "off"));
+
+    if (player)
+    {
+        uint32 const entry = SelectTierItem(tier, lt.EpicShare, player);
+        ItemTemplate const* t = entry ? sObjectMgr->GetItemTemplate(entry) : nullptr;
+        lines.push_back(t
+            ? Acore::StringFormat("Atlas: a sample for {}: {} (item level {}, entry {}).", player->GetName(),
+                t->Name1, t->ItemLevel, entry)
+            : Acore::StringFormat("Atlas: no gear in this band for {}.", player->GetName()));
+    }
+    return lines;
+}
+
 void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBoss)
 {
     if (!creature || !session) return;
@@ -845,7 +1054,52 @@ void AtlasMgr::FillCreatureLoot(Creature* creature, Session* session, bool isBos
         return true;
     };
 
-    if (isBoss)
+    // Map runs: equipment from the tier's band (PLAN 1.5); quantity raises the
+    // counts and chances, rarity the epic share.
+    auto addTierItem = [&]() -> bool
+    {
+        uint8 const tier = static_cast<uint8>(session->Tier);
+        uint32 const epicShare = ScaleEpicShare(GetLootTier(tier).EpicShare, RunRarity(*session));
+        Player const* forClass = nullptr;
+        for (auto const& pd : session->Players)
+            if (Player* p = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                if (p->getClass() == lootClass)
+                    forClass = p;
+        uint32 const entry = SelectTierItem(tier, epicShare, forClass);
+        if (!entry)
+            return false;
+        LootStoreItem storeItem(entry, 0, 100.0f, false, 1, 0, 1, 1);
+        loot.AddItem(storeItem);
+        ++itemsAdded;
+        return true;
+    };
+
+    if (session->IsMapRun)
+    {
+        bool isElite = false;
+        bool isRare  = false;
+        for (auto const& sc : session->SpawnedCreatures)
+            if (sc.Guid == creature->GetGUID())
+            {
+                isElite = sc.IsElite;
+                isRare  = sc.IsRare;
+                break;
+            }
+
+        uint32 const quantity = RunQuantity(*session);
+        RunRng rng(RunRng::MakeSeed());
+        if (isBoss || isRare)
+        {
+            for (uint32 n = RollQuantity(isBoss ? 2 : 1, quantity, rng); n; --n)
+                addTierItem();
+        }
+        else if (RollPermille(ScaleChance(isElite ? 50 : 10, quantity), rng))
+            addTierItem();
+
+        if (!isBoss && RandInt<uint32>(1, 100) <= 15)
+            addItem(0, 1, false);
+    }
+    else if (isBoss)
     {
         // Boss: 2 guaranteed rare (blue) equipment pieces
         if (!addItem(3, 3, true))

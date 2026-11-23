@@ -120,13 +120,6 @@ inline MapRarity RollMapRarity(std::array<uint32, 3> const& weights, RunRng& rng
     return MapRarity::Rare;
 }
 
-// A dropped sigil's tier: the run's, or one higher at `higherChance` %.
-inline uint8 RollDropTier(uint8 runTier, uint32 higherChance, RunRng& rng)
-{
-    bool const higher = rng.Chance(higherChance);
-    return std::min<uint8>(MAP_MAX_TIER, static_cast<uint8>(runTier + (higher ? 1 : 0)));
-}
-
 // Dungeons by tier band (stage 1 runs on the stock dungeons): Classic for
 // tiers 1-5, The Burning Crusade for 6-10, Wrath of the Lich King from 11.
 inline uint8 MapSourceBand(uint8 tier)

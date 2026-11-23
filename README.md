@@ -39,7 +39,10 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Echo Sigils** — map items of tiers 1 to 16, normal (white), magic (green, 1-2 instabilities) or rare (blue, 3-4); each holds one echo: a dungeon, a timeline, a seed and its instabilities
 - **The Timeways Lens** — the Keepers' scrying orb beside the Chronicler in Dalaran; place a sigil and a Rift in Time opens beside it
 - **Rifts** — each member's first crossing is free, and bots cross with the player who uses the rift; every later crossing, and every wipe, spends one of the run's 6 rifts. With none left and nobody inside, the echo is lost
-- **Cache of the Keepers** — where the master falls: each player's share of gold and gear, and new sigils (the run's tier, sometimes higher); bots are paid at the kill
+- **Cache of the Keepers** — where the master falls: each player's share of gold and gear, and new sigils; bots are paid at the kill
+- **Rewards ladder** — map gear comes from the tier's item-level band: 200 at tiers 1-3, 213 at tier 6, up to 251-264 at tier 16, epics more often as tiers rise (`atlas_loot_tier`)
+- **Sustain** — the master's sigil (mostly the run's tier or one lower), sometimes a second, a small chance from each cleared pack, and a sigil of the next tier for an account's first clear of a dungeon at a tier: a tier sustains itself about two runs in three
+- **Quantity and rarity** — affixes raise the gear and sigil counts and chances (quantity) and the epics and sigil rarity (rarity), capped by config
 - **Starter sigils** — the Chronicler gives three tier-1 sigils once to each level-80 character
 
 ### The Endless Timeways (roguelike mode)
@@ -133,7 +136,7 @@ Echoes run on **Normal** dungeon difficulty only (a heroic run could lock the gr
 3. Step through the **Rift in Time** beside the Lens; your bots cross with you
 4. Inside, a **Rift to Dalaran** stands at the entrance: leave to sell or repair and come back through the Lens's rift (that crossing spends one rift)
 5. A wipe pulls the party back to the entrance at the cost of a rift; with no rift left the echo is lost
-6. Slay its master: open the **Cache of the Keepers** where it fell for your share and new sigils, then take the rift home beside it. The echo closes once every player has left, or after 10 minutes; a share left in the cache follows its player
+6. Slay its master: open the **Cache of the Keepers** where it fell for your share (gold and gear of the tier's item level) and new sigils, then take the rift home beside it. The echo closes once every player has left, or after 10 minutes; a share left in the cache follows its player
 
 Maps cost a sigil instead of a cooldown. Their tier sets the creatures' strength (tier growth), the corruption of the packs and the tier of the sigils they drop. Sigils open tiers 1-5 in Classic dungeons, 6-10 in The Burning Crusade, 11-16 in Wrath of the Lich King (the Frozen Halls excepted). Same sigil, same echo: the seed is stored with it.
 
@@ -299,6 +302,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas curate <entry> [allowed\|blocked\|untested] [note]` | GM | Shows a creature's curation, AI and pools, or sets it (stored in `atlas_creature_curation`) |
 | `.atlas curate spawn <entry> [role]` | GM | Spawns a sample at your level as a run would (role stats, AI policy), to test a creature; role trash, elite (default), rare, miniboss, boss or add |
 | `.atlas map give <tier> [normal\|magic\|rare] [codes]` | GM | An Echo Sigil for the target (or you); with affix codes, exactly those |
+| `.atlas loot [tier]` | GM | A map tier's gear band, epic share and sigil rules, a sample piece for the target, and the target's run quantity and rarity |
 | `.atlas map list` | GM | The target's (or your) sigils and open map run |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
@@ -341,8 +345,9 @@ mod-atlas/
 │   ├── db-world/base/atlas_affixes.sql   # Affix table and the player affixes' passive spells
 │   ├── db-world/base/atlas_themes.sql    # Themes, the Scourge pool, creature curation
 │   ├── db-world/base/atlas_maps.sql      # Echo Sigils, the Lens, rifts, the cache
+│   ├── db-world/base/atlas_loot.sql      # The rewards ladder (gear by map tier)
 │   ├── db-characters/base/atlas_characters_setup.sql
-│   └── db-characters/base/atlas_maps_characters.sql  # Sigil data, starter grants
+│   └── db-characters/base/atlas_maps_characters.sql  # Sigil data, starter grants, first clears
 ├── tests/                            # Unit tests (AC unit_tests target)
 └── src/
     ├── AtlasConfig.cpp / .h          # Config loader
@@ -357,7 +362,8 @@ mod-atlas/
     ├── StockLayoutProvider.cpp / .h  # Layouts of the stock dungeons echoes run in
     ├── RunRng.h                      # Seeded, reproducible RNG for run layout choices
     ├── AtlasTheme.h                  # Packs, corruption and spawn clustering (pure)
-    ├── AtlasMapItem.h                # Echo Sigils: entries, rarity, drops (pure)
+    ├── AtlasMapItem.h                # Echo Sigils: entries, rarity (pure)
+    ├── AtlasLoot.h                   # Rewards ladder, sigil sustain, quantity and rarity (pure)
     ├── AtlasMaps.cpp                 # AtlasMgr: sigils, the Lens, rifts, the cache
     ├── AtlasAffix.h                  # Affix data, rolling and aggregation (pure)
     ├── AtlasAffixes.cpp / .h         # Affix registry: loading, rolling, descriptions, player auras

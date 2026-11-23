@@ -10,6 +10,7 @@
 #include "AtlasConfig.h"
 #include "StockLayoutProvider.h"
 #include "AtlasMapItem.h"
+#include "AtlasLoot.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -300,6 +301,14 @@ public:
     // Has a client: bots have no socket ("headless" sessions).
     static bool IsRealPlayer(Player const* player);
 
+    // The run's affix quantity and rarity bonuses (%), capped by config.
+    static uint32 RunQuantity(Session const& session);
+    static uint32 RunRarity(Session const& session);
+    // atlas_loot_tier (also `.atlas reload`), and `.atlas loot`.
+    void        LoadLootTiers();
+    LootTier    GetLootTier(uint8 tier) const;
+    std::vector<std::string> DescribeLootTier(uint8 tier, Player const* player) const;
+
     // -----------------------------------------------------------------------
     // Affixes in play (AtlasAffixEffects.cpp).
     // -----------------------------------------------------------------------
@@ -387,6 +396,14 @@ private:
     void LoadDungeonBossPool();
     void LoadRewardItems();
     void LoadLootPool();
+
+    // The rewards ladder of map runs (AtlasRewards.cpp, PLAN 1.5).
+    void   LoadTierGear();        // item_template: tier gear, PvP excluded
+    uint32 SelectTierItem(uint8 tier, uint32 epicShare, Player const* player) const;
+    void   GiveTierGear(Player* player, uint8 tier, uint32 count, uint32 epicShare);
+    // Map runs (AtlasMaps.cpp): a cleared pack's sigil chance, first clears.
+    void   RollPackSigils(Session& session);
+    void   MarkFirstClears(Session& session);
     void LoadLeaderboard();
     void CleanupSession(Session& session);
 
@@ -444,6 +461,9 @@ private:
     std::atomic<uint32>   _mapSpawnCount{ 0 };
 
     std::vector<RewardItem> _rewardItems;
+    std::vector<RewardItem> _tierGear;                       // map-run gear, item level 187+
+    std::array<LootTier, MAP_MAX_TIER> _lootTiers{};         // atlas_loot_tier
+    std::unordered_map<uint64, uint32> _accountProgress;     // account << 32 | map -> tiers mask (_mapItemsMutex)
     std::vector<LootPoolItem> _lootPool;
 
     std::vector<LeaderboardEntry> _leaderboard;

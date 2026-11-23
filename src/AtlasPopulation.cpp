@@ -737,6 +737,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     uint32 raresSpawned = 0;
     std::vector<std::string> rareNotes;
 
+    uint16 packId = 0;   // the anchor being filled, 1-based (map runs reward cleared packs)
     auto spawnMember = [&](PackKind kind, LayoutSpot const* spot, Position const& pos, std::size_t index,
         bool asRare, bool mayBeElite)
     {
@@ -777,6 +778,7 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
         SpawnedCreature sc;
         sc.Guid = c->GetGUID(); sc.Entry = entry;
         sc.IsElite = role != CreatureRole::Trash; sc.IsBoss = false; sc.IsRare = asRare;
+        sc.PackId = packId;
         session->SpawnedCreatures.push_back(sc);
         if (uint32 recentLimit = sAtlasConfig->GetRecentCreatureEntries(); recentLimit > 0)
         {
@@ -798,8 +800,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     // Packs, nearest first: a kind per pack, then each member at its spot,
     // then the members the run's affixes add (Teeming, Swarming), up to the
     // live-creature cap. A pack's leader may be a rare.
+    session->PacksDone.assign(layout->Anchors.size(), false);
     for (LayoutAnchor const& anchor : layout->Anchors)
     {
+        ++packId;
         if (spawnedMobs >= maxCreatures)
             break;
 

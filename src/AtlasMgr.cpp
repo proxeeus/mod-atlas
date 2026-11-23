@@ -108,6 +108,8 @@ void AtlasMgr::LoadFromDB()
     LoadDungeonBossPool();
     LoadRewardItems();
     LoadLootPool();
+    LoadTierGear();
+    LoadLootTiers();
     LoadAllPlayerStats();
     LoadLeaderboard();
     LoadDungeonGeometry();
@@ -1382,6 +1384,10 @@ void AtlasMgr::Update(uint32 diff)
                         }
                 if (anyone)
                     session.LastOccupied = now;
+
+                // Cleared packs: their sigil chances (PLAN 1.5).
+                if (session.IsActive())
+                    RollPackSigils(session);
 
                 if (session.State == SessionState::Completed)
                 {

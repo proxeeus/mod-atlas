@@ -67,17 +67,6 @@ TEST(AtlasMapItem, RollRarityHonoursWeights)
     EXPECT_NEAR(double(counts[2]), 1000, 200);
 }
 
-TEST(AtlasMapItem, DropTierStaysInRange)
-{
-    RunRng rng(5);
-    for (int i = 0; i < 200; ++i)
-    {
-        EXPECT_EQ(RollDropTier(4, 0, rng), 4);
-        EXPECT_EQ(RollDropTier(4, 100, rng), 5);
-        EXPECT_EQ(RollDropTier(16, 100, rng), 16);
-    }
-}
-
 TEST(AtlasMapItem, SourceBands)
 {
     EXPECT_EQ(MapSourceBand(1), 0);

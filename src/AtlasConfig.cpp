@@ -160,8 +160,30 @@ void AtlasConfig::LoadConfig(bool reload)
     _mapCompletedTimeoutMin =
         std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.CompletedTimeout", 10), 1, 25);
     _mapStarterCount  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.StarterSigils", 3), 10);
-    _mapExtraDropChance  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.ExtraDropChance", 35), 100);
-    _mapHigherTierChance = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.HigherTierChance", 20), 100);
+    // Sigil drops (PLAN 1.5); chances in % (packs in tenths), kept in per mille.
+    _sigilRules = SigilDropRules();
+    _sigilRules.ExtraPermille = static_cast<uint32>(std::clamp(
+        sConfigMgr->GetOption<float>("Atlas.Map.ExtraDropChance", 20.0f), 0.0f, 100.0f) * 10.0f + 0.5f);
+    _sigilRules.PackPermille = static_cast<uint32>(std::clamp(
+        sConfigMgr->GetOption<float>("Atlas.Map.PackDropChance", 1.0f), 0.0f, 100.0f) * 10.0f + 0.5f);
+    {
+        auto parts = SplitString(StripQuotes(sConfigMgr->GetOption<std::string>("Atlas.Map.DropTierShift",
+            "45,45,9,1")), ',');
+        try
+        {
+            if (parts.size() == 4)
+                for (std::size_t i = 0; i < 4; ++i)
+                    _sigilRules.TierShift[i] = static_cast<uint32>(std::stoul(parts[i]));
+        }
+        catch (...)
+        {
+            LOG_ERROR("module", "Atlas: Bad Atlas.Map.DropTierShift; using 45,45,9,1.");
+            _sigilRules.TierShift = { 45, 45, 9, 1 };
+        }
+    }
+    _mapFirstClearBonus = sConfigMgr->GetOption<bool>("Atlas.Map.FirstClearBonus", true);
+    _lootMaxQuantity    = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Loot.MaxQuantity", 100), 1000);
+    _lootMaxRarity      = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Loot.MaxRarity", 150), 1000);
     _mapExcludedSources.clear();
     for (std::string const& id : SplitString(StripQuotes(sConfigMgr->GetOption<std::string>(
         "Atlas.Map.ExcludeSources", "632,658,668")), ','))

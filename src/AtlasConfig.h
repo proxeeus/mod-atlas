@@ -11,6 +11,7 @@
 #include "RoguelikeTypes.h"
 #include "AtlasScalingMath.h"
 #include "AtlasTheme.h"
+#include "AtlasLoot.h"
 #include <array>
 #include <vector>
 #include <unordered_map>
@@ -111,9 +112,13 @@ public:
     uint32 GetMapCompletedTimeoutSec() const { return _mapCompletedTimeoutMin * 60; }
     uint32 GetMapStarterCount()       const { return _mapStarterCount; }
     bool   IsMapSourceExcluded(uint32 mapId) const;
-    uint32 GetMapExtraDropChance()    const { return _mapExtraDropChance; }
-    uint32 GetMapHigherTierChance()   const { return _mapHigherTierChance; }
     std::array<uint32, 3> const& GetMapRarityWeights() const { return _mapRarityWeights; }
+    // Sigil drops of a mended run (PLAN 1.5): tier shift, cache extra, packs.
+    SigilDropRules const& GetSigilDropRules() const { return _sigilRules; }
+    bool   IsMapFirstClearBonus()     const { return _mapFirstClearBonus; }
+    // Caps on the affixes' item quantity and rarity bonuses (%).
+    uint32 GetLootMaxQuantity()       const { return _lootMaxQuantity; }
+    uint32 GetLootMaxRarity()         const { return _lootMaxRarity; }
 
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
@@ -208,9 +213,11 @@ private:
     uint32 _mapCompletedTimeoutMin = 10;
     uint32 _mapStarterCount  = 3;
     std::vector<uint32> _mapExcludedSources;
-    uint32 _mapExtraDropChance  = 35;
-    uint32 _mapHigherTierChance = 20;
     std::array<uint32, 3> _mapRarityWeights{ { 60, 30, 10 } };
+    SigilDropRules _sigilRules;
+    bool   _mapFirstClearBonus = true;
+    uint32 _lootMaxQuantity    = 100;
+    uint32 _lootMaxRarity      = 150;
     uint32 _eliteChance     = 20;
     float  _aggroRadius     = 15.0f;
     uint32 _rareSpawnChance = 5;
