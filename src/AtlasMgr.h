@@ -48,6 +48,18 @@ public:
     void LoadFromDB();
     void LoadDungeonGeometry();   // also used by `.atlas reload`
 
+    // Clone maps (PLAN stage 2), AtlasClones.h. The registry is read once at
+    // startup (its SQL rows need a restart anyway), never on `.atlas reload`:
+    // a run open in a clone must keep finding its source.
+    void LoadCloneMaps();
+    void LoadCloneOptIns();
+    // An account opted in to clones (`.atlas clones on`): its client has the
+    // Atlas patch. Bots have no client and follow their master.
+    bool IsCloneOptedIn(uint32 account) const;
+    void SetCloneOptIn(uint32 account, bool on);
+    // The map a run on this source opens in for this party (AtlasClones.h).
+    uint32 ChooseMapRunMap(std::vector<Player*> const& party, uint32 sourceMap) const;
+
     // Session lifecycle
     // seed 0 = the leader's pending GM seed if any, else a fresh one.
     Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true,
@@ -72,7 +84,9 @@ public:
     void OnCreatureDeathHook(Creature* creature);
 
     // Dungeon population
-    void ClearDungeonCreatures(InstanceMap* map);
+    // stockSweep: also despawn the instance's own creatures (stock instances;
+    // a clone has none).
+    void ClearDungeonCreatures(InstanceMap* map, bool stockSweep = true);
     void OpenAllDoors(InstanceMap* map);
     void PopulateDungeon(Session* session, InstanceMap* map);
 
@@ -503,6 +517,8 @@ private:
     std::vector<RewardItem> _tierGear;                       // map-run gear, item level 187+
     std::array<LootTier, MAP_MAX_TIER> _lootTiers{};         // atlas_loot_tier
     std::unordered_map<uint64, uint32> _accountProgress;     // account << 32 | map -> tiers mask (_mapItemsMutex)
+    std::unordered_set<uint32>         _cloneOptIn;          // accounts (atlas_clone_optin)
+    mutable std::mutex                 _cloneMutex;
     std::vector<AtmosphereRow>         _atmosphere;
     mutable std::mutex                 _atmosphereMutex;
     std::vector<LootPoolItem> _lootPool;

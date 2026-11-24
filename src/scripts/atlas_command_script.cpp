@@ -4,6 +4,7 @@
  * .atlas run (the current run and its seed), .atlas seed (replay a seed),
  * .atlas scaling (the role table at a level, tier, party size and difficulty),
  * .atlas affix list|next (the affixes, and forcing some on the next run)
+ * Players: .atlas clones [on|off] (runs in clone maps, for clients with the Atlas patch)
  */
 
 #include "ScriptMgr.h"
@@ -65,6 +66,7 @@ public:
             { "run",           HandleRun,            SEC_GAMEMASTER,     Console::No  },
             { "seed",          HandleSeed,           SEC_GAMEMASTER,     Console::No  },
             { "scaling",       HandleScaling,        SEC_GAMEMASTER,     Console::Yes },
+            { "clones",        HandleClones,         SEC_PLAYER,         Console::No  },
         };
         static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
@@ -84,6 +86,51 @@ public:
         return true;
     }
 
+    // Clone maps (PLAN stage 2) need the Atlas client patch; this is the
+    // player saying their client has it. Without the patch, a clone leaves
+    // the client on its loading screen for good.
+    static bool HandleClones(ChatHandler* h, Optional<std::string> state)
+    {
+        Player* player = h->GetPlayer();
+        if (!player)
+            return false;
+        uint32 const account = player->GetSession()->GetAccountId();
+
+        if (state)
+        {
+            std::string s = *state;
+            std::transform(s.begin(), s.end(), s.begin(), [](unsigned char c) { return std::tolower(c); });
+            if (s != "on" && s != "off")
+            {
+                h->SendSysMessage("Usage: .atlas clones [on|off]");
+                return true;
+            }
+            bool const on = s == "on";
+            if (!on)
+                if (Session const* run = sAtlasMgr->GetSessionByPlayer(player->GetGUID()))
+                    if (run->IsClone())
+                    {
+                        h->PSendSysMessage("{} Your echo stands in a clone; close it before you turn clones off.",
+                            CHAT_PREFIX);
+                        return true;
+                    }
+            sAtlasMgr->SetCloneOptIn(account, on);
+        }
+
+        bool const optedIn = sAtlasMgr->IsCloneOptedIn(account);
+        CloneRegistry const& clones = sAtlasConfig->GetClones();
+        h->PSendSysMessage("{} Clone maps: {} on this realm, {} usable. Your account: {}.", CHAT_PREFIX,
+            sAtlasConfig->IsClonesEnabled() ? "on" : "off", clones.Size(), optedIn ? "opted in" : "not opted in");
+        if (!optedIn)
+            h->SendSysMessage("Echoes can open in clone maps of their dungeons: the same halls, empty of the present. "
+                "Only type .atlas clones on if Data\\patch-T.MPQ is in your client: without it, entering a "
+                "clone leaves you on the loading screen.");
+        else
+            h->SendSysMessage("Map runs open in a clone when one exists and everyone in your party opted in. "
+                ".atlas clones off turns it off again.");
+        return true;
+    }
+
     static bool HandleStatus(ChatHandler* h)
     {
         h->SendSysMessage("=== Atlas (V0, Keepers of Time) Status ===");
@@ -93,6 +140,8 @@ public:
         h->PSendSysMessage("Level Band: +/-{}", sAtlasConfig->GetLevelBand());
         h->PSendSysMessage("Difficulties: {}  Themes: {}  Dungeons: {}",
             sAtlasConfig->GetDifficulties().size(), sAtlasConfig->GetThemes().size(), sAtlasConfig->GetDungeons().size());
+        h->PSendSysMessage("Clone maps: {} ({} usable)", sAtlasConfig->IsClonesEnabled() ? "on" : "off",
+            sAtlasConfig->GetClones().Size());
         return true;
     }
 

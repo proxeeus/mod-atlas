@@ -403,6 +403,19 @@ Atlas.Map.StarterSigils = 3
 #        Default: "632,658,668"
 Atlas.Map.ExcludeSources = "632,658,668"
 
+#    Atlas.Clones.Enable
+#        CLONE MAPS (PLAN stage 2): map runs open in a clone of their dungeon
+#        (map IDs 900-949, same halls, no stock creatures, doors or scripts)
+#        instead of the stock instance. Needs, in this order: the clone rows
+#        (tools/clones/gen_sql.py --install, applied on start), the data
+#        links (tools/clones/link_data.sh --apply), and the Atlas client patch
+#        (Data\patch-T.MPQ, tools/clones/build_patch.py) in every player's
+#        client. A run opens in a clone only when every real player of the
+#        party typed `.atlas clones on`; otherwise it runs in the stock dungeon.
+#        Echoes and the Endless Timeways stay in the stock dungeons.
+#        Default: 0 (off)
+Atlas.Clones.Enable = 0
+
 #    SIGIL SUSTAIN (PLAN 1.5): a mended run's cache holds one sigil for each
 #    player, a second at ExtraDropChance %. Each cleared pack drops one (for
 #    each player inside) at SigilChancePerForce % per force point it held

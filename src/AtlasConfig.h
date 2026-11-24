@@ -8,6 +8,7 @@
 #define ATLAS_CONFIG_H
 
 #include "AtlasTypes.h"
+#include "AtlasClones.h"
 #include "RoguelikeTypes.h"
 #include "AtlasScalingMath.h"
 #include "AtlasTheme.h"
@@ -117,6 +118,14 @@ public:
     // Sigil drops of a mended run (PLAN 1.5): tier shift, cache extra, packs.
     SigilDropRules const& GetSigilDropRules() const { return _sigilRules; }
     bool   IsMapFirstClearBonus()     const { return _mapFirstClearBonus; }
+
+    // --- Clone maps (PLAN stage 2) ---
+    // Off by default: map runs open in the stock dungeons as in stage 1.
+    bool   IsClonesEnabled()          const { return _clonesEnabled; }
+    // The usable clones, set at startup and on `.atlas reload` (AtlasMgr
+    // checks each atlas_map_source row against the server's map data).
+    CloneRegistry const& GetClones()  const { return _clones; }
+    std::vector<CloneMap> SetClones(std::vector<CloneMap> const& clones) { return _clones.Set(clones); }
     // Caps on the affixes' item quantity and rarity bonuses (%).
     uint32 GetLootMaxQuantity()       const { return _lootMaxQuantity; }
     uint32 GetLootMaxRarity()         const { return _lootMaxRarity; }
@@ -242,6 +251,8 @@ private:
     std::array<uint32, 3> _mapRarityWeights{ { 60, 30, 10 } };
     SigilDropRules _sigilRules;
     bool   _mapFirstClearBonus = true;
+    bool   _clonesEnabled      = false;
+    CloneRegistry _clones;
     uint32 _lootMaxQuantity    = 100;
     uint32 _lootMaxRarity      = 150;
     uint32 _eliteChance     = 20;

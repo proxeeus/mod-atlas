@@ -184,6 +184,7 @@ void AtlasConfig::LoadConfig(bool reload)
     _mapCompletedTimeoutMin =
         std::clamp<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.CompletedTimeout", 10), 1, 25);
     _mapStarterCount  = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Map.StarterSigils", 3), 10);
+    _clonesEnabled    = sConfigMgr->GetOption<bool>  ("Atlas.Clones.Enable",          false);
     // Sigil drops (PLAN 1.5); chances in %, kept in per mille (the cache's
     // extra) and per 100,000 (a pack's, per force point it held).
     _sigilRules = SigilDropRules();
@@ -503,8 +504,10 @@ Theme const* AtlasConfig::GetTheme(uint32 id) const
     return nullptr;
 }
 
+// A clone answers as the dungeon it echoes.
 DungeonInfo const* AtlasConfig::GetDungeon(uint32 mapId) const
 {
+    mapId = _clones.SourceOf(mapId);
     for (auto const& d : _dungeons)
         if (d.MapId == mapId) return &d;
     return nullptr;

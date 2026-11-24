@@ -1,0 +1,15 @@
+{
+  "comment": [
+    "Atlas clone maps (DESIGN 19: maps 900-949, MapDifficulty 754+). Only enabled clones go into the client patch",
+    "and the server SQL. A clone is its source's Map.dbc row with a new ID and name and the same Directory, so the",
+    "client loads the source's terrain."
+  ],
+  "patch_name": "patch-T.MPQ",
+  "clones": [
+    { "id": 902, "source": 36,  "mapdifficulty_id": 754, "name": "Echo of the Deadmines",       "enabled": true },
+    { "id": 904, "source": 33,  "mapdifficulty_id": 755, "name": "Echo of Shadowfang Keep",     "enabled": false },
+    { "id": 901, "source": 329, "mapdifficulty_id": 756, "name": "Echo of Stratholme",          "enabled": false },
+    { "id": 900, "source": 600, "mapdifficulty_id": 757, "name": "Echo of Drak'Tharon Keep",    "enabled": false },
+    { "id": 903, "source": 602, "mapdifficulty_id": 758, "name": "Echo of the Halls of Lightning", "enabled": false }
+  ]
+}

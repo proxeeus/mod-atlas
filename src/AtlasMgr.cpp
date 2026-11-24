@@ -113,8 +113,10 @@ void AtlasMgr::LoadFromDB()
     LoadAtmosphere();
     LoadAllPlayerStats();
     LoadLeaderboard();
+    LoadCloneMaps();
     LoadDungeonGeometry();
     LoadMapItems();
+    LoadCloneOptIns();
 }
 
 // Compute group average level
@@ -179,6 +181,7 @@ Session* AtlasMgr::CreateSession(Player* leader, uint32 difficultyId,
     s.DifficultyId = difficultyId;
     s.ThemeId      = themeId;
     s.MapId        = mapId;
+    s.SourceMapId  = mapId;
     s.ScaleToParty = scaleToParty;
     s.StartTime    = GameTime::GetGameTime().count();
     s.Seed         = seed;

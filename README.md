@@ -48,6 +48,12 @@ V0 runs inside stock dungeon instances (no client patch needed). Later versions 
 - **Quantity and rarity** — affixes raise the gear and sigil counts and chances (quantity) and the epics and sigil rarity (rarity), capped by config
 - **Starter sigils** — the Chronicler gives three tier-1 sigils once to each level-80 character
 
+### Clone maps (stage 2, off by default)
+- **A dungeon of its own** — a map run can open in a *clone* of its dungeon: the same halls under a new map ID (900-949), with no stock creatures, doors, instance script or quest gates. The Deadmines (902) comes first
+- **Needs the Atlas client patch** — one file, `Data\patch-T.MPQ`, built by `tools/clones/build_patch.py` (the client's own `Map.dbc` and `MapDifficulty.dbc` plus the clone rows). A client without it never leaves the loading screen of a clone, so a run opens there only when every real player of the party typed `.atlas clones on`; bots follow their master
+- **Server side** — SQL rows (`map_dbc`, `mapdifficulty_dbc`, `instance_template`, `atlas_map_source`) generated from the same rows as the patch, and symlinks to the source's `maps`/`vmaps`/`mmaps` files (`tools/clones/link_data.sh`); every clone is checked at startup and left out if anything is missing
+- **Switch** — `Atlas.Clones.Enable` (default 0). Off, or without the opt-in, sigils open the stock dungeons as before. Echoes and the Endless Timeways stay in the stock dungeons. See `tools/clones/README.md` for the install order
+
 ### The Endless Timeways (roguelike mode)
 - **Infinite progression** — Mend an echo, get pulled into the next one, repeat until the party falls
 - **Escalating difficulty** — Enemy HP and damage scale per tier (linear, then exponential)
@@ -311,6 +317,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas loot [tier]` | GM | A map tier's gear band, epic share and sigil rules, a sample piece for the target, and the target's run quantity and rarity |
 | `.atlas map list` | GM | The target's (or your) sigils and open map run |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
+| `.atlas clones [on\|off]` | Player | Clone maps: the realm's switch, the usable clones, and your account's opt-in. Turn it on only with `Data\patch-T.MPQ` in your client |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
 Every run is logged in `atlas_run_log` (characters DB) with its seed and result (completed, failed, abandoned, or interrupted by a restart).

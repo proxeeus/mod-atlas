@@ -37,3 +37,7 @@
 
 # macOS Finder metadata
 .DS_Store
+
+# Atlas clone tools: the built client patch (tools/clones/build_patch.py) and Python caches
+client_patch/
+__pycache__/

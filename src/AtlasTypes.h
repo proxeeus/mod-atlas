@@ -132,7 +132,12 @@ struct Session
 
     uint32  DifficultyId    = 0;
     uint32  ThemeId         = 0;
+    // The map the run happens on, and the dungeon it echoes: the same stock
+    // map, or a clone (PLAN stage 2) and its source. Records, progress and
+    // the layout belong to the source; teleports, binds and presence checks
+    // to MapId.
     uint32  MapId           = 0;
+    uint32  SourceMapId     = 0;
     uint32  InstanceId      = 0;
     bool    ScaleToParty    = true;
     uint32  RoguelikeRunId  = 0;  // 0 = standalone, >0 = roguelike
@@ -201,6 +206,8 @@ struct Session
     std::vector<ObjectGuid> CacheClaimed;   // rewarded: opened the cache, or a bot paid at the kill
     std::vector<ObjectGuid> FirstClears;    // players whose account first mended this dungeon at this tier
     std::vector<bool>       PacksDone;      // per layout anchor: cleared and its sigil chance rolled
+
+    bool IsClone() const { return MapId != SourceMapId; }
 
     static bool Contains(std::vector<ObjectGuid> const& list, ObjectGuid guid)
     {

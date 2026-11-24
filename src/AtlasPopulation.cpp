@@ -395,7 +395,9 @@ void AtlasMgr::LoadDungeonGeometry()
 
 std::shared_ptr<Layout const> AtlasMgr::GetLayout(uint32 mapId) const
 {
-    return _stockLayouts.GetLayout(mapId);
+    // A clone has its source's geometry, so its source's layout (frozen
+    // clone layouts come later, PLAN 2.3).
+    return _stockLayouts.GetLayout(sAtlasConfig->GetClones().SourceOf(mapId));
 }
 
 Position AtlasMgr::GetDungeonEntrance(uint32 mapId)
@@ -405,7 +407,7 @@ Position AtlasMgr::GetDungeonEntrance(uint32 mapId)
 }
 
 // Instance population
-void AtlasMgr::ClearDungeonCreatures(InstanceMap* map)
+void AtlasMgr::ClearDungeonCreatures(InstanceMap* map, bool stockSweep)
 {
     if (!map) return;
 
@@ -427,6 +429,13 @@ void AtlasMgr::ClearDungeonCreatures(InstanceMap* map)
             }
         }
         guidIt->second.clear();
+    }
+
+    if (!stockSweep)
+    {
+        LOG_INFO("module", "Atlas: Cleared {} tracked creatures from clone map {} (inst {})", totalRemoved,
+            map->GetId(), instanceId);
+        return;
     }
 
     uint32 dbRemoved = 0;
@@ -524,8 +533,10 @@ void AtlasMgr::PopulateDungeon(Session* session, InstanceMap* map)
     Theme const*          theme = sAtlasConfig->GetTheme(session->ThemeId);
     if (!diff || !theme) return;
 
-    ClearDungeonCreatures(map);
-    OpenAllDoors(map);
+    // A clone has no stock creatures, doors or instance script to undo.
+    ClearDungeonCreatures(map, !session->IsClone());
+    if (!session->IsClone())
+        OpenAllDoors(map);
 
     // Mark all boss encounters as DONE so scripts don't interfere
     if (InstanceScript* script = map->GetInstanceScript())

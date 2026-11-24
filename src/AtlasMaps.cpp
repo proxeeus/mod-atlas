@@ -386,6 +386,15 @@ bool AtlasMgr::OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid,
         s.PortalsLeft  = sAtlasConfig->GetMapPortals();
         s.LastOccupied = GameTime::GetGameTime().count();
 
+        // Clones (PLAN stage 2): the run opens in its dungeon's clone when
+        // clones are on and every real player's client has the Atlas patch
+        // (opted in); in the stock dungeon otherwise.
+        std::vector<Player*> members;
+        for (PlayerSessionData const& pd : s.Players)
+            if (Player* m = ObjectAccessor::FindPlayer(pd.PlayerGuid))
+                members.push_back(m);
+        s.MapId = ChooseMapRunMap(members, data.SourceMap);
+
         // The sigil's affixes, plus any a GM forced (`.atlas affix next`).
         std::vector<ActiveAffix> affixes = data.Affixes;
         affixes.insert(affixes.end(), s.Affixes.begin(), s.Affixes.end());
@@ -407,6 +416,7 @@ bool AtlasMgr::OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid,
     GameObject* rift = SummonRift(lens, sessionId);
 
     uint32 portals = 0;
+    uint32 runMap = data.SourceMap;
     std::string affixText;
     {
         std::lock_guard<std::mutex> lock(_sessionMutex);
@@ -416,6 +426,7 @@ bool AtlasMgr::OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid,
             if (rift)
                 it->second.RiftGuid = rift->GetGUID();
             portals = it->second.PortalsLeft;
+            runMap = it->second.MapId;
             if (!it->second.Affixes.empty())
                 affixText = sAtlasAffixes->Describe(it->second.Affixes, true);
         }
@@ -423,8 +434,9 @@ bool AtlasMgr::OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid,
     if (!rift)
         LOG_ERROR("module", "Atlas: map run {} — the rift beside the Lens could not be summoned.", sessionId);
 
-    LOG_INFO("module", "Atlas: Map run {} opened by {} — tier {}, {}, map {}, theme {}, seed {:016X}, affixes {}",
-        sessionId, player->GetName(), data.Tier, MapRarityName(data.Rarity), data.SourceMap, data.ThemeId, data.Seed,
+    LOG_INFO("module", "Atlas: Map run {} opened by {} — tier {}, {}, map {}{}, theme {}, seed {:016X}, affixes {}",
+        sessionId, player->GetName(), data.Tier, MapRarityName(data.Rarity), data.SourceMap,
+        runMap != data.SourceMap ? Acore::StringFormat(" in clone {}", runMap) : "", data.ThemeId, data.Seed,
         sAtlasAffixes->Codes(data.Affixes));
 
     std::string const opened = Acore::StringFormat("{} The Lens takes the sigil. A rift into {} opens beside it.",
@@ -434,6 +446,9 @@ bool AtlasMgr::OpenMapRun(Player* player, GameObject* lens, ObjectGuid itemGuid,
     for (Player* member : party)
     {
         Tell(member, opened);
+        if (runMap != data.SourceMap)
+            Tell(member, Acore::StringFormat("{} This echo stands apart from the living dungeon, in a timeway of its "
+                "own: nothing of the present walks its halls.", CHAT_PREFIX));
         Tell(member, rifts);
         if (!affixText.empty())
             Tell(member, Acore::StringFormat("{} This echo is unstable: {}", CHAT_PREFIX, affixText));
@@ -534,6 +549,14 @@ void AtlasMgr::UseEntryRift(Player* player, GameObject* rift)
         if (!s->IsActive())
         {
             Tell(player, Acore::StringFormat("{} The echo beyond this rift has closed.", CHAT_PREFIX));
+            return;
+        }
+        // Never send a client without the Atlas patch into a clone: it would
+        // stay on its loading screen for good.
+        if (s->IsClone() && IsRealPlayer(player) && !IsCloneOptedIn(player->GetSession()->GetAccountId()))
+        {
+            Tell(player, Acore::StringFormat("{} This echo lies in a timeway your eyes cannot yet see (it needs the "
+                "Atlas client patch; see .atlas clones).", CHAT_PREFIX));
             return;
         }
 
@@ -756,7 +779,7 @@ void AtlasMgr::MarkFirstClears(Session& session)
         bool first = false;
         {
             std::lock_guard<std::mutex> lock(_mapItemsMutex);
-            uint32& tiers = _accountProgress[(uint64(account) << 32) | session.MapId];
+            uint32& tiers = _accountProgress[(uint64(account) << 32) | session.SourceMapId];
             first = !(tiers & bit);
             tiers |= bit;
         }
@@ -765,7 +788,7 @@ void AtlasMgr::MarkFirstClears(Session& session)
 
         session.FirstClears.push_back(pd.PlayerGuid);
         CharacterDatabase.Execute("INSERT INTO atlas_account_progress (account, source_map, tiers) VALUES "
-            "({}, {}, {}) ON DUPLICATE KEY UPDATE tiers = tiers | {}", account, session.MapId, bit, bit);
+            "({}, {}, {}) ON DUPLICATE KEY UPDATE tiers = tiers | {}", account, session.SourceMapId, bit, bit);
     }
 }
 

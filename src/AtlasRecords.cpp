@@ -167,7 +167,7 @@ void AtlasMgr::SaveLeaderboardEntry(Session const& session)
     e.CharName       = "Unknown";
     if (Player* leader = ObjectAccessor::FindPlayer(session.LeaderGuid))
         e.CharName = leader->GetName();
-    e.MapId          = session.MapId;
+    e.MapId          = session.SourceMapId;
     e.DifficultyId   = session.DifficultyId;
     e.ClearTime      = clearTime;
     e.PartySize      = static_cast<uint8>(session.Players.size());
