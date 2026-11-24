@@ -60,6 +60,15 @@ public:
     // The map a run on this source opens in for this party (AtlasClones.h).
     uint32 ChooseMapRunMap(std::vector<Player*> const& party, uint32 sourceMap) const;
 
+    // Generated-map spike (AtlasPool.cpp, DESIGN §6.2): kit pieces placed as
+    // gameobjects in an empty pool map. Read at startup only.
+    void LoadPoolPieces();
+    bool IsPoolMap(uint32 mapId) const;
+    void ProcessPoolMap(Map* map);              // from the map's own update
+    void OnPlayerEnteredPool(Player* player);   // from the allmap script
+    bool EnterSpike(Player* player, std::string& error);
+    void LeaveSpike(Player* player);
+
     // Session lifecycle
     // seed 0 = the leader's pending GM seed if any, else a fresh one.
     Session*  CreateSession(Player* leader, uint32 difficultyId, uint32 themeId, uint32 mapId, bool scaleToParty = true,
@@ -528,6 +537,18 @@ private:
     std::unordered_map<uint64, uint32> _accountProgress;     // account << 32 | map -> tiers mask (_mapItemsMutex)
     std::unordered_set<uint32>         _cloneOptIn;          // accounts (atlas_clone_optin)
     mutable std::mutex                 _cloneMutex;
+
+    struct PoolPiece
+    {
+        uint32   Entry = 0;
+        uint32   MapId = 0;
+        Position Pos;
+        Position Entrance;
+    };
+    std::vector<PoolPiece>                       _poolPieces;    // atlas_pool_piece, set at startup only
+    std::unordered_set<uint32>                   _poolSpawned;   // instance ids with their pieces (_poolMutex)
+    std::unordered_map<ObjectGuid, WorldLocation> _spikeReturns;  // where `.atlas spike leave` goes (_poolMutex)
+    std::mutex                                   _poolMutex;
     std::vector<AtmosphereRow>         _atmosphere;
     std::vector<AtmosphereRow>         _fogs;                // atlas_fog (_atmosphereMutex)
     std::vector<uint32>                _fogSpells;           // every fog spell in atlas_fog (_atmosphereMutex)

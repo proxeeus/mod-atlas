@@ -16,6 +16,7 @@ import clonedata  # noqa: E402
 import dbc  # noqa: E402
 import fogdata  # noqa: E402
 import mpq  # noqa: E402
+import pooldata  # noqa: E402
 from gen_sql import clones_sql, part_sql  # noqa: E402
 
 
@@ -119,12 +120,44 @@ def verify_fogs(archive, sql_path):
     return errors
 
 
+def verify_pool(archive, sql_path):
+    """The pool map's Map.dbc / MapDifficulty.dbc rows = its SQL rows; its WDT is in the patch and empty."""
+    errors = 0
+    cfg = pooldata.load_config()
+    m = cfg['map']
+    for name, table, fields, rid in (('Map.dbc', 'map_dbc', clonedata.MAP_FIELDS, m['id']),
+                                     ('MapDifficulty.dbc', 'mapdifficulty_dbc', clonedata.MAPDIFFICULTY_FIELDS,
+                                      m['mapdifficulty_id'])):
+        d = dbc.Dbc.parse(archive.read('DBFilesClient\\' + name))
+        _, rows = sql_rows(sql_path, table)
+        raw = d.row(rid)
+        sql = [r for r in rows if int(r[0][1]) == rid]
+        if not raw or len(sql) != 1:
+            print('pool %s row %d missing from the patch or the SQL' % (name, rid))
+            errors += 1
+            continue
+        bad = sum(1 for (_, kind), value, token in zip(fields, clonedata.decode(d, raw, fields), sql[0])
+                  if not same(value, kind, token))
+        errors += bad
+        print('%-18s row %d (pool): %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
+    if archive.read(pooldata.wdt_path(cfg)) != pooldata.empty_wdt():
+        print('pool WDT %s missing or not empty' % pooldata.wdt_path(cfg))
+        errors += 1
+    _, pieces = sql_rows(sql_path, 'atlas_pool_piece')
+    if {int(r[0][1]) for r in pieces} != {p['go_entry'] for p in cfg['pieces']}:
+        print('atlas_pool_piece rows differ from pool.json')
+        errors += 1
+    print('pool               WDT %s, %d piece(s)' % (pooldata.wdt_path(cfg), len(pieces)))
+    return errors
+
+
 def main():
     cfg = clonedata.load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--patch', default=os.path.join(clonedata.MODULE, 'client_patch', cfg['patch_name']))
     ap.add_argument('--sql', default=clones_sql())
     ap.add_argument('--fog-sql', default=part_sql('fogs'))
+    ap.add_argument('--pool-sql', default=part_sql('pool'))
     args = ap.parse_args()
 
     archive = mpq.MPQ(args.patch)
@@ -160,6 +193,7 @@ def main():
             errors += bad
             print('%-18s row %d: %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
     errors += verify_fogs(archive, args.fog_sql)
+    errors += verify_pool(archive, args.pool_sql)
     print('OK' if not errors else '%d difference(s)' % errors)
     sys.exit(1 if errors else 0)
 

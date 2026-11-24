@@ -1,0 +1,14 @@
+{
+  "comment": [
+    "Generated-map spike (DESIGN 6.2): one pool map with an empty WDT (no terrain, no WMO), where mod-atlas places",
+    "a stock WMO room as a gameobject (type 14, MAP_OBJECT). The room's display must be in the server's",
+    "vmaps/GameObjectModels.dtree (gameobject collision) and its WMO in the client. Reserved IDs: maps 950-999,",
+    "MapDifficulty 754+ (759 here), gameobject entries 900100-900199 (kit pieces)."
+  ],
+  "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways" },
+  "pieces": [
+    { "go_entry": 900100, "display": 649, "name": "Timeways Fragment: Goldmine",
+      "wmo": "World\\wmo\\Dungeon\\MD_Goldmine\\MD_Goldmine_1Room.wmo",
+      "position": [-266.0, -266.0, 0.0, 0.0], "entrance_local": [0.0, -5.0, 0.5] }
+  ]
+}

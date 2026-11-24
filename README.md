@@ -319,6 +319,7 @@ Affixes stack — at tier 10+ you might face Fortified + Tyrannical + Raging sim
 | `.atlas map list` | GM | The target's (or your) sigils and open map run |
 | `.atlas scaling [level] [tier] [party] [difficulty]` | GM | Health, melee and armor of every role at those settings (defaults: 80, tier 1, five, the last difficulty) |
 | `.atlas fog [list\|off\|<id>]` | Player | Fogs of the Atlas patch (opted-in accounts): list them, try one on you until you leave the map, or clear it; alone, inside a run, your run's fog |
+| `.atlas spike [leave]` | Player | Generated-map spike (opted-in accounts): you and the bots beside you go to the empty pool map 950 with one kit piece (a WMO room placed as a gameobject); `leave` brings you back |
 | `.atlas clones [on\|off]` | Player | Clone maps: the realm's switch, the usable clones, and your account's opt-in. Turn it on only with `Data\patch-T.MPQ` in your client |
 | `.atlas seed <hex>\|clear` | GM | The target's (or your) next run, an echo or a whole Endless descent, is built from this seed. Same seed, dungeon and settings: same creatures, elites, rare and boss |
 
