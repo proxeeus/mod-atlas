@@ -332,13 +332,22 @@ public:
         uint32 Light      = 0;   // theme / corruption look, on the main anchor
         uint32 AffixLight = 0;   // an affix's look, on the second anchor
         uint32 Music      = 0;
+        uint32 Fog        = 0;   // fog spell (atlas_fog), for players with the Atlas patch
     };
-    void        LoadAtmosphere();   // atlas_atmosphere (also `.atlas reload`)
+    void        LoadAtmosphere();   // atlas_atmosphere and atlas_fog (also `.atlas reload`)
     RunLook     GetRunLook(Session const& session) const;
     void        SendAtmosphere(Player* player, Session const& session, bool log = false);
     // From the allmap script: a run member arrived on the run's map.
     void        OnPlayerEnteredRunMap(Player* player);
     std::string DescribeRunLook(Session const& session) const;
+    // The run's fog (a screen-effect aura of the Atlas patch) on a real player
+    // whose account opted in (`.atlas clones on`), any other fog off. The aura
+    // drops by itself on map change and before a logout save.
+    void        ApplyRunFog(Player* player, Session const& session);
+    // Takes every fog off (`keep` excepted); true if one was on.
+    bool        ClearFogs(Player* player, uint32 keep = 0) const;
+    bool        IsFogSpell(uint32 spellId) const;
+    std::vector<uint32> GetFogSpells() const;
     // The run HUD (AtlasAtmosphere.cpp, PLAN 1.7): pushed to the players of a
     // run who have the addon. Full on arrival and on hello, the header when
     // it changes (from Update), ended when the run ends.
@@ -520,6 +529,8 @@ private:
     std::unordered_set<uint32>         _cloneOptIn;          // accounts (atlas_clone_optin)
     mutable std::mutex                 _cloneMutex;
     std::vector<AtmosphereRow>         _atmosphere;
+    std::vector<AtmosphereRow>         _fogs;                // atlas_fog (_atmosphereMutex)
+    std::vector<uint32>                _fogSpells;           // every fog spell in atlas_fog (_atmosphereMutex)
     mutable std::mutex                 _atmosphereMutex;
     std::vector<LootPoolItem> _lootPool;
 

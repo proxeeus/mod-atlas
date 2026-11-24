@@ -93,3 +93,51 @@ class Dbc:
     def save(self, path):
         with open(path, 'wb') as f:
             f.write(self.serialize())
+
+
+class RawDbc:
+    """A WDBC file kept as raw bytes, for big tables (Spell.dbc: 49,839 rows, 234 fields). Rows are read on
+    demand and new ones appended; the existing records and string block are written back unchanged."""
+
+    def __init__(self, data):
+        magic, self.count, self.fields, self.size, ssize = struct.unpack_from('<4s4I', data)
+        if magic != MAGIC or self.size != self.fields * 4:
+            raise ValueError('not a 4-byte-field WDBC file')
+        if len(data) != 20 + self.count * self.size + ssize:
+            raise ValueError('size mismatch')
+        self.records = bytearray(data[20:20 + self.count * self.size])
+        self.strings = bytearray(data[20 + self.count * self.size:])
+        self._index = None
+
+    def _ids(self):
+        if self._index is None:
+            self._index = {struct.unpack_from('<I', self.records, i * self.size)[0]: i for i in range(self.count)}
+        return self._index
+
+    def ids(self):
+        return set(self._ids())
+
+    def row(self, row_id):
+        i = self._ids().get(row_id)
+        if i is None:
+            return None
+        return list(struct.unpack_from('<%dI' % self.fields, self.records, i * self.size))
+
+    def string(self, offset):
+        end = self.strings.index(b'\0', offset)
+        return self.strings[offset:end].decode('utf8')
+
+    add_string = Dbc.add_string
+
+    def append(self, row):
+        if len(row) != self.fields:
+            raise ValueError('row has %d fields, expected %d' % (len(row), self.fields))
+        if row[0] in self._ids():
+            raise ValueError('row %d already exists' % row[0])
+        self._index[row[0]] = self.count
+        self.records += struct.pack('<%dI' % self.fields, *[v & 0xFFFFFFFF for v in row])
+        self.count += 1
+
+    def serialize(self):
+        return (struct.pack('<4s4I', MAGIC, self.count, self.fields, self.size, len(self.strings))
+                + bytes(self.records) + bytes(self.strings))

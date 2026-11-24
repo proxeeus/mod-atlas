@@ -15,9 +15,11 @@
 #include "ObjectAccessor.h"
 #include "Player.h"
 #include "QueryResult.h"
+#include "SpellMgr.h"
 #include "StringFormat.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#include <algorithm>
 
 namespace Atlas
 {
@@ -44,9 +46,85 @@ void AtlasMgr::LoadAtmosphere()
         LOG_ERROR("module", "Atlas: table atlas_atmosphere is empty or missing (module SQL not applied?): "
             "runs keep the dungeon's own sky.");
 
+    // Fogs (tools/clones/fogs.json, staged until installed): their spells
+    // must exist server-side too, or AddAura would do nothing.
+    std::vector<AtmosphereRow> fogs;
+    std::vector<uint32> fogSpells;
+    if (WorldDatabase.Query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() "
+            "AND table_name = 'atlas_fog'"))
+    {
+        if (QueryResult result = WorldDatabase.Query("SELECT theme_id, corruption, affix_id, spell_id "
+            "FROM atlas_fog ORDER BY id"))
+        {
+            do
+            {
+                Field* f = result->Fetch();
+                AtmosphereRow r;
+                r.ThemeId    = f[0].Get<uint32>();
+                r.Corruption = f[1].Get<uint8>();
+                r.AffixId    = f[2].Get<uint32>();
+                r.FogSpell   = f[3].Get<uint32>();
+                if (!sSpellMgr->GetSpellInfo(r.FogSpell))
+                {
+                    LOG_ERROR("module", "Atlas: atlas_fog names spell {}, which the server does not know "
+                        "(atlas_fogs.sql not applied?): row skipped.", r.FogSpell);
+                    continue;
+                }
+                if (std::find(fogSpells.begin(), fogSpells.end(), r.FogSpell) == fogSpells.end())
+                    fogSpells.push_back(r.FogSpell);
+                fogs.push_back(r);
+            } while (result->NextRow());
+        }
+    }
+
     std::lock_guard<std::mutex> lock(_atmosphereMutex);
     _atmosphere = std::move(rows);
-    LOG_INFO("module", "Atlas: {} atmosphere looks loaded.", _atmosphere.size());
+    _fogs = std::move(fogs);
+    _fogSpells = std::move(fogSpells);
+    LOG_INFO("module", "Atlas: {} atmosphere looks and {} fog rows ({} fogs) loaded.", _atmosphere.size(),
+        _fogs.size(), _fogSpells.size());
+}
+
+bool AtlasMgr::IsFogSpell(uint32 spellId) const
+{
+    std::lock_guard<std::mutex> lock(_atmosphereMutex);
+    return std::find(_fogSpells.begin(), _fogSpells.end(), spellId) != _fogSpells.end();
+}
+
+std::vector<uint32> AtlasMgr::GetFogSpells() const
+{
+    std::lock_guard<std::mutex> lock(_atmosphereMutex);
+    return _fogSpells;
+}
+
+bool AtlasMgr::ClearFogs(Player* player, uint32 keep) const
+{
+    if (!player)
+        return false;
+    bool removed = false;
+    for (uint32 spell : GetFogSpells())
+        if (spell != keep && player->HasAura(spell))
+        {
+            player->RemoveAurasDueToSpell(spell);
+            removed = true;
+        }
+    return removed;
+}
+
+void AtlasMgr::ApplyRunFog(Player* player, Session const& session)
+{
+    if (!player || !sAtlasConfig->IsAtmosphereEnabled() || !sAtlasConfig->IsFogEnabled() || !IsRealPlayer(player)
+        || player->GetMapId() != session.MapId)
+        return;
+    // Only a client with the Atlas patch knows the spell and its screen
+    // effect (an unpatched one would skip the aura, but show nothing).
+    if (!IsCloneOptedIn(player->GetSession()->GetAccountId()))
+        return;
+
+    uint32 const fog = GetRunLook(session).Fog;
+    ClearFogs(player, fog);
+    if (fog && !player->HasAura(fog))
+        player->AddAura(fog, player);
 }
 
 void AtlasMgr::SendLightOverride(Player* player, uint32 anchorLight, uint32 lightId, uint32 fadeMs)
@@ -80,6 +158,7 @@ AtlasMgr::RunLook AtlasMgr::GetRunLook(Session const& session) const
         if (!look.Music)
             look.Music = row->MusicId;
     }
+    look.Fog = PickFog(_fogs, session.ThemeId, CorruptionLevel(session.Tier), affixIds);
     return look;
 }
 
@@ -91,8 +170,8 @@ void AtlasMgr::SendAtmosphere(Player* player, Session const& session, bool log)
     RunLook const look = GetRunLook(session);
     if (log)
         LOG_INFO("module", "Atlas: Atmosphere for {} on map {} — light {} over anchor {}, affix light {} over {}, "
-            "music {}.", player->GetName(), session.MapId, look.Light, sAtlasConfig->GetAtmosphereAnchor(),
-            look.AffixLight, sAtlasConfig->GetAtmosphereAffixAnchor(), look.Music);
+            "music {}, fog {}.", player->GetName(), session.MapId, look.Light, sAtlasConfig->GetAtmosphereAnchor(),
+            look.AffixLight, sAtlasConfig->GetAtmosphereAffixAnchor(), look.Music, look.Fog);
     uint32 const fade = sAtlasConfig->GetAtmosphereFadeMs();
     // Always send both slots: a run without an affix look clears the second
     // anchor in case the previous Endless depth had one.
@@ -100,6 +179,7 @@ void AtlasMgr::SendAtmosphere(Player* player, Session const& session, bool log)
     SendLightOverride(player, sAtlasConfig->GetAtmosphereAffixAnchor(), look.AffixLight, fade);
     if (look.Music)
         player->SendDirectMessage(WorldPackets::Misc::PlayMusic(look.Music).Write());
+    ApplyRunFog(player, session);
 }
 
 void AtlasMgr::OnPlayerEnteredRunMap(Player* player)
@@ -200,9 +280,9 @@ void AtlasMgr::PushRunEnded(Session const& session)
 std::string AtlasMgr::DescribeRunLook(Session const& session) const
 {
     RunLook const look = GetRunLook(session);
-    return Acore::StringFormat("light {} (theme {}, corruption {}), affix light {}, music {}, anchors {} / {}",
-        look.Light, session.ThemeId, CorruptionLevel(session.Tier), look.AffixLight, look.Music,
-        sAtlasConfig->GetAtmosphereAnchor(), sAtlasConfig->GetAtmosphereAffixAnchor());
+    return Acore::StringFormat("light {} (theme {}, corruption {}), affix light {}, music {}, anchors {} / {}, "
+        "fog {}", look.Light, session.ThemeId, CorruptionLevel(session.Tier), look.AffixLight, look.Music,
+        sAtlasConfig->GetAtmosphereAnchor(), sAtlasConfig->GetAtmosphereAffixAnchor(), look.Fog);
 }
 
 } // namespace Atlas

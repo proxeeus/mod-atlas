@@ -1,7 +1,9 @@
 /*
  * mod-atlas — atlas_player_script.cpp
  * Player death handling: blocks spirit release, checks for wipe. Reward items
- * still waiting for their player at logout go by mail.
+ * still waiting for their player at logout go by mail. A run fog saved by a
+ * crash (a periodic save while it was on) is taken off at login outside the
+ * run's map.
  */
 
 #include "ScriptMgr.h"
@@ -30,6 +32,15 @@ public:
             return;
 
         sAtlasMgr->HandlePlayerDeath(player, session);
+    }
+
+    void OnPlayerLogin(Player* player) override
+    {
+        if (!player)
+            return;
+        Session* session = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
+        if (!session || player->GetMapId() != session->MapId)
+            sAtlasMgr->ClearFogs(player);
     }
 
     void OnPlayerLogout(Player* player) override

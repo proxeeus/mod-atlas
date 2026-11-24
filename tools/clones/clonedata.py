@@ -77,6 +77,18 @@ def source_dbcs(client=None, dbc_dir=None, patch_name='patch-T.MPQ'):
     return dbc.Dbc.parse(raw_m), dbc.Dbc.parse(raw_d), {'Map.dbc': arch_m, 'MapDifficulty.dbc': arch_d}
 
 
+def effective_raw(client, dbc_dir, name, patch_name='patch-T.MPQ'):
+    """(bytes, where) of a client DBC as the client sees it without our own patch, or from `dbc_dir`."""
+    if dbc_dir:
+        with open(os.path.join(dbc_dir, name), 'rb') as f:
+            return f.read(), dbc_dir
+    order = mpq.client_order(client, exclude=[patch_name])
+    arch, raw = mpq.read_effective(client, 'DBFilesClient\\' + name, order)
+    if not raw:
+        raise SystemExit('%s not found in the client archives' % name)
+    return raw, arch
+
+
 def decode(table, row, fields):
     """Typed values of a raw row: ints, floats and strings."""
     out = []

@@ -505,6 +505,16 @@ Atlas.Atmosphere.AffixAnchor = 2488
 #    Atlas.Atmosphere.FadeMs              Default: 2000
 Atlas.Atmosphere.FadeMs = 2000
 
+#    Atlas.Atmosphere.Fog
+#        Fogs of the Atlas client patch: a swirling fog over the screen, by
+#        theme, corruption or affix (table atlas_fog, tools/clones/fogs.json).
+#        Unlike the sky above, a dungeon's own fog can't hide it indoors. Only
+#        for accounts that typed `.atlas clones on` (their client has
+#        Data\patch-T.MPQ); needs atlas_fogs.sql (tools/clones/gen_sql.py
+#        --install fogs). Try them with `.atlas fog list`.
+#        Default: 1
+Atlas.Atmosphere.Fog = 1
+
 ###############################################################################
 # AFFIXES (DESIGN section 10)
 #   The affixes themselves are data: world table atlas_affix (module SQL

@@ -141,6 +141,8 @@ public:
     uint32 GetAtmosphereAnchor()      const { return _atmosphereAnchor; }
     uint32 GetAtmosphereAffixAnchor() const { return _atmosphereAffixAnchor; }
     uint32 GetAtmosphereFadeMs()      const { return _atmosphereFadeMs; }
+    // Fogs of the Atlas patch (atlas_fog), for accounts that opted in.
+    bool   IsFogEnabled()             const { return _fogEnabled; }
 
     // --- Affixes ---
     bool   IsAffixBotSafeOnly()       const { return _affixBotSafeOnly; }
@@ -239,6 +241,7 @@ private:
     uint32 _atmosphereAnchor      = 1826;
     uint32 _atmosphereAffixAnchor = 2488;
     uint32 _atmosphereFadeMs      = 2000;
+    bool   _fogEnabled            = true;
     uint32 _rareMarker       = 48019;
     bool   _mapsEnabled      = true;
     uint8  _mapMinLevel      = 80;

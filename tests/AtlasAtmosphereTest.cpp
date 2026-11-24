@@ -50,3 +50,55 @@ TEST(AtlasAtmosphere, AffixLookFollowsAffixOrder)
     EXPECT_EQ(PickAffixLook(rows, { 1, 2 }), nullptr);
     EXPECT_EQ(PickAffixLook(rows, {}), nullptr);
 }
+
+namespace
+{
+    AtmosphereRow Fog(uint32 theme, uint8 corruption, uint32 affix, uint32 spell)
+    {
+        AtmosphereRow r;
+        r.ThemeId = theme;
+        r.Corruption = corruption;
+        r.AffixId = affix;
+        r.FogSpell = spell;
+        return r;
+    }
+
+    std::vector<AtmosphereRow> Fogs()
+    {
+        return {
+            Fog(0, ATMOSPHERE_ANY_CORRUPTION, 0, 90400),   // Timeways Mist
+            Fog(1, ATMOSPHERE_ANY_CORRUPTION, 0, 90401),   // beasts
+            Fog(0, 4, 0, 90411),                           // plague, any theme
+            Fog(51, 2, 0, 90409),                          // the Scourge, deeper
+            Fog(0, ATMOSPHERE_ANY_CORRUPTION, 202, 90413), // Blizzard-swept
+        };
+    }
+}
+
+TEST(AtlasAtmosphere, FogFollowsThemeAndCorruption)
+{
+    auto const fogs = Fogs();
+    EXPECT_EQ(PickFog(fogs, 1, 0, {}), 90401u);    // the theme's own
+    EXPECT_EQ(PickFog(fogs, 1, 4, {}), 90411u);    // corruption takes over
+    EXPECT_EQ(PickFog(fogs, 7, 0, {}), 90400u);    // a theme without a fog: the default
+    EXPECT_EQ(PickFog(fogs, 51, 2, {}), 90409u);   // the theme at its level
+    EXPECT_EQ(PickFog(fogs, 51, 1, {}), 90400u);
+}
+
+TEST(AtlasAtmosphere, AffixFogWins)
+{
+    auto const fogs = Fogs();
+    EXPECT_EQ(PickFog(fogs, 1, 0, { 7, 202 }), 90413u);
+    EXPECT_EQ(PickFog(fogs, 1, 4, { 202 }), 90413u);
+    EXPECT_EQ(PickFog(fogs, 1, 0, { 7 }), 90401u);  // an affix without a fog changes nothing
+}
+
+TEST(AtlasAtmosphere, FogRowsAndLightRowsStayApart)
+{
+    // A light row has no fog and a fog row no light: each pick sees only its own.
+    std::vector<AtmosphereRow> const lights = Rows();
+    EXPECT_EQ(PickFog(lights, 1, 0, { 202 }), 0u);
+    auto const fogs = Fogs();
+    EXPECT_EQ(PickThemeLook(fogs, 1, 0), nullptr);
+    EXPECT_EQ(PickAffixLook(fogs, { 202 }), nullptr);
+}

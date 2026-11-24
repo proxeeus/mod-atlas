@@ -2,7 +2,8 @@
 
   python3 -I verify.py [--patch FILE] [--sql FILE]
 
-Reads client_patch/patch-T.MPQ and atlas_clones.sql (staged or installed); exits 1 on any difference.
+Reads client_patch/patch-T.MPQ, atlas_clones.sql and atlas_fogs.sql (staged or installed); exits 1 on any
+difference.
 """
 import argparse
 import os
@@ -13,8 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import clonedata  # noqa: E402
 import dbc  # noqa: E402
+import fogdata  # noqa: E402
 import mpq  # noqa: E402
-from gen_sql import clones_sql  # noqa: E402
+from gen_sql import clones_sql, part_sql  # noqa: E402
 
 
 def _tokens(text):
@@ -75,11 +77,54 @@ def same(value, kind, token):
     return int(raw) == value
 
 
+def verify_fogs(archive, sql_path):
+    """Fog spells: patch Spell.dbc rows = spell_dbc rows; each has a swirling-fog ScreenEffect row; atlas_fog only
+    names fog spells."""
+    errors = 0
+    cfg = fogdata.load_config()
+    fields = fogdata.spell_fields()
+    spells = dbc.RawDbc(archive.read(fogdata.DBC_SPELL))
+    effects = dbc.Dbc.parse(archive.read(fogdata.DBC_SCREEN_EFFECT))
+    cols, rows = sql_rows(sql_path, 'spell_dbc')
+    if cols != [n for n, _ in fields]:
+        print('spell_dbc: column list differs from Spell.dbc')
+        return 1
+    by_id = {int(r[0][1]): r for r in rows}
+    want = {f['spell']: f for f in cfg['fogs']}
+    if set(by_id) != set(want):
+        print('spell_dbc: SQL rows %s, fogs %s' % (sorted(by_id), sorted(want)))
+        errors += 1
+    misc = [n for n, _ in fields].index('EffectMiscValue_1')
+    for sid, fog in sorted(want.items()):
+        raw = spells.row(sid)
+        if not raw or sid not in by_id:
+            print('fog spell %d missing from the patch or the SQL' % sid)
+            errors += 1
+            continue
+        bad = sum(1 for (col, kind), value, token in zip(fields, fogdata.decode_spell(spells, raw, fields), by_id[sid])
+                  if not same(value, kind, token))
+        effect = effects.row(raw[misc])
+        if not effect or effect[2] != fogdata.SCREEN_EFFECT_SWIRLING_FOG:
+            print('fog spell %d: no swirling-fog ScreenEffect row %d' % (sid, raw[misc]))
+            bad += 1
+        errors += bad
+        print('Spell.dbc          row %d: %d of %d fields match, screen effect %d' % (sid, len(fields) - bad,
+                                                                                   len(fields), raw[misc]))
+    _, fog_rows = sql_rows(sql_path, 'atlas_fog')
+    unknown = {int(r[4][1]) for r in fog_rows} - set(want)
+    if unknown:
+        print('atlas_fog names spells that are not fogs: %s' % sorted(unknown))
+        errors += 1
+    print('atlas_fog          %d rows' % len(fog_rows))
+    return errors
+
+
 def main():
     cfg = clonedata.load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--patch', default=os.path.join(clonedata.MODULE, 'client_patch', cfg['patch_name']))
     ap.add_argument('--sql', default=clones_sql())
+    ap.add_argument('--fog-sql', default=part_sql('fogs'))
     args = ap.parse_args()
 
     archive = mpq.MPQ(args.patch)
@@ -114,6 +159,7 @@ def main():
                     bad += 1
             errors += bad
             print('%-18s row %d: %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
+    errors += verify_fogs(archive, args.fog_sql)
     print('OK' if not errors else '%d difference(s)' % errors)
     sys.exit(1 if errors else 0)
 

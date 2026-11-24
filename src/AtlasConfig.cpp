@@ -172,6 +172,7 @@ void AtlasConfig::LoadConfig(bool reload)
     _atmosphereAnchor      = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.Anchor",      1826);
     _atmosphereAffixAnchor = sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.AffixAnchor", 2488);
     _atmosphereFadeMs      = std::min<uint32>(sConfigMgr->GetOption<uint32>("Atlas.Atmosphere.FadeMs", 2000), 60000);
+    _fogEnabled            = sConfigMgr->GetOption<bool>  ("Atlas.Atmosphere.Fog",         true);
     _rareMarker       = sConfigMgr->GetOption<uint32>("Atlas.Affix.RareMarker",      48019);
 
     // Maps (PLAN 1.4)

@@ -4,7 +4,8 @@
  * .atlas run (the current run and its seed), .atlas seed (replay a seed),
  * .atlas scaling (the role table at a level, tier, party size and difficulty),
  * .atlas affix list|next (the affixes, and forcing some on the next run)
- * Players: .atlas clones [on|off] (runs in clone maps, for clients with the Atlas patch)
+ * Players: .atlas clones [on|off] (runs in clone maps, for clients with the Atlas patch),
+ * .atlas fog [list|off|<spell>] (tries the fogs of the Atlas patch)
  */
 
 #include "ScriptMgr.h"
@@ -67,6 +68,7 @@ public:
             { "seed",          HandleSeed,           SEC_GAMEMASTER,     Console::No  },
             { "scaling",       HandleScaling,        SEC_GAMEMASTER,     Console::Yes },
             { "clones",        HandleClones,         SEC_PLAYER,         Console::No  },
+            { "fog",           HandleFog,            SEC_PLAYER,         Console::No  },
         };
         static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
@@ -126,8 +128,67 @@ public:
                 "Only type .atlas clones on if Data\\patch-T.MPQ is in your client: without it, entering a "
                 "clone leaves you on the loading screen.");
         else
-            h->SendSysMessage("Map runs open in a clone when one exists and everyone in your party opted in. "
-                ".atlas clones off turns it off again.");
+            h->SendSysMessage("Map runs open in a clone when one exists and everyone in your party opted in, and "
+                "carry the fogs of the patch (.atlas fog list). .atlas clones off turns it off again.");
+        return true;
+    }
+
+    // .atlas fog [list|off|<spell>]: tries a fog of the Atlas patch on you (it
+    // goes when you leave the map); without arguments, your run's fog again.
+    // Needs the opt-in: only a client with the patch can show it.
+    static bool HandleFog(ChatHandler* h, Optional<std::string> arg)
+    {
+        Player* player = h->GetPlayer();
+        if (!player)
+            return false;
+        if (!sAtlasMgr->IsCloneOptedIn(player->GetSession()->GetAccountId()))
+        {
+            h->PSendSysMessage("{} Fogs need the Atlas client patch: see .atlas clones.", CHAT_PREFIX);
+            return true;
+        }
+
+        std::vector<uint32> const fogs = sAtlasMgr->GetFogSpells();
+        std::string const what = arg ? *arg : "";
+        if (what == "list")
+        {
+            for (uint32 spell : fogs)
+                if (SpellInfo const* info = sSpellMgr->GetSpellInfo(spell))
+                    h->PSendSysMessage("  {} — {}", spell, info->SpellName[0]);
+            h->PSendSysMessage("{} {} fogs. .atlas fog <id> tries one, .atlas fog off clears it.", CHAT_PREFIX,
+                fogs.size());
+            return true;
+        }
+        if (what == "off")
+        {
+            sAtlasMgr->ClearFogs(player);
+            h->PSendSysMessage("{} The mist clears.", CHAT_PREFIX);
+            return true;
+        }
+        if (what.empty())
+        {
+            Session* s = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
+            if (!s || player->GetMapId() != s->MapId)
+            {
+                h->SendSysMessage("Usage: .atlas fog list | off | <id> (without one: your run's fog, inside a run)");
+                return true;
+            }
+            sAtlasMgr->ApplyRunFog(player, *s);
+            h->PSendSysMessage("{} Your echo's fog: {}.", CHAT_PREFIX, sAtlasMgr->GetRunLook(*s).Fog);
+            return true;
+        }
+
+        uint32 spell = 0;
+        std::from_chars(what.data(), what.data() + what.size(), spell);
+        if (!sAtlasMgr->IsFogSpell(spell))
+        {
+            h->PSendSysMessage("{} {} is not a fog; .atlas fog list shows them.", CHAT_PREFIX, what);
+            return true;
+        }
+        sAtlasMgr->ClearFogs(player, spell);
+        if (!player->HasAura(spell))
+            player->AddAura(spell, player);
+        h->PSendSysMessage("{} Fog {} on you until you leave this map (.atlas fog off clears it).", CHAT_PREFIX,
+            spell);
         return true;
     }
 
