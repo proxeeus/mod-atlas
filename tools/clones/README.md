@@ -18,10 +18,11 @@ Run with `python3 -I` from anywhere; nothing here writes to the client folder or
 
 1. Edit `clones.json` (next free ID in 900-949, next MapDifficulty ID 754+).
 2. `build_patch.py`, `gen_sql.py`, `verify.py` (must print `OK`).
-3. Install in order (STAGE2 6): world DB backup, `gen_sql.py --install` and a restart (the rows), `link_data.sh
+3. Install in order (STAGE2 6): world DB backup, `gen_sql.py --install` and a build (the rows), `link_data.sh
    --apply` and a restart, the patch in the client (`Data\patch-T.MPQ`), then `Atlas.Clones.Enable = 1`. Roll back
-   in reverse. The play setup mounts `modules/` live into the containers: whatever sits in `data/sql/db-world/base/`
-   is applied on the next worldserver start, rebuilt or not. That is why the clone rows wait in `staged/`.
+   in reverse. On the play setup, module SQL is applied by `ac-db-import` from the modules baked into its image, so
+   whatever sits in `data/sql/db-world/base/` lands with the next image build. That is why the clone rows wait in
+   `staged/` until the backup is taken.
 
 ## Why `patch-T.MPQ`
 

@@ -5,8 +5,8 @@
   python3 -I gen_sql.py [--client DIR | --dbc-dir DIR] [--check] [--install]
 
 atlas_clones.sql goes to data/sql/staged/ (never applied: the updater only reads data/sql/*db-world*) until
---install moves it to data/sql/db-world/base/, where the next worldserver start applies it. The play setup mounts
-the module folder live, so install only after the world DB backup (STAGE2 6). Once installed, regenerating keeps
+--install moves it to data/sql/db-world/base/, where the database updater applies it (on the play setup: ac-db-import
+after the next image build). Install only after the world DB backup (STAGE2 6). Once installed, regenerating keeps
 writing to base/. --check compares the files on disk with what would be written and exits 1 on a difference.
 """
 import argparse
@@ -137,7 +137,7 @@ def main():
     ap.add_argument('--dbc-dir', help='read Map.dbc and MapDifficulty.dbc from this folder instead of the client')
     ap.add_argument('--check', action='store_true', help='only compare with the files on disk')
     ap.add_argument('--install', action='store_true',
-                    help='write atlas_clones.sql to db-world/base/ (applied on the next start), drop the staged one')
+                    help='write atlas_clones.sql to db-world/base/ (applied by the next update), drop the staged one')
     args = ap.parse_args()
 
     cfg = clonedata.load_config()

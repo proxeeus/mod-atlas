@@ -407,7 +407,7 @@ Atlas.Map.ExcludeSources = "632,658,668"
 #        CLONE MAPS (PLAN stage 2): map runs open in a clone of their dungeon
 #        (map IDs 900-949, same halls, no stock creatures, doors or scripts)
 #        instead of the stock instance. Needs, in this order: the clone rows
-#        (tools/clones/gen_sql.py --install, applied on start), the data
+#        (tools/clones/gen_sql.py --install, applied by the DB updater), the data
 #        links (tools/clones/link_data.sh --apply), and the Atlas client patch
 #        (Data\patch-T.MPQ, tools/clones/build_patch.py) in every player's
 #        client. A run opens in a clone only when every real player of the
