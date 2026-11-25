@@ -269,7 +269,7 @@ def build_files(spec, client=DEFAULT_CLIENT):
     struct.pack_into('<I', mohd, 32, spec['wmo_id'])
     struct.pack_into('<6f', mohd, 36, *lo, *hi)
     parts = {'MOHD': bytes(mohd), 'MOTX': motx, 'MOMT': momt, 'MOGN': mogn, 'MOGI': mogi, 'MOPV': mopv,
-             'MOPT': mopt, 'MOPR': mopr, 'MOVV': b'', 'MOVB': b''}
+             'MOPT': mopt, 'MOPR': mopr, 'MOVV': b'', 'MOVB': b'', 'MFOG': kitwmo.with_pool_fog(root['MFOG'])}
     want = ['MVER', 'MOHD', 'MOTX', 'MOMT', 'MOGN', 'MOGI', 'MOSB', 'MOPV', 'MOPT', 'MOPR', 'MOVV', 'MOVB', 'MOLT',
             'MODS', 'MODN', 'MODD', 'MFOG']
     if order[:len(want)] != want:

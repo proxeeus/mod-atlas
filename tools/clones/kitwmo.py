@@ -292,11 +292,29 @@ def group_file(mesh, name_offset, portal_start=0, portal_count=0):
     return _chunk('MVER', struct.pack('<I', 17)) + _chunk('MOGP', header + sub), tris, verts
 
 
-# The global fog every WMO carries (MFOG entry 0): flags, position, radii, then fog end / start scalar / colour,
-# underwater end / start scalar / colour (as in stock WMOs).
-GLOBAL_FOG = struct.pack('<I3f2f2fI2fI', 0, 0.0, 0.0, 0.0, 0.0, 0.0, 444.4445, 0.25, 0xff000000, 222.2222, -0.5,
-                         0xff000000)
-assert len(GLOBAL_FOG) == 48
+def pool_fog():
+    """(fog end yd, start fraction, colour ARGB) of the pool map (pool.json "light"). Inside a WMO the client uses
+    the WMO's own fog (MFOG) instead of the map's light, so every kit piece carries the map's fog itself."""
+    with open(os.path.join(HERE, 'pool.json')) as f:
+        lt = json.load(f)['light']
+    return float(lt['fog_end_yd']), float(lt['fog_start']), 0xff000000 | int(lt['fog_colour'], 16)
+
+
+def fog_entry(end, start, colour):
+    """One MFOG entry, global (no radius): flags, position, radii, fog end / start fraction / colour, then the same
+    for underwater."""
+    data = struct.pack('<I3f2f2fI2fI', 0, 0.0, 0.0, 0.0, 0.0, 0.0, end, start, colour, end, start, colour)
+    assert len(data) == 48
+    return data
+
+
+def with_pool_fog(mfog):
+    """`mfog` (a stock WMO's fog entries) with every entry's fog turned into the pool map's."""
+    end, start, colour = pool_fog()
+    out = bytearray(mfog)
+    for o in range(0, len(out) - 47, 48):
+        struct.pack_into('<2fI2fI', out, o + 24, end, start, colour, end, start, colour)
+    return bytes(out)
 
 
 def root_file(mesh, wmo_id, group_name):
@@ -314,7 +332,8 @@ def root_file(mesh, wmo_id, group_name):
     mods = b'Set_$DefaultGlobal'.ljust(20, b'\0') + struct.pack('<3I', 0, 0, 0)
     parts = [('MVER', struct.pack('<I', 17)), ('MOHD', mohd), ('MOTX', motx), ('MOMT', momt), ('MOGN', mogn),
              ('MOGI', mogi), ('MOSB', b'\0\0\0\0'), ('MOPV', b''), ('MOPT', b''), ('MOPR', b''), ('MOVV', b''),
-             ('MOVB', b''), ('MOLT', b''), ('MODS', mods), ('MODN', b''), ('MODD', b''), ('MFOG', GLOBAL_FOG)]
+             ('MOVB', b''), ('MOLT', b''), ('MODS', mods), ('MODN', b''), ('MODD', b''),
+             ('MFOG', fog_entry(*pool_fog()))]
     return b''.join(_chunk(t, d) for t, d in parts)
 
 
