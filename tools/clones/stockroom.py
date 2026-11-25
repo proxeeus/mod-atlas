@@ -18,7 +18,8 @@ import mpq
 
 DEFAULT_CLIENT = '/Users/gaming/Desktop/World of Warcraft 3.3.5a'
 ADAPTER_LEN = 8.0
-COLLAR = 1.5               # a rock ring this wide around the adapter's room end hides the seam with the room
+COLLAR = 3.0               # a rock ring this wide around the adapter's room end hides the seam with the room
+SHELL_DROP = 1.0           # a rock slab this far under the room's lowest point catches anyone a gap lets through
 ADAPTER_TEXTURES = ['DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_08.BLP', 'DUNGEONS\\TEXTURES\\FLOOR\\MM_CAVEFLOOR_03.BLP',
                     'DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_09.BLP',
                     'DUNGEONS\\TEXTURES\\WOOD\\MM_MINEBEAM_01.BLP']   # wall, floor, ceiling, beam
@@ -62,6 +63,43 @@ def room_collision(sub):
     return verts, tris
 
 
+def floor_at(verts, tris, x, y, below):
+    """The highest walkable surface under (x, y) lower than `below`, or None."""
+    best = None
+    for i0, i1, i2 in tris:
+        (ax, ay, az), (bx, by, bz), (cx, cy, cz) = verts[i0], verts[i1], verts[i2]
+        den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if abs(den) < 1e-9:
+            continue
+        l1 = ((by - cy) * (x - cx) + (cx - bx) * (y - cy)) / den
+        l2 = ((cy - ay) * (x - cx) + (ax - cx) * (y - cy)) / den
+        if min(l1, l2, 1 - l1 - l2) < 0:
+            continue
+        ux, uy, uz = bx - ax, by - ay, bz - az
+        vx, vy, vz = cx - ax, cy - ay, cz - az
+        nz = ux * vy - uy * vx
+        if abs(nz) / (math.sqrt((uy * vz - uz * vy) ** 2 + (uz * vx - ux * vz) ** 2 + nz ** 2) or 1) < 0.6:
+            continue
+        z = l1 * az + l2 * bz + (1 - l1 - l2) * cz
+        if z < below and (best is None or z > best):
+            best = z
+    return best
+
+
+def door_floor(door, verts, tris):
+    """The room's own floor just inside a doorway (portal outlines often reach below it), else the outline's
+    bottom."""
+    (dx, dy), (rx, ry), (cx, cy) = door['out'], door['right'], door['centre']
+    z0, z1 = door['rect'][2], door['rect'][3]
+    found = []
+    for back in (1.0, 2.0):
+        for side in (-1.5, 0.0, 1.5):
+            z = floor_at(verts, tris, cx - dx * back + rx * side, cy - dy * back + ry * side, z0 + 3.0)
+            if z is not None and z > z0 - 2.0:
+                found.append(z)
+    return max(found) if found else z0
+
+
 def doorways(root, header, room_center):
     """The room's portals as doorways: [{portal verts, plane, side, outward (dx, dy), centre, rect}]."""
     pv = root['MOPV']
@@ -95,7 +133,9 @@ def doorways(root, header, room_center):
 def adapter_mesh(door, mats):
     """The passage from a doorway's outline to the standard doorway, and its socket."""
     (dx, dy), (rx, ry), (cx, cy) = door['out'], door['right'], door['centre']
-    r0, r1, z0, z1 = door['rect']
+    r0, r1, _, z1 = door['rect']
+    z0 = door['floor']
+    z1 = max(z1, z0 + 3.0)
     ex, ey = cx + dx * ADAPTER_LEN, cy + dy * ADAPTER_LEN
     hw = kitwmo.DOOR_W / 2
 
@@ -159,6 +199,9 @@ def build_files(spec, client=DEFAULT_CLIENT):
     doors = doorways(root, header, centre)
     if not doors:
         raise SystemExit('%s group %d has no doorway' % (src, g))
+    rverts, rtris = room_collision(sub)
+    for d in doors:
+        d['floor'] = door_floor(d, rverts, rtris)
 
     # Materials: the source's, then the adapters' (unculled copies of cave wall, floor, ceiling).
     motx = root['MOTX']
@@ -170,7 +213,8 @@ def build_files(spec, client=DEFAULT_CLIENT):
     mats = tuple(base + i for i in range(len(ADAPTER_TEXTURES)))
 
     # Groups: 0 = the room, 1.. = one adapter per doorway. Names in MOGN.
-    names = [spec['file'] + '_room'] + ['%s_door%d' % (spec['file'], i) for i in range(len(doors))]
+    names = ([spec['file'] + '_room'] + ['%s_door%d' % (spec['file'], i) for i in range(len(doors))]
+             + [spec['file'] + '_shell'])
     mogn, name_off = b'\0\0', []
     for n in names:
         name_off.append(len(mogn))
@@ -193,7 +237,6 @@ def build_files(spec, client=DEFAULT_CLIENT):
     struct.pack_into('<I', group_raw, mogp_at + 0, name_off[0])
     struct.pack_into('<HH', group_raw, mogp_at + 0x24, 0, len(doors))
     files[path[:-4] + '_000.wmo'] = bytes(group_raw)
-    rverts, rtris = room_collision(sub)
     groups.append((rverts, rtris, flags & (MOGP_INDOORS | MOGP_OUTDOORS)))
 
     mogi = struct.pack('<I6fI', flags, *gbox, name_off[0])
@@ -209,8 +252,20 @@ def build_files(spec, client=DEFAULT_CLIENT):
         lo = [min(lo[i], b[i]) for i in range(3)]
         hi = [max(hi[i], b[3 + i]) for i in range(3)]
 
+    # The shell: a rock slab under the whole room, so a gap in a cut room's floor drops nobody into the void.
+    shell = kitwmo.Mesh(inside=(centre[0], centre[1], gbox[2] + 5.0))
+    sz = gbox[2] - SHELL_DROP
+    shell.flat(gbox[0] - 2.0, gbox[1] - 2.0, gbox[3] + 2.0, gbox[4] + 2.0, sz, mats[1])
+    data, tris, verts = kitwmo.group_file(shell, name_off[-1])
+    files['%s_%03d.wmo' % (path[:-4], 1 + len(doors))] = data
+    groups.append((verts, tris, MOGP_OUTDOORS))
+    b = shell.bounds()
+    mogi += struct.pack('<I6fI', 0x8 | 0x1, *b, name_off[-1])
+    lo = [min(lo[i], b[i]) for i in range(3)]
+    hi = [max(hi[i], b[3 + i]) for i in range(3)]
+
     struct.pack_into('<I', mohd, 0, len(momt) // 64)
-    struct.pack_into('<II', mohd, 4, 1 + len(doors), len(doors))
+    struct.pack_into('<II', mohd, 4, 2 + len(doors), len(doors))
     struct.pack_into('<I', mohd, 32, spec['wmo_id'])
     struct.pack_into('<6f', mohd, 36, *lo, *hi)
     parts = {'MOHD': bytes(mohd), 'MOTX': motx, 'MOMT': momt, 'MOGN': mogn, 'MOGI': mogi, 'MOPV': mopv,
@@ -221,7 +276,7 @@ def build_files(spec, client=DEFAULT_CLIENT):
         raise SystemExit('%s: unexpected root chunk order %s' % (src, order))
     files[path] = b''.join(_chunk(t, parts.get(t, root[t])) for t in want)
 
-    floor = min(d['rect'][2] for d in doors)
+    floor = min(d['floor'] for d in doors)
     return files, {'sockets': sockets, 'entrance': [centre[0], centre[1], floor + 0.1],
                    'bounds': tuple(lo) + tuple(hi), 'groups': groups,
                    'verts': [v for gr in groups for v in gr[0]], 'tris': []}
