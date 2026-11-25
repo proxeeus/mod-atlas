@@ -1,7 +1,7 @@
 """Find a kit piece's sockets: a top view of a WMO's floors, and floor heights walking out of one of its portals.
 Reads the client's archives read-only.
 
-  python3 -I wmofloor.py <wmo> --png FILE          floor map (8 px per yard, north up, 10 yd grid, origin in white)
+  python3 -I wmofloor.py <wmo> --png FILE [--scale S]  floor map (S px per yard, default 8; north up, 10 yd grid)
   python3 -I wmofloor.py <wmo> --portal N [--out D]  walk out of portal N; suggest a socket D yards out
 
 <wmo> is the root file as the client names it, e.g. World\\wmo\\Dungeon\\MD_Goldmine\\MD_Goldmine_1Room.wmo.
@@ -130,11 +130,11 @@ def probe(groups, portals, n, inside, out):
         print('no floor %.1f yd out' % at)
 
 
-def png(groups, path):
+def png(groups, path, scale=8):
     pts = [v for _, tris in groups for t in tris for v in t]
     x0, x1 = min(p[0] for p in pts) - 2, max(p[0] for p in pts) + 2
     y0, y1 = min(p[1] for p in pts) - 2, max(p[1] for p in pts) + 2
-    S = 8
+    S = scale
     W, H = int((x1 - x0) * S), int((y1 - y0) * S)
     img = bytearray([24, 24, 32] * W * H)
     top = [-1e9] * (W * H)
@@ -188,6 +188,7 @@ def main():
     ap.add_argument('wmo')
     ap.add_argument('--client', default=DEFAULT_CLIENT)
     ap.add_argument('--png')
+    ap.add_argument('--scale', type=float, default=8, help='pixels per yard (default 8)')
     ap.add_argument('--portal', type=int)
     ap.add_argument('--inside', type=float, nargs=2, default=(0.0, 0.0), metavar=('X', 'Y'),
                     help='a point inside the piece, to tell the portal\'s outward side (default 0 0)')
@@ -200,7 +201,7 @@ def main():
     for i, p in enumerate(portals):
         print('portal %d: %s' % (i, ' '.join('(%.1f, %.1f, %.1f)' % v for v in p)))
     if args.png:
-        png(groups, args.png)
+        png(groups, args.png, args.scale)
     if args.portal is not None:
         probe(groups, portals, args.portal, args.inside, args.out)
 

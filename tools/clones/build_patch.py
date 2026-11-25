@@ -60,6 +60,21 @@ def check_area(archive, stock, pool_cfg):
         raise SystemExit('AreaTable.dbc: a stock row changed')
 
 
+def check_displays(archive, stock, pool_cfg):
+    """GameObjectDisplayInfo.dbc = the stock rows unchanged plus one row per kit piece, naming its WMO."""
+    new = dbc.Dbc.parse(archive.read(pooldata.DBC_GO_DISPLAY))
+    fields = pooldata.GODISPLAY_FIELDS
+    old_rows = {r[0]: clonedata.decode(stock, r, fields) for r in stock.rows}
+    new_rows = {r[0]: clonedata.decode(new, r, fields) for r in new.rows}
+    if set(new_rows) - set(old_rows) != {p['display'] for p in pool_cfg['pieces']} or set(old_rows) - set(new_rows):
+        raise SystemExit('GameObjectDisplayInfo.dbc: unexpected row set change')
+    if any(new_rows[rid] != values for rid, values in old_rows.items()):
+        raise SystemExit('GameObjectDisplayInfo.dbc: a stock row changed')
+    for p in pool_cfg['pieces']:
+        if new_rows[p['display']][1] != p['wmo'] or not archive.read(p['wmo']):
+            raise SystemExit('kit piece %d: display or WMO missing from the patch' % p['go_entry'])
+
+
 def roundtrip(path, want, sources, added, pool_cfg):
     """Read the archive back and check every file and every row."""
     archive = mpq.MPQ(path)
@@ -117,13 +132,17 @@ def main():
     raw_display, where['GameObjectDisplayInfo.dbc'] = clonedata.effective_raw(client, args.dbc_dir,
                                                                               'GameObjectDisplayInfo.dbc',
                                                                               cfg['patch_name'])
-    pooldata.check_pieces(dbc.Dbc.parse(raw_display), pool_cfg)
+    display_dbc = dbc.Dbc.parse(raw_display)
+    pooldata.add_displays(display_dbc, pool_cfg)
     area_dbc, area_row, wdt, _, where['AreaTable.dbc'] = pooldata.client_inputs(client, args.dbc_dir, pool_cfg,
                                                                              cfg['patch_name'])
     print('source %-18s %s' % ('AreaTable.dbc', where['AreaTable.dbc']))
     stock_area = dbc.Dbc.parse(clonedata.effective_raw(client, args.dbc_dir, 'AreaTable.dbc', cfg['patch_name'])[0])
     files = {clonedata.DBC_MAP: map_dbc.serialize(), clonedata.DBC_MAPDIFFICULTY: md_dbc.serialize(),
-             pooldata.DBC_AREATABLE: area_dbc.serialize(), pooldata.wdt_path(pool_cfg): wdt}
+             pooldata.DBC_AREATABLE: area_dbc.serialize(), pooldata.wdt_path(pool_cfg): wdt,
+             pooldata.DBC_GO_DISPLAY: display_dbc.serialize()}
+    for p in pool_cfg['pieces']:
+        files.update(p['files'])
 
     fog_cfg = fogdata.load_config()
     raw_effects, where['ScreenEffect.dbc'] = clonedata.effective_raw(client, args.dbc_dir, 'ScreenEffect.dbc',
@@ -140,6 +159,7 @@ def main():
     raw = mpq.write(out, files)
     archive = roundtrip(out, files, sources, added, pool_cfg)
     check_area(archive, stock_area, pool_cfg)
+    check_displays(archive, dbc.Dbc.parse(raw_display), pool_cfg)
     check_fogs(archive, dbc.Dbc.parse(raw_effects), dbc.RawDbc(raw_spells), fogs)
 
     digest = clonedata.checksum(map_dbc, md_dbc, added)
@@ -153,9 +173,12 @@ def main():
                  m[63], m[65], d[0], d[1], d[2], d[20], d[21]))
     m = clonedata.decode(map_dbc, pool_map, clonedata.MAP_FIELDS)
     a = clonedata.decode(area_dbc, area_row, pooldata.AREATABLE_FIELDS)
-    print('pool map %d "%s" Directory=%s area %d (%s, global WMO at %s), pieces %s'
+    print('pool map %d "%s" Directory=%s area %d (%s, global WMO at %s)'
           % (m[0], m[clonedata.MAP_NAME_ENUS], m[1], m[pooldata.MAP_AREATABLE], pooldata.wdt_path(pool_cfg),
-             pooldata.global_wmo_position(pool_cfg), [(p['go_entry'], p['display']) for p in pool_cfg['pieces']]))
+             pooldata.global_wmo_position(pool_cfg)))
+    for p in pool_cfg['pieces']:
+        print('kit piece %d display %d %-5s %s: %d triangles, %d socket(s)' % (p['go_entry'], p['display'], p['role'],
+              p['wmo'], len(p['tris']), len(p['sockets'])))
     print('pool area %d "%s" map %d bit %d flags %d ambience %d music %d intro %d'
           % (a[0], a[pooldata.AREA_NAME_ENUS], a[1], a[3], a[4], a[7], a[8], a[9]))
     print('Map.dbc %d rows, MapDifficulty.dbc %d rows, AreaTable.dbc %d rows, ScreenEffect.dbc %d rows, '

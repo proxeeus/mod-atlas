@@ -143,6 +143,23 @@ def verify_pool(archive, sql_path):
                   if not same(value, kind, token))
         errors += bad
         print('%-18s row %d (pool): %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
+    d = dbc.Dbc.parse(archive.read(pooldata.DBC_GO_DISPLAY))
+    _, rows = sql_rows(sql_path, 'gameobjectdisplayinfo_dbc')
+    by_id = {int(r[0][1]): r for r in rows}
+    for p in cfg['pieces']:
+        raw = d.row(p['display'])
+        if not raw or p['display'] not in by_id:
+            print('kit display %d missing from the patch or the SQL' % p['display'])
+            errors += 1
+            continue
+        bad = sum(1 for (_, kind), value, token in zip(pooldata.GODISPLAY_FIELDS,
+                                                       clonedata.decode(d, raw, pooldata.GODISPLAY_FIELDS),
+                                                       by_id[p['display']]) if not same(value, kind, token))
+        errors += bad
+        if not archive.read(p['wmo']) or not archive.read(p['wmo'][:-4] + '_000.wmo'):
+            print('kit piece %d: WMO files missing from the patch' % p['go_entry'])
+            errors += 1
+    print('kit displays       %d, all fields match' % len(cfg['pieces']) if not errors else 'kit displays differ')
     wdt = archive.read(pooldata.wdt_path(cfg))
     name = pooldata.start_piece(cfg)['wmo'].encode('ascii') + b'\0'
     if not wdt or wdt[20:24] != b'\x01\0\0\0' or name not in wdt:

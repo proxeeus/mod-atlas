@@ -238,7 +238,11 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w('INSERT INTO `instance_template` (`map`, `parent`, `script`, `allowMount`) VALUES')
     w("(%d,0,'',0);" % m['id'])
     w('')
-    w('-- Kit pieces: type 14 (MAP_OBJECT), the room is the display\'s WMO.')
+    dlo, dhi = pooldata.DISPLAY_ID_RANGE
+    w('-- Kit pieces (kit.json): our own WMOs (in patch-T.MPQ) with our own displays; type 14 (MAP_OBJECT).')
+    w('DELETE FROM `gameobjectdisplayinfo_dbc` WHERE `ID` BETWEEN %d AND %d;' % (dlo, dhi))
+    w('INSERT INTO `gameobjectdisplayinfo_dbc`\n%s VALUES' % columns(pooldata.GODISPLAY_FIELDS))
+    w(',\n'.join(values(pooldata.display_values(p), pooldata.GODISPLAY_FIELDS) for p in cfg['pieces']) + ';')
     w('DELETE FROM `gameobject_template` WHERE `entry` BETWEEN %d AND %d;' % (plo, phi))
     w('INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `size`, `ScriptName`) '
       'VALUES')
@@ -269,6 +273,7 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w('    `min_y`      FLOAT NOT NULL DEFAULT 0,')
     w('    `max_x`      FLOAT NOT NULL DEFAULT 0,')
     w('    `max_y`      FLOAT NOT NULL DEFAULT 0,')
+    w('    `role`       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT \'0 grows layouts, 1 caps open doorways\',')
     w('    PRIMARY KEY (`go_entry`)')
     w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: kit pieces\';')
     w('CREATE TABLE `atlas_pool_socket` (')
@@ -287,12 +292,13 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w('(%d,%s,%s,%s,%s,%d,%d);' % ((m['id'],) + tuple(literal(float(v), 'f') for v in (ox, oy, oz, oo))
                                   + (m['start'], m['max_pieces'])))
     w('INSERT INTO `atlas_pool_piece` (`go_entry`, `entrance_x`, `entrance_y`, `entrance_z`, `min_x`, `min_y`,')
-    w('    `max_x`, `max_y`) VALUES')
+    w('    `max_x`, `max_y`, `role`) VALUES')
     rows = []
     for p in cfg['pieces']:
         x0, y0, _, x1, y1, _ = boxes[p['go_entry']]
-        rows.append('(%d,%s)' % (p['go_entry'], ','.join(literal(float(v), 'f')
-                                                         for v in list(p['entrance_local']) + [x0, y0, x1, y1])))
+        rows.append('(%d,%s,%d)' % (p['go_entry'], ','.join(literal(float(v), 'f')
+                                                            for v in list(p['entrance_local']) + [x0, y0, x1, y1]),
+                                    1 if p['role'] == 'cap' else 0))
     w(',\n'.join(rows) + ';')
     sockets = ['(%d,%d,%s)' % (p['go_entry'], i, ','.join(literal(float(v), 'f')
                                                          for v in list(s['local']) + [s['facing']]))
@@ -313,6 +319,7 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
           'DELETE FROM `mapdifficulty_dbc` WHERE `ID` = %d;' % m['mapdifficulty_id'],
           'DELETE FROM `areatable_dbc` WHERE `ID` BETWEEN %d AND %d;' % (alo, ahi),
           'DELETE FROM `gameobject_template` WHERE `entry` BETWEEN %d AND %d;' % (plo, phi),
+          'DELETE FROM `gameobjectdisplayinfo_dbc` WHERE `ID` BETWEEN %d AND %d;' % pooldata.DISPLAY_ID_RANGE,
           'DROP TABLE IF EXISTS `atlas_pool_socket`;',
           'DROP TABLE IF EXISTS `atlas_pool_piece`;',
           'DROP TABLE IF EXISTS `atlas_pool_map`;',

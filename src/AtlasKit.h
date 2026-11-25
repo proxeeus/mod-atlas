@@ -4,7 +4,7 @@
  * a stock WMO placed as a gameobject; its sockets are points on its edge where
  * another piece can join, each with the direction it faces out of the piece.
  * Two pieces join when a socket of one sits on a socket of the other, the two
- * facing opposite ways.
+ * facing opposite ways. A cap piece closes a doorway the layout leaves open.
  *
  * Positions are yards, angles radians, a piece's local frame is its WMO's own
  * (the gameobject's orientation turns it about the vertical, counter-clockwise,
@@ -42,8 +42,12 @@ struct KitPiece
     uint32 Entry = 0;                  // gameobject_template (type 14)
     float  EntranceX = 0.0f, EntranceY = 0.0f, EntranceZ = 0.0f;  // where arrivals stand (start piece)
     float  MinX = 0.0f, MinY = 0.0f, MaxX = 0.0f, MaxY = 0.0f;    // the WMO's box, top view
+    bool   Cap = false;                // closes open doorways; never grows a layout
     std::vector<KitSocket> Sockets;
 };
+
+// Two placed sockets this close (yards) are one joint.
+constexpr float KIT_SOCKET_MATCH = 0.5f;
 
 struct KitPlacement
 {
@@ -152,8 +156,9 @@ inline std::vector<KitPlacement> KitBuildLayout(std::vector<KitPiece> const& kit
         // Every (piece, socket) that could join here, in a random order.
         std::vector<std::pair<std::size_t, std::size_t>> options;
         for (std::size_t k = 0; k < kit.size(); ++k)
-            for (std::size_t s = 0; s < kit[k].Sockets.size(); ++s)
-                options.emplace_back(k, s);
+            if (!kit[k].Cap)
+                for (std::size_t s = 0; s < kit[k].Sockets.size(); ++s)
+                    options.emplace_back(k, s);
         rng.Shuffle(options);
 
         for (auto const& [k, s] : options)
@@ -171,6 +176,48 @@ inline std::vector<KitPlacement> KitBuildLayout(std::vector<KitPiece> const& kit
         }
     }
     return placed;
+}
+
+// The world sockets of a layout that no other piece's socket meets.
+inline std::vector<KitPoint> KitOpenSockets(std::vector<KitPiece> const& kit, std::vector<KitPlacement> const& layout)
+{
+    std::vector<KitPoint> all;
+    for (KitPlacement const& p : layout)
+        if (KitPiece const* piece = KitFind(kit, p.Entry))
+            for (KitSocket const& s : piece->Sockets)
+                all.push_back(KitSocketInWorld(p, s));
+
+    std::vector<KitPoint> open;
+    for (std::size_t i = 0; i < all.size(); ++i)
+    {
+        bool joined = false;
+        for (std::size_t j = 0; j < all.size() && !joined; ++j)
+            joined = j != i && std::fabs(all[i].X - all[j].X) < KIT_SOCKET_MATCH
+                && std::fabs(all[i].Y - all[j].Y) < KIT_SOCKET_MATCH
+                && std::fabs(all[i].Z - all[j].Z) < KIT_SOCKET_MATCH;
+        if (!joined)
+            open.push_back(all[i]);
+    }
+    return open;
+}
+
+// Closes every open doorway of a layout with the kit's first cap piece (its
+// first socket). Returns how many caps were added.
+inline std::size_t KitCapLayout(std::vector<KitPiece> const& kit, std::vector<KitPlacement>& layout)
+{
+    KitPiece const* cap = nullptr;
+    for (KitPiece const& p : kit)
+        if (p.Cap && !p.Sockets.empty())
+        {
+            cap = &p;
+            break;
+        }
+    if (!cap)
+        return 0;
+    std::vector<KitPoint> const open = KitOpenSockets(kit, layout);
+    for (KitPoint const& at : open)
+        layout.push_back(KitJoin(at, cap->Entry, cap->Sockets.front()));
+    return open.size();
 }
 
 } // namespace Atlas

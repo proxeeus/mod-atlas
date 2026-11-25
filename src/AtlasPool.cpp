@@ -78,7 +78,7 @@ void AtlasMgr::LoadPoolPieces()
         return;
 
     if (QueryResult result = WorldDatabase.Query("SELECT go_entry, entrance_x, entrance_y, entrance_z, min_x, min_y, "
-            "max_x, max_y FROM atlas_pool_piece ORDER BY go_entry"))
+            "max_x, max_y, role FROM atlas_pool_piece ORDER BY go_entry"))
     {
         do
         {
@@ -92,6 +92,7 @@ void AtlasMgr::LoadPoolPieces()
             p.MinY = f[5].Get<float>();
             p.MaxX = f[6].Get<float>();
             p.MaxY = f[7].Get<float>();
+            p.Cap = f[8].Get<uint8>() == 1;
             GameObjectTemplate const* go = sObjectMgr->GetGameObjectTemplate(p.Entry);
             if (!go || go->type != GAMEOBJECT_TYPE_MAP_OBJECT)
             {
@@ -166,7 +167,9 @@ void AtlasMgr::ProcessPoolMap(Map* map)
     }
 
     RunRng rng(RunRng::MakeSeed());
-    std::vector<KitPlacement> const layout = KitBuildLayout(_poolKit, pool->Start, pool->Origin, pool->MaxPieces, rng);
+    std::vector<KitPlacement> layout = KitBuildLayout(_poolKit, pool->Start, pool->Origin, pool->MaxPieces, rng);
+    std::size_t const grown = layout.size();
+    std::size_t const caps = KitCapLayout(_poolKit, layout);   // no doorway may open onto the void
     uint32 placed = 0;
     for (KitPlacement const& p : layout)
     {
@@ -184,8 +187,8 @@ void AtlasMgr::ProcessPoolMap(Map* map)
         LOG_INFO("module", "Atlas: kit piece {} placed in map {} instance {} at ({:.1f}, {:.1f}, {:.1f}) facing "
             "{:.0f} deg.", p.Entry, map->GetId(), map->GetInstanceId(), p.X, p.Y, p.Z, p.O * 180.0f / float(M_PI));
     }
-    LOG_INFO("module", "Atlas: map {} instance {} layout: {} of {} piece(s) placed (seed {}).", map->GetId(),
-        map->GetInstanceId(), placed, layout.size(), rng.GetSeed());
+    LOG_INFO("module", "Atlas: map {} instance {} layout: {} of {} piece(s) placed ({} grown, {} cap(s); seed {}).",
+        map->GetId(), map->GetInstanceId(), placed, layout.size(), grown, caps, rng.GetSeed());
 }
 
 void AtlasMgr::OnPlayerEnteredPool(Player* player)

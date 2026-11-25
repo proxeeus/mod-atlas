@@ -54,10 +54,19 @@ INSERT INTO `areatable_dbc`
 INSERT INTO `instance_template` (`map`, `parent`, `script`, `allowMount`) VALUES
 (950,0,'',0);
 
--- Kit pieces: type 14 (MAP_OBJECT), the room is the display's WMO.
+-- Kit pieces (kit.json): our own WMOs (in patch-T.MPQ) with our own displays; type 14 (MAP_OBJECT).
+DELETE FROM `gameobjectdisplayinfo_dbc` WHERE `ID` BETWEEN 9900 AND 9949;
+INSERT INTO `gameobjectdisplayinfo_dbc`
+(`ID`,`ModelName`,`Sound_1`,`Sound_2`,`Sound_3`,`Sound_4`,`Sound_5`,`Sound_6`,`Sound_7`,`Sound_8`,`Sound_9`,`Sound_10`,
+    `GeoBoxMinX`,`GeoBoxMinY`,`GeoBoxMinZ`,`GeoBoxMaxX`,`GeoBoxMaxY`,`GeoBoxMaxZ`,`ObjectEffectPackageID`) VALUES
+(9900,'World\\wmo\\Dungeon\\AtlasKit\\AtlasKit_Room4.wmo',0,0,0,0,0,0,0,0,0,0,-12,-12,0,12,12,10,0),
+(9901,'World\\wmo\\Dungeon\\AtlasKit\\AtlasKit_Corridor20.wmo',0,0,0,0,0,0,0,0,0,0,-10,-4,0,10,4,7,0),
+(9902,'World\\wmo\\Dungeon\\AtlasKit\\AtlasKit_Cap.wmo',0,0,0,0,0,0,0,0,0,0,0.2,-4.5,-0.5,0.8,4.5,7.5,0);
 DELETE FROM `gameobject_template` WHERE `entry` BETWEEN 900100 AND 900199;
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `size`, `ScriptName`) VALUES
-(900100,14,649,'Timeways Fragment: Goldmine','',1.0,'');
+(900100,14,9900,'Timeways Chamber','',1.0,''),
+(900101,14,9901,'Timeways Tunnel','',1.0,''),
+(900102,14,9902,'Timeways Rockfall','',1.0,'');
 
 -- The kit, its sockets and each pool map's layout settings (src/AtlasKit.h).
 -- Generated: dropped and made again.
@@ -83,6 +92,7 @@ CREATE TABLE `atlas_pool_piece` (
     `min_y`      FLOAT NOT NULL DEFAULT 0,
     `max_x`      FLOAT NOT NULL DEFAULT 0,
     `max_y`      FLOAT NOT NULL DEFAULT 0,
+    `role`       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT '0 grows layouts, 1 caps open doorways',
     PRIMARY KEY (`go_entry`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: kit pieces';
 CREATE TABLE `atlas_pool_socket` (
@@ -96,9 +106,17 @@ CREATE TABLE `atlas_pool_socket` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: kit piece sockets';
 
 INSERT INTO `atlas_pool_map` (`map`, `origin_x`, `origin_y`, `origin_z`, `origin_o`, `start`, `max_pieces`) VALUES
-(950,-266,-266,0,0,900100,4);
+(950,-266,-266,0,0,900100,7);
 INSERT INTO `atlas_pool_piece` (`go_entry`, `entrance_x`, `entrance_y`, `entrance_z`, `min_x`, `min_y`,
-    `max_x`, `max_y`) VALUES
-(900100,0,-5,-0.5,-60.4565773,-38.4920578,45.7029076,26.5744667);
+    `max_x`, `max_y`, `role`) VALUES
+(900100,0,0,0.1,-12,-12,12,12,0),
+(900101,0,0,0.1,-10,-4,10,4,0),
+(900102,-2,0,0.1,0.2,-4.5,0.8,4.5,1);
 INSERT INTO `atlas_pool_socket` (`go_entry`, `socket`, `x`, `y`, `z`, `facing`) VALUES
-(900100,0,44.54,9.83,-4.03,12.18);
+(900100,0,12,0,0,0),
+(900100,1,0,12,0,90),
+(900100,2,-12,0,0,180),
+(900100,3,0,-12,0,270),
+(900101,0,10,0,0,0),
+(900101,1,-10,0,0,180),
+(900102,0,0,0,0,180);

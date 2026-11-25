@@ -130,3 +130,68 @@ TEST(AtlasKit, CorridorGrowsAndIsReproducible)
         EXPECT_NEAR(std::fmod(std::fabs(la[i].X) + 0.001f, 10.0f), 0.0f, 0.01f);   // 10 yd apart
     }
 }
+
+namespace
+{
+    // The generated tileset (kit.json): a 24 x 24 room with four doorways, a
+    // 20 yd corridor, and a cap.
+    std::vector<KitPiece> Tileset()
+    {
+        KitPiece room;
+        room.Entry = 900100;
+        room.MinX = -12.0f; room.MinY = -12.0f; room.MaxX = 12.0f; room.MaxY = 12.0f;
+        room.Sockets = { { 12.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 12.0f, 0.0f, 90.0f * DEG },
+                         { -12.0f, 0.0f, 0.0f, 180.0f * DEG }, { 0.0f, -12.0f, 0.0f, 270.0f * DEG } };
+        KitPiece corridor;
+        corridor.Entry = 900101;
+        corridor.MinX = -10.0f; corridor.MinY = -4.0f; corridor.MaxX = 10.0f; corridor.MaxY = 4.0f;
+        corridor.Sockets = { { 10.0f, 0.0f, 0.0f, 0.0f }, { -10.0f, 0.0f, 0.0f, 180.0f * DEG } };
+        KitPiece cap;
+        cap.Entry = 900102;
+        cap.Cap = true;
+        cap.MinX = 0.2f; cap.MinY = -4.5f; cap.MaxX = 0.2f; cap.MaxY = 4.5f;
+        cap.Sockets = { { 0.0f, 0.0f, 0.0f, 180.0f * DEG } };
+        return { room, corridor, cap };
+    }
+}
+
+TEST(AtlasKit, CapsNeverGrowALayout)
+{
+    std::vector<KitPiece> const kit = Tileset();
+    for (uint64 seed = 1; seed < 40; ++seed)
+    {
+        RunRng rng(seed);
+        for (KitPlacement const& p : KitBuildLayout(kit, 900100, ORIGIN, 8, rng))
+            EXPECT_NE(p.Entry, 900102u);
+    }
+}
+
+TEST(AtlasKit, CappedLayoutsHaveNoOpenDoorway)
+{
+    std::vector<KitPiece> const kit = Tileset();
+    for (uint64 seed = 1; seed < 40; ++seed)
+    {
+        RunRng rng(seed);
+        std::vector<KitPlacement> layout = KitBuildLayout(kit, 900100, ORIGIN, 7, rng);
+        std::size_t const grown = layout.size();
+        std::size_t const caps = KitCapLayout(kit, layout);
+        EXPECT_EQ(layout.size(), grown + caps);
+        EXPECT_TRUE(KitOpenSockets(kit, layout).empty()) << "seed " << seed;
+        // A lone room has four doorways, all capped.
+        if (grown == 1)
+        {
+            EXPECT_EQ(caps, 4u);
+        }
+    }
+}
+
+TEST(AtlasKit, OpenSocketsOfALoneRoomAreItsDoorways)
+{
+    std::vector<KitPiece> const kit = Tileset();
+    std::vector<KitPlacement> const layout{ { 900100, 0.0f, 0.0f, 0.0f, 0.0f } };
+    EXPECT_EQ(KitOpenSockets(kit, layout).size(), 4u);
+    std::vector<KitPlacement> joined = layout;
+    joined.push_back(KitJoin(KitSocketInWorld(layout[0], kit[0].Sockets[0]), 900101, kit[1].Sockets[1]));
+    EXPECT_NEAR(joined[1].X, 22.0f, 1e-3f);   // corridor centre 10 yd past the east doorway
+    EXPECT_EQ(KitOpenSockets(kit, joined).size(), 4u);   // 3 room doorways + the corridor's far end
+}

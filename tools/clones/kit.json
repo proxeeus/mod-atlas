@@ -1,0 +1,16 @@
+{
+  "comment": [
+    "The Atlas tileset (TILESET.md): pieces generated as WMOs by kitwmo.py, shown as gameobjects (type 14) and",
+    "collided by the server through generated models (kitvmo.py). All share one doorway (8 x 7 yd, floor at z 0).",
+    "role 'piece' grows layouts; 'cap' closes the doorways a layout leaves open.",
+    "Reserved IDs: gameobject entries 900100-900199, displays 9900-9949, WMO ids 7900-7949."
+  ],
+  "pieces": [
+    { "go_entry": 900100, "display": 9900, "wmo_id": 7900, "file": "AtlasKit_Room4", "name": "Timeways Chamber",
+      "role": "piece", "shape": "room", "size": 24, "height": 10, "doors": "ENWS" },
+    { "go_entry": 900101, "display": 9901, "wmo_id": 7901, "file": "AtlasKit_Corridor20", "name": "Timeways Tunnel",
+      "role": "piece", "shape": "corridor", "length": 20 },
+    { "go_entry": 900102, "display": 9902, "wmo_id": 7902, "file": "AtlasKit_Cap", "name": "Timeways Rockfall",
+      "role": "cap", "shape": "cap" }
+  ]
+}
