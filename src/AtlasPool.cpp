@@ -96,7 +96,11 @@ void AtlasMgr::LoadPoolPieces()
 
 void AtlasMgr::ProcessPoolMap(Map* map)
 {
-    if (!map || _poolPieces.empty() || !IsPoolMap(map->GetId()))
+    // Instances only. OnMapUpdate also runs for the pool map's base map (the
+    // MapInstanced parent, instance 0), whose ToInstanceMap() is a bad cast:
+    // a gameobject created there reads a garbage instance script and crashes
+    // the server in GameObject::Create -> SetZoneScript.
+    if (!map || !map->GetInstanceId() || _poolPieces.empty() || !IsPoolMap(map->GetId()))
         return;
     {
         std::lock_guard<std::mutex> lock(_poolMutex);
