@@ -2,9 +2,12 @@
 files the client reads (layout per Wowdecomp2 MapObjRead.cpp, CMapObj::Load / CMapObjGroup::CreateDataPointers).
 
 Every piece is one exterior group (flag 0x8: a gameobject's interior groups show only through portals, so a
-doorway into the next piece would look into black) with a client collision tree (MOBN/MOBR, flag 0x1). Faces are
-emitted on both sides, so they show whatever the winding the client culls. Pieces share one doorway (DOOR_W x
-DOOR_H, floor at z = 0); a socket sits on the floor at the middle of each opening, facing out.
+doorway into the next piece would look into black) with a client collision tree (MOBN/MOBR, flag 0x1). Each face
+is emitted once, its normal towards the inside of the piece, and every material is unculled (MOMT flag 0x4) so a
+face shows from both sides (two faces on one plane z-fight). The group's liquid is 15 = none: without MOHD flag 0x4
+the client reads GetLiquidType(groupLiquid + 1), so 0 would fill the piece with water (MapObjRead.cpp).
+Pieces share one doorway (DOOR_W x DOOR_H, floor at z = 0); a socket sits on the floor at the middle of each
+opening, facing out.
 """
 import json
 import math
@@ -19,6 +22,8 @@ UV_SCALE = 1.0 / 6.0          # texture repeats every 6 yd
 BSP_LEAF = 32                 # faces per leaf (the client caches at most 1024)
 WMO_DIR = 'World\\wmo\\Dungeon\\AtlasKit'
 FACE_RENDER = 0x20            # MOPY: rendered (and collides)
+MAT_UNCULLED = 0x4            # MOMT: drawn from both sides
+NO_LIQUID = 15                # MOGP groupLiquid: none (see above)
 
 # Materials (the Goldmine room's own textures, all stock).
 MATERIALS = [
@@ -38,20 +43,25 @@ def load_kit(path=None):
 class Mesh:
     """Triangles with per-face vertices (flat normals), material ids and planar texture coordinates."""
 
-    def __init__(self):
+    def __init__(self, inside=None):
         self.verts, self.normals, self.uvs, self.tris = [], [], [], []
+        self.inside = inside      # a point inside the piece: normals face it
 
     def quad(self, a, b, c, d, mat):
-        """A planar quad a-b-c-d, on both sides."""
+        """A planar quad a-b-c-d, once, its normal towards `inside` (when set)."""
         n = _normal(a, b, c)
-        for corners, normal in (((a, b, c, d), n), ((d, c, b, a), tuple(-x for x in n))):
-            base = len(self.verts)
-            for p in corners:
-                self.verts.append(p)
-                self.normals.append(normal)
-                self.uvs.append(_uv(p, normal))
-            self.tris.append((base, base + 1, base + 2, mat))
-            self.tris.append((base, base + 2, base + 3, mat))
+        if self.inside is not None:
+            centre = [sum(p[i] for p in (a, b, c, d)) / 4 for i in range(3)]
+            if sum(n[i] * (self.inside[i] - centre[i]) for i in range(3)) < 0:
+                a, b, c, d = d, c, b, a
+                n = tuple(-x for x in n)
+        base = len(self.verts)
+        for p in (a, b, c, d):
+            self.verts.append(p)
+            self.normals.append(n)
+            self.uvs.append(_uv(p, n))
+        self.tris.append((base, base + 1, base + 2, mat))
+        self.tris.append((base, base + 2, base + 3, mat))
 
     def box_wall(self, x0, y0, x1, y1, z0, z1, mat):
         """A vertical quad from (x0, y0) to (x1, y1), z0 to z1."""
@@ -106,7 +116,7 @@ SIDES = {'E': (1, 0, 0.0), 'N': (0, 1, 90.0), 'W': (-1, 0, 180.0), 'S': (0, -1, 
 
 def build_room(size, height, doors):
     half = size / 2.0
-    m = Mesh()
+    m = Mesh(inside=(0.0, 0.0, height / 2))
     m.flat(-half, -half, half, half, 0.0, FLOOR)
     m.flat(-half, -half, half, half, height, CEIL)
     for side in 'ENWS':
@@ -118,7 +128,7 @@ def build_room(size, height, doors):
 
 def build_corridor(length):
     hl, hw = length / 2.0, DOOR_W / 2
-    m = Mesh()
+    m = Mesh(inside=(0.0, 0.0, DOOR_H / 2))
     m.flat(-hl, -hw, hl, hw, 0.0, FLOOR)
     m.flat(-hl, -hw, hl, hw, DOOR_H, CEIL)
     m.box_wall(-hl, hw, hl, hw, 0.0, DOOR_H, WALL)
@@ -230,7 +240,7 @@ def group_file(mesh, name_offset):
     nodes, faces = _bsp(tris, verts)
     bounds = mesh.bounds()
     header = struct.pack('<3I6f6H4B4I', name_offset, 0, 0x8 | 0x1, *bounds, 0, 0, 0, 0, len(batches), 0, 0, 0, 0, 0,
-                         0, 0, 0, 0)
+                         NO_LIQUID, 0, 0, 0)
     assert len(header) == 68
     sub = (_chunk('MOPY', b''.join(struct.pack('<BB', FACE_RENDER, t[3]) for t in tris))
            + _chunk('MOVI', b''.join(struct.pack('<3H', *t[:3]) for t in tris))
@@ -253,7 +263,8 @@ assert len(GLOBAL_FOG) == 48
 def root_file(mesh, wmo_id, group_name):
     motx, tex_off = _strings([t for t, _, _ in MATERIALS] + [''])
     empty = tex_off[-1]
-    momt = b''.join(struct.pack('<16I', 0, 0, 0, tex_off[i], 0, 0, empty, colour, ground, 0, 0, 0, 0, 0, 0, 0)
+    momt = b''.join(struct.pack('<16I', MAT_UNCULLED, 0, 0, tex_off[i], 0, 0, empty, colour, ground, 0, 0, 0, 0,
+                                0, 0, 0)
                     for i, (_, ground, colour) in enumerate(MATERIALS))
     mogn = b'\0\0' + group_name.encode('ascii') + b'\0'
     mogn += b'\0' * ((-len(mogn)) % 4)
