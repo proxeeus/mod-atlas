@@ -178,7 +178,7 @@ def main():
              pooldata.global_wmo_position(pool_cfg)))
     for p in pool_cfg['pieces']:
         print('kit piece %d display %d %-5s %s: %d triangles, %d socket(s)' % (p['go_entry'], p['display'], p['role'],
-              p['wmo'], len(p['tris']), len(p['sockets'])))
+              p['wmo'], sum(len(g[1]) for g in p['groups']), len(p['sockets'])))
     print('pool area %d "%s" map %d bit %d flags %d ambience %d music %d intro %d'
           % (a[0], a[pooldata.AREA_NAME_ENUS], a[1], a[3], a[4], a[7], a[8], a[9]))
     print('Map.dbc %d rows, MapDifficulty.dbc %d rows, AreaTable.dbc %d rows, ScreenEffect.dbc %d rows, '

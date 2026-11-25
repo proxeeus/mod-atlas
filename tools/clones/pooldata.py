@@ -103,7 +103,7 @@ def kit_pieces(path=None):
         out.append({'go_entry': spec['go_entry'], 'display': spec['display'], 'name': spec['name'],
                     'file': spec['file'], 'wmo': kitwmo.wmo_path(spec), 'role': spec['role'],
                     'entrance_local': info['entrance'], 'sockets': info['sockets'], 'bounds': info['bounds'],
-                    'files': files, 'verts': info['verts'], 'tris': info['tris'],
+                    'files': files, 'verts': info['verts'], 'tris': info['tris'], 'groups': info['groups'],
                     'model': kitvmo.model_name(spec)})
     return out
 

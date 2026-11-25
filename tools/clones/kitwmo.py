@@ -209,8 +209,8 @@ def _bsp(tris, verts):
     return nodes, faces
 
 
-def group_file(mesh, name_offset):
-    """The group file (MVER, MOGP) of a one-group piece."""
+def group_file(mesh, name_offset, portal_start=0, portal_count=0):
+    """A generated exterior group file (MVER, MOGP); its portal refs start at `portal_start` in the root's MOPR."""
     # Faces sorted by material, vertices re-laid per batch so each batch's vertices are contiguous.
     order = sorted(range(len(mesh.tris)), key=lambda t: mesh.tris[t][3])
     verts, normals, uvs, tris, batches = [], [], [], [], []
@@ -239,8 +239,8 @@ def group_file(mesh, name_offset):
 
     nodes, faces = _bsp(tris, verts)
     bounds = mesh.bounds()
-    header = struct.pack('<3I6f6H4B4I', name_offset, 0, 0x8 | 0x1, *bounds, 0, 0, 0, 0, len(batches), 0, 0, 0, 0, 0,
-                         NO_LIQUID, 0, 0, 0)
+    header = struct.pack('<3I6f6H4B4I', name_offset, 0, 0x8 | 0x1, *bounds, portal_start, portal_count, 0, 0,
+                         len(batches), 0, 0, 0, 0, 0, NO_LIQUID, 0, 0, 0)
     assert len(header) == 68
     sub = (_chunk('MOPY', b''.join(struct.pack('<BB', FACE_RENDER, t[3]) for t in tris))
            + _chunk('MOVI', b''.join(struct.pack('<3H', *t[:3]) for t in tris))
@@ -284,10 +284,14 @@ def wmo_path(spec):
 
 
 def build_files(spec):
-    """{client path: bytes} of a piece's root and group file, and its data for pool.json / collision."""
+    """{client path: bytes} of a piece's root and group files, and its data for pool.json / collision."""
+    if spec['shape'] == 'stock_room':
+        import stockroom
+        return stockroom.build_files(spec)
     mesh, sockets, entrance = build_piece(spec)
     root = root_file(mesh, spec['wmo_id'], spec['file'])
     group, tris, verts = group_file(mesh, 2)
     path = wmo_path(spec)
     files = {path: root, path[:-4] + '_000.wmo': group}
-    return files, {'sockets': sockets, 'entrance': entrance, 'bounds': mesh.bounds(), 'tris': tris, 'verts': verts}
+    return files, {'sockets': sockets, 'entrance': entrance, 'bounds': mesh.bounds(), 'tris': tris, 'verts': verts,
+                   'groups': [(verts, tris, 0x8)]}

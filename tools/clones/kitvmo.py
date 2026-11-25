@@ -36,20 +36,30 @@ def bounds(verts):
     return lo, hi
 
 
-def vmo(verts, tris):
-    """The .vmo bytes of a one-group model from vertices and (i0, i1, i2[, material]) triangles."""
-    if not verts or not tris:
-        raise SystemExit('a kit piece needs geometry')
+def _group(verts, tris, mogp):
     lo, hi = bounds(verts)
     vert = struct.pack('<I', len(verts)) + b''.join(struct.pack('<3f', *v) for v in verts)
     trim = struct.pack('<I', len(tris)) + b''.join(struct.pack('<3I', *t[:3]) for t in tris)
-    group = (struct.pack('<3f3f', *lo, *hi) + struct.pack('<II', MOGP_OUTDOORS, 0)
-             + b'VERT' + struct.pack('<I', len(vert)) + vert
-             + b'TRIM' + struct.pack('<I', len(trim)) + trim
-             + b'MBIH' + _bih(lo, hi, len(tris))
-             + b'LIQU' + struct.pack('<I', 0))
-    return (VMAP_MAGIC + b'WMOD' + struct.pack('<II', 8, 0) + b'GMOD' + struct.pack('<I', 1) + group
-            + b'GBIH' + _bih(lo, hi, 1))
+    return (struct.pack('<3f3f', *lo, *hi) + struct.pack('<II', mogp, 0)
+            + b'VERT' + struct.pack('<I', len(vert)) + vert
+            + b'TRIM' + struct.pack('<I', len(trim)) + trim
+            + b'MBIH' + _bih(lo, hi, len(tris))
+            + b'LIQU' + struct.pack('<I', 0))
+
+
+def vmo_groups(groups):
+    """The .vmo bytes of a model from [(vertices, triangles, mogpFlags)] groups (one leaf holds every group)."""
+    groups = [g for g in groups if g[0] and g[1]]
+    if not groups:
+        raise SystemExit('a kit piece needs geometry')
+    lo, hi = bounds([v for g in groups for v in g[0]])
+    return (VMAP_MAGIC + b'WMOD' + struct.pack('<II', 8, 0) + b'GMOD' + struct.pack('<I', len(groups))
+            + b''.join(_group(*g) for g in groups) + b'GBIH' + _bih(lo, hi, len(groups)))
+
+
+def vmo(verts, tris):
+    """The .vmo bytes of a one-group model (outdoors) from vertices and (i0, i1, i2[, material]) triangles."""
+    return vmo_groups([(verts, tris, MOGP_OUTDOORS)])
 
 
 def dtree_entry(display, name, verts):

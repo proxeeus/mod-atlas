@@ -45,14 +45,14 @@ def build():
     os.makedirs(OUT, exist_ok=True)
     entries, names = [], []
     for p in cfg['pieces']:
-        data = kitvmo.vmo(p['verts'], p['tris'])
-        kitvmo.read_vmo(data)
+        data = kitvmo.vmo_groups(p['groups'])
         name = p['model'] + '.vmo'
         with open(os.path.join(OUT, name), 'wb') as f:
             f.write(data)
         entries.append(kitvmo.dtree_entry(p['display'], p['model'], p['verts']))
         names.append(name)
-        print('built %-30s display %d, %d triangles' % (name, p['display'], len(p['tris'])))
+        print('built %-30s display %d, %d groups, %d triangles' % (name, p['display'], len(p['groups']),
+                                                                    sum(len(g[1]) for g in p['groups'])))
     return entries, names
 
 
