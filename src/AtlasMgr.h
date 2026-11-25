@@ -68,6 +68,8 @@ public:
     bool IsPoolMap(uint32 mapId) const;
     void ProcessPoolMap(Map* map);              // from the map's own update
     void OnPlayerEnteredPool(Player* player);   // from the allmap script
+    void GuardPoolMap(Map* map);                // void safety net, from the map's own update
+    void OnPoolDeath(Player* player);           // back to the entrance, alive (no graveyard run)
     bool EnterSpike(Player* player, std::string& error);
     void LeaveSpike(Player* player);
 
@@ -548,6 +550,7 @@ private:
         uint32   MaxPieces = 1;
     };
     PoolMap const* GetPoolMap(uint32 mapId) const;
+    Position PoolEntrance(PoolMap const& pool) const;
     std::vector<KitPiece>                        _poolKit;       // atlas_pool_piece + _socket, set at startup only
     std::vector<PoolMap>                         _poolMaps;      // atlas_pool_map, set at startup only
     std::unordered_set<uint32>                   _poolSpawned;   // instance ids with their pieces (_poolMutex)

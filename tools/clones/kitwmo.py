@@ -19,6 +19,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DOOR_W = 8.0
 DOOR_H = 7.0
 UV_SCALE = 1.0 / 6.0          # texture repeats every 6 yd
+WALL_T = 0.5                  # wall thickness at a room doorway: the jamb depth; the socket sits at its outer edge
 BSP_LEAF = 32                 # faces per leaf (the client caches at most 1024)
 WMO_DIR = 'World\\wmo\\Dungeon\\AtlasKit'
 FACE_RENDER = 0x20            # MOPY: rendered (and collides)
@@ -109,9 +110,45 @@ def _door_wall(mesh, side, half, height, door):
         mesh.box_wall(x0, y0, x1, y1, 0.0, height, WALL)
     (x0, y0), (x1, y1) = at(-hw), at(hw)
     mesh.box_wall(x0, y0, x1, y1, DOOR_H, height, WALL)            # lintel
+    # The doorway's reveal, as deep as the wall: two joined rooms then keep their walls WALL_T apart (one shared
+    # plane would z-fight) and the wall shows its thickness.
+    out = {'E': (1, 0), 'W': (-1, 0), 'N': (0, 1), 'S': (0, -1)}[side]
+    def deep(t, d):
+        x, y = at(t)
+        return x + out[0] * d, y + out[1] * d
+    for t in (-hw, hw):                                            # jambs
+        (x0, y0), (x1, y1) = deep(t, 0.0), deep(t, WALL_T)
+        mesh.box_wall(x0, y0, x1, y1, 0.0, DOOR_H, WALL)
+    a, b, c, d = deep(-hw, 0.0), deep(hw, 0.0), deep(hw, WALL_T), deep(-hw, WALL_T)
+    mesh.quad(a + (DOOR_H,), b + (DOOR_H,), c + (DOOR_H,), d + (DOOR_H,), WALL)     # lintel underside
+    mesh.quad(a + (0.0,), b + (0.0,), c + (0.0,), d + (0.0,), FLOOR)                # threshold
 
 
 SIDES = {'E': (1, 0, 0.0), 'N': (0, 1, 90.0), 'W': (-1, 0, 180.0), 'S': (0, -1, 270.0)}
+
+
+def box(mesh, corners_lo, corners_hi, mat):
+    """An upright box from a footprint (four corners, in order) between two heights: four sides and the top."""
+    for i in range(4):
+        (x0, y0), (x1, y1) = corners_lo[i], corners_lo[(i + 1) % 4]
+        mesh.box_wall(x0, y0, x1, y1, corners_hi[0], corners_hi[1], mat)
+    (a, b, c, d) = corners_lo
+    mesh.quad(a + (corners_hi[1],), b + (corners_hi[1],), c + (corners_hi[1],), d + (corners_hi[1],), mat)
+
+
+def mine_frame(mesh, centre, out, z0, depth, mat):
+    """A wooden support frame in a doorway: two posts and a lintel, `depth` deep, at `centre` facing `out`."""
+    (cx, cy), (dx, dy) = centre, out
+    rx, ry = dy, -dx
+    hw, t = DOOR_W / 2, 0.5
+
+    def foot(r0, r1):
+        return [(cx + rx * r0, cy + ry * r0), (cx + rx * r1, cy + ry * r1),
+                (cx + rx * r1 + dx * depth, cy + ry * r1 + dy * depth),
+                (cx + rx * r0 + dx * depth, cy + ry * r0 + dy * depth)]
+    box(mesh, foot(-hw, -hw + t), (z0, z0 + DOOR_H), mat)
+    box(mesh, foot(hw - t, hw), (z0, z0 + DOOR_H), mat)
+    box(mesh, foot(-hw, hw), (z0 + DOOR_H - t, z0 + DOOR_H), mat)
 
 
 def build_room(size, height, doors):
@@ -121,7 +158,8 @@ def build_room(size, height, doors):
     m.flat(-half, -half, half, half, height, CEIL)
     for side in 'ENWS':
         _door_wall(m, side, half, height, side in doors)
-    sockets = [{'local': [SIDES[s][0] * half, SIDES[s][1] * half, 0.0], 'facing': SIDES[s][2]} for s in 'ENWS'
+    edge = half + WALL_T
+    sockets = [{'local': [SIDES[s][0] * edge, SIDES[s][1] * edge, 0.0], 'facing': SIDES[s][2]} for s in 'ENWS'
                if s in doors]
     return m, sockets, [0.0, 0.0, 0.1]
 
@@ -142,9 +180,10 @@ def build_corridor(length):
 
 
 def build_cap():
-    """A slab that closes a doorway left open: its socket faces -x, the slab stands just inside it."""
+    """A slab that closes a doorway left open: its socket faces -x, the slab stands just past it. Its faces turn
+    towards the doorway: the client collides with a face from its front only."""
     hw = DOOR_W / 2 + 0.5
-    m = Mesh()
+    m = Mesh(inside=(-5.0, 0.0, DOOR_H / 2))
     for x in (0.2, 0.8):                     # two faces 0.6 yd apart: a slab with some thickness
         m.box_wall(x, -hw, x, hw, -0.5, DOOR_H + 0.5, WALL)
     return m, [{'local': [0.0, 0.0, 0.0], 'facing': 180.0}], [-2.0, 0.0, 0.1]

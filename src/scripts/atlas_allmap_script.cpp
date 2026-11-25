@@ -24,6 +24,7 @@ public:
     {
         sAtlasMgr->ProcessMapSpawns(map);
         sAtlasMgr->ProcessPoolMap(map);
+        sAtlasMgr->GuardPoolMap(map);
     }
 
     void OnPlayerEnterAll(Map* map, Player* player) override

@@ -12,6 +12,6 @@
     "uses (below 4096)."
   ],
   "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways",
-           "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900100, "max_pieces": 9 },
+           "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900100, "max_pieces": 12 },
   "area": { "id": 7900, "template": 2366, "name": "The Timeways", "area_bit": 4000 }
 }

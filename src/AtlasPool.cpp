@@ -46,6 +46,10 @@ namespace
     constexpr uint32 PIECE_LIFETIME = 4 * 3600;
     // Long enough for the client to load the WMO after the loading screen.
     constexpr auto ARRIVAL_ROOT = std::chrono::seconds(5);
+    // Below the layout's origin by this much is the void: back to the entrance.
+    constexpr float VOID_DEPTH = 120.0f;
+    // A death in a pool map: back to the entrance, alive, after this long.
+    constexpr auto POOL_REVIVE = std::chrono::seconds(3);
 
     void Tell(Player* player, std::string const& text)
     {
@@ -62,6 +66,56 @@ AtlasMgr::PoolMap const* AtlasMgr::GetPoolMap(uint32 mapId) const
         if (m.MapId == mapId)
             return &m;
     return nullptr;
+}
+
+Position AtlasMgr::PoolEntrance(PoolMap const& pool) const
+{
+    KitPiece const* start = KitFind(_poolKit, pool.Start);
+    KitPlacement const origin{ pool.Start, pool.Origin.X, pool.Origin.Y, pool.Origin.Z, pool.Origin.O };
+    KitPoint const e = start ? KitToWorld(origin, start->EntranceX, start->EntranceY, start->EntranceZ)
+        : KitPoint{ pool.Origin.X, pool.Origin.Y, pool.Origin.Z, pool.Origin.O };
+    return Position(e.X, e.Y, e.Z, e.O);
+}
+
+void AtlasMgr::GuardPoolMap(Map* map)
+{
+    if (!map || !map->GetInstanceId())
+        return;
+    PoolMap const* pool = GetPoolMap(map->GetId());
+    if (!pool)
+        return;
+    float const limit = pool->Origin.Z - VOID_DEPTH;
+    for (MapReference const& ref : map->GetPlayers())
+    {
+        Player* p = ref.GetSource();
+        if (!p || !p->IsInWorld() || p->IsBeingTeleported() || p->GetPositionZ() >= limit)
+            continue;
+        Position const e = PoolEntrance(*pool);
+        p->NearTeleportTo(e.GetPositionX(), e.GetPositionY(), e.GetPositionZ() + 0.5f, e.GetOrientation());
+        LOG_INFO("module", "Atlas: {} fell into the void of map {} instance {} at z {:.1f}: back to the entrance.",
+            p->GetName(), map->GetId(), map->GetInstanceId(), p->GetPositionZ());
+    }
+}
+
+void AtlasMgr::OnPoolDeath(Player* player)
+{
+    if (!player || !IsPoolMap(player->GetMapId()))
+        return;
+    ObjectGuid const guid = player->GetGUID();
+    player->m_Events.AddEventAtOffset([this, guid]()
+    {
+        Player* p = ObjectAccessor::FindPlayer(guid);
+        if (!p || !p->IsInWorld() || p->IsAlive())
+            return;
+        PoolMap const* pool = GetPoolMap(p->GetMapId());
+        if (!pool)
+            return;
+        p->ResurrectPlayer(1.0f);
+        p->SpawnCorpseBones();
+        Position const e = PoolEntrance(*pool);
+        p->NearTeleportTo(e.GetPositionX(), e.GetPositionY(), e.GetPositionZ() + 0.5f, e.GetOrientation());
+        LOG_INFO("module", "Atlas: {} died in map {}: revived at the entrance.", p->GetName(), p->GetMapId());
+    }, POOL_REVIVE);
 }
 
 bool AtlasMgr::IsPoolMap(uint32 mapId) const
@@ -251,8 +305,7 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
     }
 
     // Arrivals stand at the start piece's entrance, which every layout has at its origin.
-    KitPlacement const origin{ pool->Start, pool->Origin.X, pool->Origin.Y, pool->Origin.Z, pool->Origin.O };
-    KitPoint const entrance = KitToWorld(origin, start->EntranceX, start->EntranceY, start->EntranceZ);
+    Position const entrance = PoolEntrance(*pool);
 
     // The player, and the bots of their group standing in the same place.
     std::vector<Player*> travelers{ player };
@@ -275,7 +328,8 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
         // A fresh instance each time.
         if (sInstanceSaveMgr->PlayerGetBoundInstance(t->GetGUID(), pool->MapId, DUNGEON_DIFFICULTY_NORMAL))
             sInstanceSaveMgr->PlayerUnbindInstance(t->GetGUID(), pool->MapId, DUNGEON_DIFFICULTY_NORMAL, true, t);
-        t->TeleportTo(pool->MapId, entrance.X, entrance.Y, entrance.Z, entrance.O);
+        t->TeleportTo(pool->MapId, entrance.GetPositionX(), entrance.GetPositionY(), entrance.GetPositionZ(),
+            entrance.GetOrientation());
     }
     LOG_INFO("module", "Atlas: spike — {} and {} bot(s) to pool map {}.", player->GetName(), travelers.size() - 1,
         pool->MapId);

@@ -18,8 +18,10 @@ import mpq
 
 DEFAULT_CLIENT = '/Users/gaming/Desktop/World of Warcraft 3.3.5a'
 ADAPTER_LEN = 8.0
+COLLAR = 1.5               # a rock ring this wide around the adapter's room end hides the seam with the room
 ADAPTER_TEXTURES = ['DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_08.BLP', 'DUNGEONS\\TEXTURES\\FLOOR\\MM_CAVEFLOOR_03.BLP',
-                    'DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_09.BLP']   # wall, floor, ceiling
+                    'DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_09.BLP',
+                    'DUNGEONS\\TEXTURES\\WOOD\\MM_MINEBEAM_01.BLP']   # wall, floor, ceiling, beam
 MOGP_INDOORS = 0x2000
 MOGP_OUTDOORS = 0x8
 
@@ -103,11 +105,18 @@ def adapter_mesh(door, mats):
     far = [p(ex, ey, -hw, z0), p(ex, ey, hw, z0), p(ex, ey, hw, z0 + kitwmo.DOOR_H), p(ex, ey, -hw, z0 + kitwmo.DOOR_H)]
     mid = ((cx + ex) / 2, (cy + ey) / 2, z0 + kitwmo.DOOR_H / 2)
     m = kitwmo.Mesh(inside=mid)
-    wall, floor, ceil = mats
+    wall, floor, ceil, beam = mats
     m.quad(near[0], near[1], far[1], far[0], floor)
     m.quad(near[3], near[2], far[2], far[3], ceil)
     m.quad(near[0], far[0], far[3], near[3], wall)
     m.quad(near[1], far[1], far[2], near[2], wall)
+    # The collar: a rock ring around the room end, in the portal's plane, over any seam with the room's walls.
+    c = COLLAR
+    m.quad(p(cx, cy, r0 - c, z0), p(cx, cy, r0, z0), p(cx, cy, r0, z1 + c), p(cx, cy, r0 - c, z1 + c), wall)
+    m.quad(p(cx, cy, r1, z0), p(cx, cy, r1 + c, z0), p(cx, cy, r1 + c, z1 + c), p(cx, cy, r1, z1 + c), wall)
+    m.quad(p(cx, cy, r0, z1), p(cx, cy, r1, z1), p(cx, cy, r1, z1 + c), p(cx, cy, r0, z1 + c), wall)
+    # A mine frame at the outer end, the way the Goldmine shores up its tunnels.
+    kitwmo.mine_frame(m, (ex - dx * 0.6, ey - dy * 0.6), (dx, dy), z0, 0.6, beam)
     socket = {'local': [round(ex, 3), round(ey, 3), round(z0, 3)],
               'facing': round(math.degrees(math.atan2(dy, dx)) % 360.0, 3)}
     return m, socket
@@ -158,7 +167,7 @@ def build_files(spec, client=DEFAULT_CLIENT):
     for i, tex in enumerate(ADAPTER_TEXTURES):
         motx, off = _texture_offset(motx, tex)
         momt += struct.pack('<16I', kitwmo.MAT_UNCULLED, 0, 0, off, 0, 0, 0, 0xff7f7f7f, 10, 0, 0, 0, 0, 0, 0, 0)
-    mats = (base, base + 1, base + 2)
+    mats = tuple(base + i for i in range(len(ADAPTER_TEXTURES)))
 
     # Groups: 0 = the room, 1.. = one adapter per doorway. Names in MOGN.
     names = [spec['file'] + '_room'] + ['%s_door%d' % (spec['file'], i) for i in range(len(doors))]

@@ -223,4 +223,5 @@ def add_pool(map_dbc, md_dbc, cfg):
 
 def display_values(p):
     """The `gameobjectdisplayinfo_dbc` row of a kit piece (GODISPLAY_FIELDS order)."""
-    return [p['display'], p['wmo']] + [0] * 10 + [float(v) for v in p['bounds']] + [0]
+    f32 = [struct.unpack('<f', struct.pack('<f', v))[0] for v in p['bounds']]   # as the patch stores them
+    return [p['display'], p['wmo']] + [0] * 10 + f32 + [0]
