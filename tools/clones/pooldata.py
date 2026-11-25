@@ -1,7 +1,14 @@
-"""The generated-map pool (pool.json): Map.dbc and MapDifficulty.dbc rows of a pool map whose WDT is empty (no
-terrain tiles, no WMO), the WDT itself, and the kit pieces mod-atlas places in it as gameobjects. The client reads
-MVER, MPHD and MAIN and only looks for a WMO when MPHD flag 1 is set (Wowdecomp2 CMap::LoadWdt, WorldClient/
-Map.cpp:2892); a missing WDL is skipped (MapLowDetail.cpp:123).
+"""The generated-map pool (pool.json): Map.dbc, MapDifficulty.dbc and AreaTable.dbc rows of a pool map that has no
+terrain, its WDT, and the kit pieces mod-atlas places in it as gameobjects.
+
+The WDT has no terrain tiles, only a global WMO (MPHD flag 1, one MWMO name, one MODF placement; Wowdecomp2
+CMap::LoadWdt, WorldClient/Map.cpp:2892): a copy of the first piece's WMO far below the play space, never seen. It
+is there because the client takes a map's zone (name, music, ambience) from Map.dbc AreaTableID only for a map with
+a global WMO (World::QueryAreaIdAtPosition, World.cpp:4674, CMap::bDungeon); without one it looks for terrain under
+the player, finds none and keeps the zone it came from. A missing WDL is skipped (MapLowDetail.cpp:123).
+
+The server takes the zone from Map.dbc AreaTableID too when nothing under the player gives one (Map::
+GetFullTerrainStatusForPosition, linked_zone), so the same area row goes into areatable_dbc.
 """
 import json
 import os
@@ -12,7 +19,23 @@ import dbc
 
 POOL_MAP_RANGE = (950, 999)
 PIECE_ENTRY_RANGE = (900100, 900199)
+AREA_ID_RANGE = (7900, 7949)
+AREA_BIT_MAX = 4095  # the server keeps 128 x 32 explored-zone bits (PLAYER_EXPLORED_ZONES_SIZE)
 DBC_GO_DISPLAY = 'DBFilesClient\\GameObjectDisplayInfo.dbc'
+DBC_AREATABLE = 'DBFilesClient\\AreaTable.dbc'
+
+# AreaTable.dbc (3.3.5a), the column order of `areatable_dbc`.
+AREATABLE_FIELDS = ([('ID', 'i'), ('ContinentID', 'i'), ('ParentAreaID', 'i'), ('AreaBit', 'i'), ('Flags', 'i'),
+                     ('SoundProviderPref', 'i'), ('SoundProviderPrefUnderwater', 'i'), ('AmbienceID', 'i'),
+                     ('ZoneMusic', 'i'), ('IntroSound', 'i'), ('ExplorationLevel', 'i')]
+                    + clonedata._lang('AreaName')
+                    + [('FactionGroupMask', 'i'), ('LiquidTypeID_1', 'i'), ('LiquidTypeID_2', 'i'),
+                       ('LiquidTypeID_3', 'i'), ('LiquidTypeID_4', 'i'), ('MinElevation', 'f'),
+                       ('Ambient_Multiplier', 'f'), ('Lightid', 'i')])
+assert len(AREATABLE_FIELDS) == 36
+AREA_NAME_ENUS = 11
+MAP_AREATABLE = [n for n, _ in clonedata.MAP_FIELDS].index('AreaTableID')
+GLOBAL_WMO_DEPTH = 3000.0  # yards below the piece: beyond any view distance
 
 
 def load_config(path=None):
@@ -29,6 +52,11 @@ def load_config(path=None):
     for p in cfg['pieces']:
         if not PIECE_ENTRY_RANGE[0] <= p['go_entry'] <= PIECE_ENTRY_RANGE[1]:
             raise ValueError('piece %d outside %d-%d' % (p['go_entry'], *PIECE_ENTRY_RANGE))
+    a = cfg['area']
+    if not AREA_ID_RANGE[0] <= a['id'] <= AREA_ID_RANGE[1]:
+        raise ValueError('pool area %d outside %d-%d' % (a['id'], *AREA_ID_RANGE))
+    if not 0 < a['area_bit'] <= AREA_BIT_MAX:
+        raise ValueError('pool area bit %d outside 1-%d' % (a['area_bit'], AREA_BIT_MAX))
     return cfg
 
 
@@ -37,16 +65,86 @@ def wdt_path(cfg):
     return 'World\\Maps\\%s\\%s.wdt' % (d, d)
 
 
-def empty_wdt():
-    """MVER 18, MPHD (32 bytes, no flags: no global WMO), MAIN (64 x 64 tiles, none present), empty MWMO."""
+def wmo_header(raw):
+    """(wmoID, bounding box (x0, y0, z0, x1, y1, z1)) from a root WMO's MOHD chunk."""
+    if raw[0:4][::-1] != b'MVER' or raw[12:16][::-1] != b'MOHD':
+        raise SystemExit('not a root WMO (no MVER, MOHD)')
+    mohd = raw[20:20 + struct.unpack_from('<I', raw, 16)[0]]
+    return struct.unpack_from('<I', mohd, 32)[0], struct.unpack_from('<6f', mohd, 36)
+
+
+def global_wmo_position(cfg):
+    """World position of the global WMO: under the first piece, out of sight."""
+    px, py, pz, _ = cfg['pieces'][0]['position']
+    return px, py, pz - GLOBAL_WMO_DEPTH
+
+
+def pool_wdt(cfg, bbox):
+    """MVER 18, MPHD (flag 1: global WMO), MAIN (64 x 64 tiles, none present), MWMO (the first piece's WMO) and its
+    MODF placement. A global WMO is placed in raw world coordinates (no tile offset), stored as file = (-y, z, -x)
+    (the inverse of CMap::LoadWdt); `bbox` is the WMO's own (MOHD) bounding box, unrotated."""
     def chunk(tag, data):
         return tag[::-1].encode('ascii') + struct.pack('<I', len(data)) + data
-    return (chunk('MVER', struct.pack('<I', 18)) + chunk('MPHD', bytes(32)) + chunk('MAIN', bytes(64 * 64 * 8))
-            + chunk('MWMO', b''))
+
+    wx, wy, wz = global_wmo_position(cfg)
+    x0, y0, z0, x1, y1, z1 = bbox
+    lo = (-(wy + y1), wz + z0, -(wx + x1))
+    hi = (-(wy + y0), wz + z1, -(wx + x0))
+    name = cfg['pieces'][0]['wmo'].encode('ascii') + b'\0'
+    # Yaw 180: the client adds half a turn to a WDT placement (RotateAroundZ(rotZ + pi)), so this one is unrotated
+    # and its extents are the plain box.
+    modf = struct.pack('<II3f3f3f3fHHHH', 0, 0, -wy, wz, -wx, 0.0, 180.0, 0.0, *lo, *hi, 0, 0, 0, 0)
+    assert len(modf) == 64
+    return (chunk('MVER', struct.pack('<I', 18)) + chunk('MPHD', struct.pack('<I', 1) + bytes(28))
+            + chunk('MAIN', bytes(64 * 64 * 8)) + chunk('MWMO', name) + chunk('MODF', modf))
+
+
+def client_inputs(client, dbc_dir, cfg, patch_name='patch-T.MPQ'):
+    """(AreaTable.dbc with the pool area added, the area's raw row, the WDT, where) from the client's own files
+    (read-only), or from `dbc_dir` (AreaTable.dbc and the first piece's WMO by its base name)."""
+    import mpq
+    raw_area, where = clonedata.effective_raw(client, dbc_dir, 'AreaTable.dbc', patch_name)
+    area_dbc = dbc.Dbc.parse(raw_area)
+    row = add_area(area_dbc, cfg)
+    wmo = cfg['pieces'][0]['wmo']
+    if dbc_dir:
+        with open(os.path.join(dbc_dir, wmo.split('\\')[-1]), 'rb') as f:
+            raw_wmo = f.read()
+    else:
+        _, raw_wmo = mpq.read_effective(client, wmo, mpq.client_order(client, exclude=[patch_name]))
+        if not raw_wmo:
+            raise SystemExit('%s not found in the client archives' % wmo)
+    _, bbox = wmo_header(raw_wmo)
+    return area_dbc, row, pool_wdt(cfg, bbox), where
+
+
+def add_area(area_dbc, cfg):
+    """Append the pool map's area (a copy of the template area's, as a zone of the pool map with no flags, our ID,
+    name and explore bit). Returns the raw row."""
+    a = cfg['area']
+    src = area_dbc.row(a['template'])
+    if not src:
+        raise SystemExit('pool area template %d has no AreaTable.dbc row' % a['template'])
+    if a['id'] in area_dbc.ids():
+        raise SystemExit('AreaTable.dbc already has a row %d' % a['id'])
+    if any(r[3] == a['area_bit'] for r in area_dbc.rows):
+        raise SystemExit('AreaTable.dbc: explore bit %d is used by another area' % a['area_bit'])
+    row = list(src)
+    row[0] = a['id']
+    row[1] = cfg['map']['id']
+    row[2] = 0           # a zone, not a subzone
+    row[3] = a['area_bit']
+    row[4] = 0           # no rest, sanctuary, capital or PvP flags
+    row[10] = 0          # no exploration experience
+    row[AREA_NAME_ENUS] = area_dbc.add_string(a['name'])
+    row[28] = 0          # FactionGroupMask
+    area_dbc.rows.append(row)
+    area_dbc.rows.sort(key=lambda r: r[0])
+    return row
 
 
 def add_pool(map_dbc, md_dbc, cfg):
-    """Append the pool map's rows (a copy of the template map's, with our ID, Directory and name)."""
+    """Append the pool map's rows (a copy of the template map's, with our ID, Directory, name and area)."""
     m = cfg['map']
     src = map_dbc.row(m['template'])
     if not src:
@@ -63,6 +161,7 @@ def add_pool(map_dbc, md_dbc, cfg):
     row[0] = m['id']
     row[1] = map_dbc.add_string(m['directory'])
     row[clonedata.MAP_NAME_ENUS] = map_dbc.add_string(m['name'])
+    row[MAP_AREATABLE] = cfg['area']['id']
     md = list(src_md[0])
     md[0] = m['mapdifficulty_id']
     md[1] = m['id']

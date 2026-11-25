@@ -1,6 +1,7 @@
 """Build the Atlas client patch, Data/patch-T.MPQ: the client's own Map.dbc and MapDifficulty.dbc plus one row
-each per enabled clone (clones.json) and for the generated-map pool (pool.json, with its empty WDT), and its own
-ScreenEffect.dbc and Spell.dbc plus each fog's rows (fogs.json).
+each per enabled clone (clones.json) and for the generated-map pool (pool.json, with its WDT: no terrain, a global
+WMO out of sight), the client's AreaTable.dbc plus the pool map's area, and its own ScreenEffect.dbc and Spell.dbc
+plus each fog's rows (fogs.json).
 Reads the client archives read-only; writes only into modules/mod-atlas/client_patch/ (gitignored). The user copies
 the MPQ into the client's Data folder.
 
@@ -45,6 +46,18 @@ def check_fogs(archive, old_effects, old_spells, fogs):
         print('fog %d "%s" (%s) -> screen effect %d: colour %s spread %d strength %d%%'
               % (fog['spell'], values[[n for n, _ in fields].index('Name_Lang_enUS')], fog['aura'], fog['effect'],
                  fog['colour'], fog['spread'], fog['strength']))
+
+
+def check_area(archive, stock, pool_cfg):
+    """AreaTable.dbc = the stock rows unchanged plus the pool area."""
+    new = dbc.Dbc.parse(archive.read(pooldata.DBC_AREATABLE))
+    fields = pooldata.AREATABLE_FIELDS
+    old_rows = {r[0]: clonedata.decode(stock, r, fields) for r in stock.rows}
+    new_rows = {r[0]: clonedata.decode(new, r, fields) for r in new.rows}
+    if set(new_rows) - set(old_rows) != {pool_cfg['area']['id']} or set(old_rows) - set(new_rows):
+        raise SystemExit('AreaTable.dbc: unexpected row set change')
+    if any(new_rows[rid] != values for rid, values in old_rows.items()):
+        raise SystemExit('AreaTable.dbc: a stock row changed')
 
 
 def roundtrip(path, want, sources, added, pool_cfg):
@@ -105,8 +118,12 @@ def main():
                                                                               'GameObjectDisplayInfo.dbc',
                                                                               cfg['patch_name'])
     pooldata.check_pieces(dbc.Dbc.parse(raw_display), pool_cfg)
+    area_dbc, area_row, wdt, where['AreaTable.dbc'] = pooldata.client_inputs(client, args.dbc_dir, pool_cfg,
+                                                                             cfg['patch_name'])
+    print('source %-18s %s' % ('AreaTable.dbc', where['AreaTable.dbc']))
+    stock_area = dbc.Dbc.parse(clonedata.effective_raw(client, args.dbc_dir, 'AreaTable.dbc', cfg['patch_name'])[0])
     files = {clonedata.DBC_MAP: map_dbc.serialize(), clonedata.DBC_MAPDIFFICULTY: md_dbc.serialize(),
-             pooldata.wdt_path(pool_cfg): pooldata.empty_wdt()}
+             pooldata.DBC_AREATABLE: area_dbc.serialize(), pooldata.wdt_path(pool_cfg): wdt}
 
     fog_cfg = fogdata.load_config()
     raw_effects, where['ScreenEffect.dbc'] = clonedata.effective_raw(client, args.dbc_dir, 'ScreenEffect.dbc',
@@ -122,6 +139,7 @@ def main():
     os.makedirs(os.path.dirname(out), exist_ok=True)
     raw = mpq.write(out, files)
     archive = roundtrip(out, files, sources, added, pool_cfg)
+    check_area(archive, stock_area, pool_cfg)
     check_fogs(archive, dbc.Dbc.parse(raw_effects), dbc.RawDbc(raw_spells), fogs)
 
     digest = clonedata.checksum(map_dbc, md_dbc, added)
@@ -134,10 +152,15 @@ def main():
               % (c['id'], c['source'], m[clonedata.MAP_NAME_ENUS], m[1], m[2], m[3], m[57], m[59], m[60], m[61],
                  m[63], m[65], d[0], d[1], d[2], d[20], d[21]))
     m = clonedata.decode(map_dbc, pool_map, clonedata.MAP_FIELDS)
-    print('pool map %d "%s" Directory=%s (%s, empty), pieces %s' % (m[0], m[clonedata.MAP_NAME_ENUS], m[1],
-          pooldata.wdt_path(pool_cfg), [(p['go_entry'], p['display']) for p in pool_cfg['pieces']]))
-    print('Map.dbc %d rows, MapDifficulty.dbc %d rows, ScreenEffect.dbc %d rows, Spell.dbc %d rows'
-          % (len(map_dbc.rows), len(md_dbc.rows), len(effects.rows), spells.count))
+    a = clonedata.decode(area_dbc, area_row, pooldata.AREATABLE_FIELDS)
+    print('pool map %d "%s" Directory=%s area %d (%s, global WMO at %s), pieces %s'
+          % (m[0], m[clonedata.MAP_NAME_ENUS], m[1], m[pooldata.MAP_AREATABLE], pooldata.wdt_path(pool_cfg),
+             pooldata.global_wmo_position(pool_cfg), [(p['go_entry'], p['display']) for p in pool_cfg['pieces']]))
+    print('pool area %d "%s" map %d bit %d flags %d ambience %d music %d intro %d'
+          % (a[0], a[pooldata.AREA_NAME_ENUS], a[1], a[3], a[4], a[7], a[8], a[9]))
+    print('Map.dbc %d rows, MapDifficulty.dbc %d rows, AreaTable.dbc %d rows, ScreenEffect.dbc %d rows, '
+          'Spell.dbc %d rows' % (len(map_dbc.rows), len(md_dbc.rows), len(area_dbc.rows), len(effects.rows),
+                                 spells.count))
     print('wrote %s (%d bytes)\nsha256 %s\nrows checksum %s' % (out, len(raw), sha, digest))
 
     manifest = {'patch': os.path.basename(out), 'sha256': sha, 'rows_checksum': digest,

@@ -121,13 +121,16 @@ def verify_fogs(archive, sql_path):
 
 
 def verify_pool(archive, sql_path):
-    """The pool map's Map.dbc / MapDifficulty.dbc rows = its SQL rows; its WDT is in the patch and empty."""
+    """The pool map's Map.dbc / MapDifficulty.dbc / AreaTable.dbc rows = its SQL rows; its WDT (a global WMO, no
+    terrain) is in the patch."""
     errors = 0
     cfg = pooldata.load_config()
     m = cfg['map']
     for name, table, fields, rid in (('Map.dbc', 'map_dbc', clonedata.MAP_FIELDS, m['id']),
                                      ('MapDifficulty.dbc', 'mapdifficulty_dbc', clonedata.MAPDIFFICULTY_FIELDS,
-                                      m['mapdifficulty_id'])):
+                                      m['mapdifficulty_id']),
+                                     ('AreaTable.dbc', 'areatable_dbc', pooldata.AREATABLE_FIELDS,
+                                      cfg['area']['id'])):
         d = dbc.Dbc.parse(archive.read('DBFilesClient\\' + name))
         _, rows = sql_rows(sql_path, table)
         raw = d.row(rid)
@@ -140,8 +143,10 @@ def verify_pool(archive, sql_path):
                   if not same(value, kind, token))
         errors += bad
         print('%-18s row %d (pool): %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
-    if archive.read(pooldata.wdt_path(cfg)) != pooldata.empty_wdt():
-        print('pool WDT %s missing or not empty' % pooldata.wdt_path(cfg))
+    wdt = archive.read(pooldata.wdt_path(cfg))
+    name = cfg['pieces'][0]['wmo'].encode('ascii') + b'\0'
+    if not wdt or wdt[20:24] != b'\x01\0\0\0' or name not in wdt:
+        print('pool WDT %s missing, or without its global WMO %s' % (pooldata.wdt_path(cfg), cfg['pieces'][0]['wmo']))
         errors += 1
     _, pieces = sql_rows(sql_path, 'atlas_pool_piece')
     if {int(r[0][1]) for r in pieces} != {p['go_entry'] for p in cfg['pieces']}:
