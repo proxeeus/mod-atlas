@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import clonedata  # noqa: E402
 import dbc  # noqa: E402
 import fogdata  # noqa: E402
+import lightdata  # noqa: E402
 import mpq  # noqa: E402
 import pooldata  # noqa: E402
 
@@ -155,11 +156,19 @@ def main():
     files[fogdata.DBC_SCREEN_EFFECT] = effects.serialize()
     files[fogdata.DBC_SPELL] = spells.serialize()
 
+    light_src = lightdata.sources(client, args.dbc_dir, cfg['patch_name'])
+    light_stock = {n: dbc.Dbc.parse(t.serialize()) for n, (t, _) in light_src.items()}
+    light_tables = {n: t for n, (t, _) in light_src.items()}
+    light_added = lightdata.add_light(light_tables, pool_cfg)
+    for n, t in light_tables.items():
+        files['DBFilesClient\\%s.dbc' % n] = t.serialize()
+
     os.makedirs(os.path.dirname(out), exist_ok=True)
     raw = mpq.write(out, files)
     archive = roundtrip(out, files, sources, added, pool_cfg)
     check_area(archive, stock_area, pool_cfg)
     check_displays(archive, dbc.Dbc.parse(raw_display), pool_cfg)
+    lightdata.check(archive, light_stock, pool_cfg, light_added)
     check_fogs(archive, dbc.Dbc.parse(raw_effects), dbc.RawDbc(raw_spells), fogs)
 
     digest = clonedata.checksum(map_dbc, md_dbc, added)
@@ -179,6 +188,8 @@ def main():
     for p in pool_cfg['pieces']:
         print('kit piece %d display %d %-5s %s: %d triangles, %d socket(s)' % (p['go_entry'], p['display'], p['role'],
               p['wmo'], sum(len(g[1]) for g in p['groups']), len(p['sockets'])))
+    print('pool light %d, params %d/%d: fog %s yd, colour %s' % (pool_cfg['light']['id'], pool_cfg['light']['params'],
+          pool_cfg['light']['params'] + 1, pool_cfg['light']['fog_end_yd'], pool_cfg['light']['fog_colour']))
     print('pool area %d "%s" map %d bit %d flags %d ambience %d music %d intro %d'
           % (a[0], a[pooldata.AREA_NAME_ENUS], a[1], a[3], a[4], a[7], a[8], a[9]))
     print('Map.dbc %d rows, MapDifficulty.dbc %d rows, AreaTable.dbc %d rows, ScreenEffect.dbc %d rows, '

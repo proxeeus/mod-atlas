@@ -17,7 +17,7 @@ import kitwmo
 import mpq
 
 DEFAULT_CLIENT = '/Users/gaming/Desktop/World of Warcraft 3.3.5a'
-ADAPTER_LEN = 8.0
+ADAPTER_LEN = 14.0         # long enough that a real room's irregular walls keep clear of its neighbours
 COLLAR = 3.0               # a rock ring this wide around the adapter's room end hides the seam with the room
 SHELL_DROP = 1.0           # a rock slab this far under the room's lowest point catches anyone a gap lets through
 ADAPTER_TEXTURES = ['DUNGEONS\\TEXTURES\\ROCK\\MM_CAVEWALL_08.BLP', 'DUNGEONS\\TEXTURES\\FLOOR\\MM_CAVEFLOOR_03.BLP',

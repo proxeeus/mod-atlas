@@ -9,9 +9,12 @@
     "Reserved IDs: maps 950-999, MapDifficulty 754+ (759 here), gameobject entries 900100-900199 (kit pieces),",
     "AreaTable 7900-7949. The area is the map's zone for client and server (name, music, ambience; no rest or",
     "sanctuary flags). It copies its template's sounds (2366 The Black Morass) and has an explore bit no other area",
-    "uses (below 4096)."
+    "uses (below 4096). light: the map's own sky and fog (lightdata.py), Light 2600-2649, LightParams 950-999."
   ],
   "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways",
            "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900100, "max_pieces": 12 },
-  "area": { "id": 7900, "template": 2366, "name": "The Timeways", "area_bit": 4000 }
+  "area": { "id": 7900, "template": 2366, "name": "The Timeways", "area_bit": 4000 },
+  "light": { "id": 2600, "params": 950, "template_light": 84, "template": 87, "underwater_template": 88,
+             "fog_end_yd": 50, "fog_start": 0.05, "fog_colour": "1e1830",
+             "comment": "Light 84 = the Black Morass's global light; a thick violet fog, the sky the fog's colour" }
 }
