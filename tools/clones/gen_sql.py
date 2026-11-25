@@ -1,8 +1,8 @@
 """Write the server rows from the same source rows as the client patch:
   atlas_clones.sql    map_dbc, mapdifficulty_dbc, instance_template, atlas_map_source (clones.json)
   atlas_fogs.sql      spell_dbc rows of the fog spells and the atlas_fog table (fogs.json)
-  atlas_pool.sql      the generated-map pool map and its area, its kit pieces (gameobject_template,
-                      atlas_pool_piece; pool.json)
+  atlas_pool.sql      the generated-map pool map and its area, its kit (gameobject_template, atlas_pool_piece,
+                      atlas_pool_socket) and layout settings (atlas_pool_map; pool.json)
   data/sql/uninstall/atlas_{clones,fogs}_uninstall.sql    delete exactly the reserved rows (not auto-applied)
 
   python3 -I gen_sql.py [--client DIR | --dbc-dir DIR] [--check] [--install clones|fogs|pool ...]
@@ -202,7 +202,7 @@ def render_fogs(spells, fogs, digest):
     return base, '\n'.join(un) + '\n'
 
 
-def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, cfg):
+def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, cfg):
     lo, hi = pooldata.POOL_MAP_RANGE
     alo, ahi = pooldata.AREA_ID_RANGE
     plo, phi = pooldata.PIECE_ENTRY_RANGE
@@ -245,28 +245,61 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, cfg):
     w(',\n'.join("(%d,14,%d,%s,'',1.0,'')" % (p['go_entry'], p['display'], literal(p['name'], 's'))
                  for p in cfg['pieces']) + ';')
     w('')
-    w('CREATE TABLE IF NOT EXISTS `atlas_pool_piece` (')
-    w('    `go_entry`   INT UNSIGNED NOT NULL COMMENT \'gameobject_template entry (900100-900199)\',')
-    w('    `map`        SMALLINT UNSIGNED NOT NULL COMMENT \'pool map (950-999)\',')
-    w('    `x`          FLOAT NOT NULL DEFAULT 0,')
-    w('    `y`          FLOAT NOT NULL DEFAULT 0,')
-    w('    `z`          FLOAT NOT NULL DEFAULT 0,')
-    w('    `o`          FLOAT NOT NULL DEFAULT 0,')
-    w('    `entrance_x` FLOAT NOT NULL DEFAULT 0 COMMENT \'where players arrive, on the floor of the piece\',')
+    w('-- The kit, its sockets and each pool map\'s layout settings (src/AtlasKit.h).')
+    w('-- Generated: dropped and made again.')
+    w('DROP TABLE IF EXISTS `atlas_pool_socket`;')
+    w('DROP TABLE IF EXISTS `atlas_pool_piece`;')
+    w('DROP TABLE IF EXISTS `atlas_pool_map`;')
+    w('CREATE TABLE `atlas_pool_map` (')
+    w('    `map`        SMALLINT UNSIGNED NOT NULL COMMENT \'pool map (%d-%d)\',' % (lo, hi))
+    w('    `origin_x`   FLOAT NOT NULL DEFAULT 0 COMMENT \'where the start piece goes\',')
+    w('    `origin_y`   FLOAT NOT NULL DEFAULT 0,')
+    w('    `origin_z`   FLOAT NOT NULL DEFAULT 0,')
+    w('    `origin_o`   FLOAT NOT NULL DEFAULT 0 COMMENT \'degrees\',')
+    w('    `start`      INT UNSIGNED NOT NULL COMMENT \'kit piece the layout starts with\',')
+    w('    `max_pieces` TINYINT UNSIGNED NOT NULL DEFAULT 1,')
+    w('    PRIMARY KEY (`map`)')
+    w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: pool map layouts\';')
+    w('CREATE TABLE `atlas_pool_piece` (')
+    w('    `go_entry`   INT UNSIGNED NOT NULL COMMENT \'gameobject_template entry (%d-%d), type 14\',' % (plo, phi))
+    w('    `entrance_x` FLOAT NOT NULL DEFAULT 0 COMMENT \'where arrivals stand, local, on the floor\',')
     w('    `entrance_y` FLOAT NOT NULL DEFAULT 0,')
     w('    `entrance_z` FLOAT NOT NULL DEFAULT 0,')
+    w('    `min_x`      FLOAT NOT NULL DEFAULT 0 COMMENT \'the WMO box, top view, local\',')
+    w('    `min_y`      FLOAT NOT NULL DEFAULT 0,')
+    w('    `max_x`      FLOAT NOT NULL DEFAULT 0,')
+    w('    `max_y`      FLOAT NOT NULL DEFAULT 0,')
     w('    PRIMARY KEY (`go_entry`)')
-    w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: pool map kit pieces\';')
+    w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: kit pieces\';')
+    w('CREATE TABLE `atlas_pool_socket` (')
+    w('    `go_entry`   INT UNSIGNED NOT NULL,')
+    w('    `socket`     TINYINT UNSIGNED NOT NULL,')
+    w('    `x`          FLOAT NOT NULL DEFAULT 0 COMMENT \'local\',')
+    w('    `y`          FLOAT NOT NULL DEFAULT 0,')
+    w('    `z`          FLOAT NOT NULL DEFAULT 0,')
+    w('    `facing`     FLOAT NOT NULL DEFAULT 0 COMMENT \'out of the piece, degrees\',')
+    w('    PRIMARY KEY (`go_entry`, `socket`)')
+    w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: kit piece sockets\';')
     w('')
-    w('DELETE FROM `atlas_pool_piece` WHERE `go_entry` BETWEEN %d AND %d;' % (plo, phi))
-    w('INSERT INTO `atlas_pool_piece` (`go_entry`, `map`, `x`, `y`, `z`, `o`, `entrance_x`, `entrance_y`, '
-      '`entrance_z`) VALUES')
+    ox, oy, oz, oo = m['origin']
+    w('INSERT INTO `atlas_pool_map` (`map`, `origin_x`, `origin_y`, `origin_z`, `origin_o`, `start`, `max_pieces`) '
+      'VALUES')
+    w('(%d,%s,%s,%s,%s,%d,%d);' % ((m['id'],) + tuple(literal(float(v), 'f') for v in (ox, oy, oz, oo))
+                                  + (m['start'], m['max_pieces'])))
+    w('INSERT INTO `atlas_pool_piece` (`go_entry`, `entrance_x`, `entrance_y`, `entrance_z`, `min_x`, `min_y`,')
+    w('    `max_x`, `max_y`) VALUES')
     rows = []
     for p in cfg['pieces']:
-        ex, ey, ez = pooldata.entrance(p)
-        rows.append('(%d,%d,%s,%s,%s,%s,%s,%s,%s)' % ((p['go_entry'], m['id']) + tuple(
-            literal(v, 'f') for v in list(p['position']) + [ex, ey, ez])))
+        x0, y0, _, x1, y1, _ = boxes[p['go_entry']]
+        rows.append('(%d,%s)' % (p['go_entry'], ','.join(literal(float(v), 'f')
+                                                         for v in list(p['entrance_local']) + [x0, y0, x1, y1])))
     w(',\n'.join(rows) + ';')
+    sockets = ['(%d,%d,%s)' % (p['go_entry'], i, ','.join(literal(float(v), 'f')
+                                                         for v in list(s['local']) + [s['facing']]))
+               for p in cfg['pieces'] for i, s in enumerate(p['sockets'])]
+    if sockets:
+        w('INSERT INTO `atlas_pool_socket` (`go_entry`, `socket`, `x`, `y`, `z`, `facing`) VALUES')
+        w(',\n'.join(sockets) + ';')
     base = '\n'.join(out) + '\n'
 
     un = ['-- mod-atlas: removes the pool rows of atlas_pool.sql (tools/clones/gen_sql.py; reserved IDs only).',
@@ -280,7 +313,9 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, cfg):
           'DELETE FROM `mapdifficulty_dbc` WHERE `ID` = %d;' % m['mapdifficulty_id'],
           'DELETE FROM `areatable_dbc` WHERE `ID` BETWEEN %d AND %d;' % (alo, ahi),
           'DELETE FROM `gameobject_template` WHERE `entry` BETWEEN %d AND %d;' % (plo, phi),
+          'DROP TABLE IF EXISTS `atlas_pool_socket`;',
           'DROP TABLE IF EXISTS `atlas_pool_piece`;',
+          'DROP TABLE IF EXISTS `atlas_pool_map`;',
           "DELETE FROM `updates` WHERE `name` = 'atlas_pool.sql';"]
     return base, '\n'.join(un) + '\n'
 
@@ -312,8 +347,8 @@ def main():
     texts = {'clones': render(map_dbc, md_dbc, added, digest, clonedata.source_instance_templates())}
     pool_cfg = pooldata.load_config()
     pool_map, pool_md = pooldata.add_pool(map_dbc, md_dbc, pool_cfg)
-    area_dbc, area_row, _, _ = pooldata.client_inputs(client, args.dbc_dir, pool_cfg, cfg['patch_name'])
-    texts['pool'] = render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, pool_cfg)
+    area_dbc, area_row, _, boxes, _ = pooldata.client_inputs(client, args.dbc_dir, pool_cfg, cfg['patch_name'])
+    texts['pool'] = render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, pool_cfg)
 
     raw_effects, _ = clonedata.effective_raw(client, args.dbc_dir, 'ScreenEffect.dbc', cfg['patch_name'])
     raw_spells, _ = clonedata.effective_raw(client, args.dbc_dir, 'Spell.dbc', cfg['patch_name'])

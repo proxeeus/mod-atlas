@@ -1,19 +1,22 @@
 /*
  * mod-atlas — AtlasPool.cpp
- * AtlasMgr: the generated-map spike (DESIGN §6.2). A pool map (950-999) has
- * an empty WDT in the Atlas patch: no terrain, no WMO, no server map, vmap or
- * mmap files. Kit pieces from atlas_pool_piece are placed in each instance as
- * gameobjects (type 14, a stock WMO with a stock display, so the server has
- * their collision model in GameObjectModels.dtree). `.atlas spike` takes a
- * player who has the patch, with the bots beside them, into one; `.atlas
- * spike leave` brings them back.
+ * AtlasMgr: generated maps (DESIGN §6.2). A pool map (950-999) has no terrain:
+ * its WDT in the Atlas patch holds only a global WMO out of sight (for the
+ * client's zone), and there are no server map, vmap or mmap files. Each
+ * instance gets its own layout of kit pieces (atlas_pool_piece, joined socket
+ * to socket: AtlasKit.h, atlas_pool_socket) from its pool map's start piece at
+ * its origin (atlas_pool_map), placed as gameobjects (type 14, a stock WMO with
+ * a stock display, so the server has their collision model in
+ * GameObjectModels.dtree). `.atlas spike` takes a player who has the patch,
+ * with the bots beside them, into one; `.atlas spike leave` brings them back.
  *
- * Arrivals are rooted until the piece has surely loaded on the client (the
- * gameobject comes with the map's first update), then put on its floor.
+ * Arrivals are rooted until the pieces have surely loaded on the client (they
+ * come with the map's first update), then put on the floor.
  */
 
 #include "AtlasMgr.h"
 #include "AtlasClones.h"
+#include "AtlasKit.h"
 #include "AtlasConfig.h"
 #include "Chat.h"
 #include "DBCStores.h"
@@ -28,8 +31,10 @@
 #include "ObjectMgr.h"
 #include "Player.h"
 #include "QueryResult.h"
+#include "RunRng.h"
 #include "StringFormat.h"
 #include "WorldSession.h"
+#include <algorithm>
 #include <cmath>
 
 namespace Atlas
@@ -49,49 +54,98 @@ namespace
     }
 }
 
-bool AtlasMgr::IsPoolMap(uint32 mapId) const
+AtlasMgr::PoolMap const* AtlasMgr::GetPoolMap(uint32 mapId) const
 {
     if (mapId < POOL_MAP_ID_MIN || mapId > POOL_MAP_ID_MAX)
-        return false;
-    for (PoolPiece const& p : _poolPieces)
-        if (p.MapId == mapId)
-            return true;
-    return false;
+        return nullptr;
+    for (PoolMap const& m : _poolMaps)
+        if (m.MapId == mapId)
+            return &m;
+    return nullptr;
+}
+
+bool AtlasMgr::IsPoolMap(uint32 mapId) const
+{
+    return GetPoolMap(mapId) != nullptr;
 }
 
 void AtlasMgr::LoadPoolPieces()
 {
-    _poolPieces.clear();
+    _poolKit.clear();
+    _poolMaps.clear();
     if (!WorldDatabase.Query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() "
-            "AND table_name = 'atlas_pool_piece'"))
+            "AND table_name = 'atlas_pool_map'"))
         return;
 
-    QueryResult result = WorldDatabase.Query("SELECT go_entry, map, x, y, z, o, entrance_x, entrance_y, entrance_z "
-        "FROM atlas_pool_piece ORDER BY go_entry");
-    if (!result)
-        return;
-    do
+    if (QueryResult result = WorldDatabase.Query("SELECT go_entry, entrance_x, entrance_y, entrance_z, min_x, min_y, "
+            "max_x, max_y FROM atlas_pool_piece ORDER BY go_entry"))
     {
-        Field* f = result->Fetch();
-        PoolPiece p;
-        p.Entry = f[0].Get<uint32>();
-        p.MapId = f[1].Get<uint32>();
-        p.Pos.Relocate(f[2].Get<float>(), f[3].Get<float>(), f[4].Get<float>(), f[5].Get<float>());
-        p.Entrance.Relocate(f[6].Get<float>(), f[7].Get<float>(), f[8].Get<float>(), f[5].Get<float>());
-
-        MapEntry const* map = sMapStore.LookupEntry(p.MapId);
-        GameObjectTemplate const* go = sObjectMgr->GetGameObjectTemplate(p.Entry);
-        if (p.MapId < POOL_MAP_ID_MIN || p.MapId > POOL_MAP_ID_MAX || !map || !map->IsDungeon()
-            || !sObjectMgr->GetInstanceTemplate(p.MapId) || !go || go->type != GAMEOBJECT_TYPE_MAP_OBJECT)
+        do
         {
-            LOG_ERROR("module", "Atlas: pool piece {} on map {} is not usable (pool map rows, instance template or "
-                "a type-14 gameobject_template missing).", p.Entry, p.MapId);
-            continue;
-        }
-        _poolPieces.push_back(p);
-        LOG_INFO("module", "Atlas: pool piece {} (display {}) on map {} at ({:.1f}, {:.1f}, {:.1f}).", p.Entry,
-            go->displayId, p.MapId, p.Pos.GetPositionX(), p.Pos.GetPositionY(), p.Pos.GetPositionZ());
-    } while (result->NextRow());
+            Field* f = result->Fetch();
+            KitPiece p;
+            p.Entry = f[0].Get<uint32>();
+            p.EntranceX = f[1].Get<float>();
+            p.EntranceY = f[2].Get<float>();
+            p.EntranceZ = f[3].Get<float>();
+            p.MinX = f[4].Get<float>();
+            p.MinY = f[5].Get<float>();
+            p.MaxX = f[6].Get<float>();
+            p.MaxY = f[7].Get<float>();
+            GameObjectTemplate const* go = sObjectMgr->GetGameObjectTemplate(p.Entry);
+            if (!go || go->type != GAMEOBJECT_TYPE_MAP_OBJECT)
+            {
+                LOG_ERROR("module", "Atlas: kit piece {} skipped: no type-14 gameobject_template.", p.Entry);
+                continue;
+            }
+            _poolKit.push_back(p);
+        } while (result->NextRow());
+    }
+
+    if (QueryResult result = WorldDatabase.Query("SELECT go_entry, x, y, z, facing FROM atlas_pool_socket "
+            "ORDER BY go_entry, socket"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            uint32 const entry = f[0].Get<uint32>();
+            auto it = std::find_if(_poolKit.begin(), _poolKit.end(), [entry](KitPiece const& p)
+            {
+                return p.Entry == entry;
+            });
+            if (it == _poolKit.end())
+                continue;
+            it->Sockets.push_back({ f[1].Get<float>(), f[2].Get<float>(), f[3].Get<float>(),
+                f[4].Get<float>() * float(M_PI) / 180.0f });
+        } while (result->NextRow());
+    }
+
+    if (QueryResult result = WorldDatabase.Query("SELECT map, origin_x, origin_y, origin_z, origin_o, start, "
+            "max_pieces FROM atlas_pool_map ORDER BY map"))
+    {
+        do
+        {
+            Field* f = result->Fetch();
+            PoolMap m;
+            m.MapId = f[0].Get<uint32>();
+            m.Origin = { f[1].Get<float>(), f[2].Get<float>(), f[3].Get<float>(),
+                f[4].Get<float>() * float(M_PI) / 180.0f };
+            m.Start = f[5].Get<uint32>();
+            m.MaxPieces = std::max<uint32>(1, f[6].Get<uint32>());
+            MapEntry const* map = sMapStore.LookupEntry(m.MapId);
+            if (m.MapId < POOL_MAP_ID_MIN || m.MapId > POOL_MAP_ID_MAX || !map || !map->IsDungeon()
+                || !sObjectMgr->GetInstanceTemplate(m.MapId) || !KitFind(_poolKit, m.Start))
+            {
+                LOG_ERROR("module", "Atlas: pool map {} is not usable (map rows, instance template or its start piece "
+                    "{} missing).", m.MapId, m.Start);
+                continue;
+            }
+            _poolMaps.push_back(m);
+            LOG_INFO("module", "Atlas: pool map {} — start piece {} at ({:.1f}, {:.1f}, {:.1f}), up to {} pieces, "
+                "{} kit piece(s).", m.MapId, m.Start, m.Origin.X, m.Origin.Y, m.Origin.Z, m.MaxPieces,
+                _poolKit.size());
+        } while (result->NextRow());
+    }
 }
 
 void AtlasMgr::ProcessPoolMap(Map* map)
@@ -100,30 +154,38 @@ void AtlasMgr::ProcessPoolMap(Map* map)
     // MapInstanced parent, instance 0), whose ToInstanceMap() is a bad cast:
     // a gameobject created there reads a garbage instance script and crashes
     // the server in GameObject::Create -> SetZoneScript.
-    if (!map || !map->GetInstanceId() || _poolPieces.empty() || !IsPoolMap(map->GetId()))
+    if (!map || !map->GetInstanceId())
+        return;
+    PoolMap const* pool = GetPoolMap(map->GetId());
+    if (!pool)
         return;
     {
         std::lock_guard<std::mutex> lock(_poolMutex);
         if (!_poolSpawned.insert(map->GetInstanceId()).second)
             return;
     }
-    for (PoolPiece const& p : _poolPieces)
+
+    RunRng rng(RunRng::MakeSeed());
+    std::vector<KitPlacement> const layout = KitBuildLayout(_poolKit, pool->Start, pool->Origin, pool->MaxPieces, rng);
+    uint32 placed = 0;
+    for (KitPlacement const& p : layout)
     {
-        if (p.MapId != map->GetId())
-            continue;
-        float const o = p.Pos.GetOrientation();
-        GameObject* go = map->SummonGameObject(p.Entry, p.Pos.GetPositionX(), p.Pos.GetPositionY(),
-            p.Pos.GetPositionZ(), o, 0.0f, 0.0f, std::sin(o / 2.0f), std::cos(o / 2.0f), PIECE_LIFETIME, false);
+        GameObject* go = map->SummonGameObject(p.Entry, p.X, p.Y, p.Z, p.O, 0.0f, 0.0f, std::sin(p.O / 2.0f),
+            std::cos(p.O / 2.0f), PIECE_LIFETIME, false);
         if (!go)
         {
-            LOG_ERROR("module", "Atlas: could not place pool piece {} in instance {}.", p.Entry, map->GetInstanceId());
+            LOG_ERROR("module", "Atlas: could not place kit piece {} in map {} instance {}.", p.Entry, map->GetId(),
+                map->GetInstanceId());
             continue;
         }
         // A room is wider than the normal sight range of one object.
         go->SetVisibilityDistanceOverride(VisibilityDistanceType::Gigantic);
-        LOG_INFO("module", "Atlas: pool piece {} placed in map {} instance {}.", p.Entry, map->GetId(),
-            map->GetInstanceId());
+        ++placed;
+        LOG_INFO("module", "Atlas: kit piece {} placed in map {} instance {} at ({:.1f}, {:.1f}, {:.1f}) facing "
+            "{:.0f} deg.", p.Entry, map->GetId(), map->GetInstanceId(), p.X, p.Y, p.Z, p.O * 180.0f / float(M_PI));
     }
+    LOG_INFO("module", "Atlas: map {} instance {} layout: {} of {} piece(s) placed (seed {}).", map->GetId(),
+        map->GetInstanceId(), placed, layout.size(), rng.GetSeed());
 }
 
 void AtlasMgr::OnPlayerEnteredPool(Player* player)
@@ -162,9 +224,11 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
         error = "The Timeways need the Atlas client patch: see .atlas clones.";
         return false;
     }
-    if (_poolPieces.empty())
+    PoolMap const* pool = _poolMaps.empty() ? nullptr : &_poolMaps.front();
+    KitPiece const* start = pool ? KitFind(_poolKit, pool->Start) : nullptr;
+    if (!start)
     {
-        error = "No kit piece is loaded (atlas_pool.sql not installed?).";
+        error = "No pool map is loaded (atlas_pool.sql not installed?).";
         return false;
     }
     if (GetSessionByPlayer(player->GetGUID()))
@@ -183,7 +247,9 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
         return false;
     }
 
-    PoolPiece const& piece = _poolPieces.front();
+    // Arrivals stand at the start piece's entrance, which every layout has at its origin.
+    KitPlacement const origin{ pool->Start, pool->Origin.X, pool->Origin.Y, pool->Origin.Z, pool->Origin.O };
+    KitPoint const entrance = KitToWorld(origin, start->EntranceX, start->EntranceY, start->EntranceZ);
 
     // The player, and the bots of their group standing in the same place.
     std::vector<Player*> travelers{ player };
@@ -204,13 +270,12 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
                 t->GetPositionZ(), t->GetOrientation());
         }
         // A fresh instance each time.
-        if (sInstanceSaveMgr->PlayerGetBoundInstance(t->GetGUID(), piece.MapId, DUNGEON_DIFFICULTY_NORMAL))
-            sInstanceSaveMgr->PlayerUnbindInstance(t->GetGUID(), piece.MapId, DUNGEON_DIFFICULTY_NORMAL, true, t);
-        t->TeleportTo(piece.MapId, piece.Entrance.GetPositionX(), piece.Entrance.GetPositionY(),
-            piece.Entrance.GetPositionZ(), piece.Entrance.GetOrientation());
+        if (sInstanceSaveMgr->PlayerGetBoundInstance(t->GetGUID(), pool->MapId, DUNGEON_DIFFICULTY_NORMAL))
+            sInstanceSaveMgr->PlayerUnbindInstance(t->GetGUID(), pool->MapId, DUNGEON_DIFFICULTY_NORMAL, true, t);
+        t->TeleportTo(pool->MapId, entrance.X, entrance.Y, entrance.Z, entrance.O);
     }
     LOG_INFO("module", "Atlas: spike — {} and {} bot(s) to pool map {}.", player->GetName(), travelers.size() - 1,
-        piece.MapId);
+        pool->MapId);
     return true;
 }
 

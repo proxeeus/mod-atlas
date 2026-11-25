@@ -17,8 +17,9 @@ Run with `python3 -I` from anywhere; nothing here writes to the client folder or
 | Tool | What it does |
 |---|---|
 | `build_patch.py` | Reads the client's effective `Map.dbc`, `MapDifficulty.dbc`, `ScreenEffect.dbc` and `Spell.dbc` (read-only, archive order as the client, our own `patch-T.MPQ` left out), appends the clone and fog rows and writes `client_patch/patch-T.MPQ` (gitignored, about 49 MB: Spell.dbc is whole) plus a `.json` manifest. Round-trips the archive and checks that no stock row changed. |
-| `gen_sql.py` | Writes `atlas_clones.sql` (`map_dbc`, `mapdifficulty_dbc`, `instance_template`, `atlas_map_source`), `atlas_fogs.sql` (`spell_dbc` 90400-90449, `atlas_fog`), `atlas_pool.sql` (pool map 950, `gameobject_template` 900100+, `atlas_pool_piece`) and their uninstall scripts in `data/sql/uninstall/` from the same rows. Each waits in `data/sql/staged/` (never applied) until `--install clones` / `fogs` / `pool` moves it to `data/sql/db-world/base/`. `--check` only compares. |
-| `verify.py` | Compares the built patch with the SQL, field by field (clones, fog spells, their screen effects). |
+| `gen_sql.py` | Writes `atlas_clones.sql` (`map_dbc`, `mapdifficulty_dbc`, `instance_template`, `atlas_map_source`), `atlas_fogs.sql` (`spell_dbc` 90400-90449, `atlas_fog`), `atlas_pool.sql` (pool map 950 and its area 7900, `gameobject_template` 900100+, the kit: `atlas_pool_piece`, `atlas_pool_socket`, `atlas_pool_map`) and their uninstall scripts in `data/sql/uninstall/` from the same rows. Each waits in `data/sql/staged/` (never applied) until `--install clones` / `fogs` / `pool` moves it to `data/sql/db-world/base/`. `--check` only compares. |
+| `verify.py` | Compares the built patch with the SQL, field by field (clones, fog spells, their screen effects, the pool map and its area). |
+| `wmofloor.py` | Finds a kit piece's sockets (`pool.json`): a top view of a WMO's floors (`--png`) and floor heights walking out of one of its portals, with a suggested socket (`--portal N`). Read-only. |
 | `link_data.sh` | Data symlinks in the worldserver's client-data volume: dry run by default, `--apply`, `--remove`. |
 | `dbc.py`, `mpq.py`, `clonedata.py`, `fogdata.py`, `pooldata.py` | WDBC reader/writer (and a raw mode for Spell.dbc), MPQ reader/writer and client archive order, the shared clone and fog rows. |
 

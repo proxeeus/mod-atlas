@@ -118,7 +118,7 @@ def main():
                                                                               'GameObjectDisplayInfo.dbc',
                                                                               cfg['patch_name'])
     pooldata.check_pieces(dbc.Dbc.parse(raw_display), pool_cfg)
-    area_dbc, area_row, wdt, where['AreaTable.dbc'] = pooldata.client_inputs(client, args.dbc_dir, pool_cfg,
+    area_dbc, area_row, wdt, _, where['AreaTable.dbc'] = pooldata.client_inputs(client, args.dbc_dir, pool_cfg,
                                                                              cfg['patch_name'])
     print('source %-18s %s' % ('AreaTable.dbc', where['AreaTable.dbc']))
     stock_area = dbc.Dbc.parse(clonedata.effective_raw(client, args.dbc_dir, 'AreaTable.dbc', cfg['patch_name'])[0])

@@ -1,18 +1,28 @@
 {
   "comment": [
-    "Generated-map spike (DESIGN 6.2): one pool map with no terrain (its WDT has only a global WMO, out of sight, for",
-    "the client's zone lookup), where mod-atlas places",
-    "a stock WMO room as a gameobject (type 14, MAP_OBJECT). The room's display must be in the server's",
-    "vmaps/GameObjectModels.dtree (gameobject collision) and its WMO in the client. Reserved IDs: maps 950-999,",
-    "MapDifficulty 754+ (759 here), gameobject entries 900100-900199 (kit pieces), AreaTable 7900-7949.",
-    "The area is the map's zone for client and server (name, music, ambience; no rest or sanctuary flags). It copies",
-    "its template's sounds (2366 The Black Morass) and has an explore bit no other area uses (below 4096)."
+    "Generated maps (DESIGN 6.2): a pool map has no terrain (its WDT holds only a global WMO, out of sight, for the",
+    "client's zone lookup). mod-atlas builds a layout of kit pieces in each instance: stock WMOs placed as",
+    "gameobjects (type 14, MAP_OBJECT), joined socket to socket (src/AtlasKit.h). A piece's display must be in the",
+    "server's vmaps/GameObjectModels.dtree (gameobject collision) and its WMO in the client.",
+    "A socket is a point on a piece's edge, in the WMO's own frame (yards), with the direction it faces out of the",
+    "piece (degrees, counter-clockwise from +x). Two pieces join with a socket on a socket, facing apart. Find them",
+    "with tools/clones/wmofloor.py (floor map, floor heights along a portal).",
+    "map.origin is where the start piece goes (x, y, z, facing in degrees); max_pieces caps a layout.",
+    "Reserved IDs: maps 950-999, MapDifficulty 754+ (759 here), gameobject entries 900100-900199 (kit pieces),",
+    "AreaTable 7900-7949. The area is the map's zone for client and server (name, music, ambience; no rest or",
+    "sanctuary flags). It copies its template's sounds (2366 The Black Morass) and has an explore bit no other area",
+    "uses (below 4096)."
   ],
-  "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways" },
+  "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways",
+           "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900100, "max_pieces": 4 },
   "area": { "id": 7900, "template": 2366, "name": "The Timeways", "area_bit": 4000 },
   "pieces": [
     { "go_entry": 900100, "display": 649, "name": "Timeways Fragment: Goldmine",
       "wmo": "World\\wmo\\Dungeon\\MD_Goldmine\\MD_Goldmine_1Room.wmo",
-      "position": [-266.0, -266.0, 0.0, 0.0], "entrance_local": [0.0, -5.0, -0.5] }
+      "entrance_local": [0.0, -5.0, -0.5],
+      "sockets": [
+        { "local": [44.54, 9.83, -4.03], "facing": 12.18,
+          "comment": "apron outside the mouth, 17.5 yd out (wmofloor.py --portal 1 --out 17.5)" }
+      ] }
   ]
 }

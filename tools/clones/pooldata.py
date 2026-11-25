@@ -49,9 +49,20 @@ def load_config(path=None):
     clone_md = {c['mapdifficulty_id'] for c in clonedata.load_config()['clones']}
     if m['mapdifficulty_id'] in clone_md:
         raise ValueError('pool MapDifficulty %d is taken by a clone in clones.json' % m['mapdifficulty_id'])
+    entries = set()
     for p in cfg['pieces']:
         if not PIECE_ENTRY_RANGE[0] <= p['go_entry'] <= PIECE_ENTRY_RANGE[1]:
             raise ValueError('piece %d outside %d-%d' % (p['go_entry'], *PIECE_ENTRY_RANGE))
+        if p['go_entry'] in entries:
+            raise ValueError('piece %d listed twice' % p['go_entry'])
+        entries.add(p['go_entry'])
+        for s in p['sockets']:
+            if len(s['local']) != 3 or not -360.0 <= s['facing'] <= 360.0:
+                raise ValueError('piece %d: a socket needs local [x, y, z] and a facing in degrees' % p['go_entry'])
+    if m['start'] not in entries:
+        raise ValueError('pool map start piece %d is not in pieces' % m['start'])
+    if len(m['origin']) != 4 or m['max_pieces'] < 1:
+        raise ValueError('pool map needs origin [x, y, z, facing] and max_pieces >= 1')
     a = cfg['area']
     if not AREA_ID_RANGE[0] <= a['id'] <= AREA_ID_RANGE[1]:
         raise ValueError('pool area %d outside %d-%d' % (a['id'], *AREA_ID_RANGE))
@@ -73,14 +84,18 @@ def wmo_header(raw):
     return struct.unpack_from('<I', mohd, 32)[0], struct.unpack_from('<6f', mohd, 36)
 
 
+def start_piece(cfg):
+    return next(p for p in cfg['pieces'] if p['go_entry'] == cfg['map']['start'])
+
+
 def global_wmo_position(cfg):
-    """World position of the global WMO: under the first piece, out of sight."""
-    px, py, pz, _ = cfg['pieces'][0]['position']
-    return px, py, pz - GLOBAL_WMO_DEPTH
+    """World position of the global WMO: under the layout's origin, out of sight."""
+    ox, oy, oz, _ = cfg['map']['origin']
+    return ox, oy, oz - GLOBAL_WMO_DEPTH
 
 
 def pool_wdt(cfg, bbox):
-    """MVER 18, MPHD (flag 1: global WMO), MAIN (64 x 64 tiles, none present), MWMO (the first piece's WMO) and its
+    """MVER 18, MPHD (flag 1: global WMO), MAIN (64 x 64 tiles, none present), MWMO (the start piece's WMO) and its
     MODF placement. A global WMO is placed in raw world coordinates (no tile offset), stored as file = (-y, z, -x)
     (the inverse of CMap::LoadWdt); `bbox` is the WMO's own (MOHD) bounding box, unrotated."""
     def chunk(tag, data):
@@ -90,7 +105,7 @@ def pool_wdt(cfg, bbox):
     x0, y0, z0, x1, y1, z1 = bbox
     lo = (-(wy + y1), wz + z0, -(wx + x1))
     hi = (-(wy + y0), wz + z1, -(wx + x0))
-    name = cfg['pieces'][0]['wmo'].encode('ascii') + b'\0'
+    name = start_piece(cfg)['wmo'].encode('ascii') + b'\0'
     # Yaw 180: the client adds half a turn to a WDT placement (RotateAroundZ(rotZ + pi)), so this one is unrotated
     # and its extents are the plain box.
     modf = struct.pack('<II3f3f3f3fHHHH', 0, 0, -wy, wz, -wx, 0.0, 180.0, 0.0, *lo, *hi, 0, 0, 0, 0)
@@ -100,22 +115,24 @@ def pool_wdt(cfg, bbox):
 
 
 def client_inputs(client, dbc_dir, cfg, patch_name='patch-T.MPQ'):
-    """(AreaTable.dbc with the pool area added, the area's raw row, the WDT, where) from the client's own files
-    (read-only), or from `dbc_dir` (AreaTable.dbc and the first piece's WMO by its base name)."""
+    """(AreaTable.dbc with the pool area added, the area's raw row, the WDT, {go_entry: WMO box}, where) from the
+    client's own files (read-only), or from `dbc_dir` (AreaTable.dbc and each piece's WMO by its base name)."""
     import mpq
     raw_area, where = clonedata.effective_raw(client, dbc_dir, 'AreaTable.dbc', patch_name)
     area_dbc = dbc.Dbc.parse(raw_area)
     row = add_area(area_dbc, cfg)
-    wmo = cfg['pieces'][0]['wmo']
-    if dbc_dir:
-        with open(os.path.join(dbc_dir, wmo.split('\\')[-1]), 'rb') as f:
-            raw_wmo = f.read()
-    else:
-        _, raw_wmo = mpq.read_effective(client, wmo, mpq.client_order(client, exclude=[patch_name]))
-        if not raw_wmo:
-            raise SystemExit('%s not found in the client archives' % wmo)
-    _, bbox = wmo_header(raw_wmo)
-    return area_dbc, row, pool_wdt(cfg, bbox), where
+    order = None if dbc_dir else mpq.client_order(client, exclude=[patch_name])
+    boxes = {}
+    for p in cfg['pieces']:
+        if dbc_dir:
+            with open(os.path.join(dbc_dir, p['wmo'].split('\\')[-1]), 'rb') as f:
+                raw_wmo = f.read()
+        else:
+            _, raw_wmo = mpq.read_effective(client, p['wmo'], order)
+            if not raw_wmo:
+                raise SystemExit('%s not found in the client archives' % p['wmo'])
+        boxes[p['go_entry']] = wmo_header(raw_wmo)[1]
+    return area_dbc, row, pool_wdt(cfg, boxes[cfg['map']['start']]), boxes, where
 
 
 def add_area(area_dbc, cfg):
@@ -181,12 +198,3 @@ def check_pieces(display_dbc, cfg):
         model = display_dbc.string(r[1])
         if model.lower() != p['wmo'].lower():
             raise SystemExit('piece %d: display %d shows %s, not %s' % (p['go_entry'], p['display'], model, p['wmo']))
-
-
-def entrance(piece):
-    """World position of a piece's entrance (rotation 0 only, for the spike)."""
-    px, py, pz, po = piece['position']
-    if po:
-        raise SystemExit('piece %d: rotated pieces are not supported yet' % piece['go_entry'])
-    ex, ey, ez = piece['entrance_local']
-    return px + ex, py + ey, pz + ez

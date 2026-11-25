@@ -144,15 +144,26 @@ def verify_pool(archive, sql_path):
         errors += bad
         print('%-18s row %d (pool): %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
     wdt = archive.read(pooldata.wdt_path(cfg))
-    name = cfg['pieces'][0]['wmo'].encode('ascii') + b'\0'
+    name = pooldata.start_piece(cfg)['wmo'].encode('ascii') + b'\0'
     if not wdt or wdt[20:24] != b'\x01\0\0\0' or name not in wdt:
-        print('pool WDT %s missing, or without its global WMO %s' % (pooldata.wdt_path(cfg), cfg['pieces'][0]['wmo']))
+        print('pool WDT %s missing, or without its global WMO %s' % (pooldata.wdt_path(cfg),
+                                                                       pooldata.start_piece(cfg)['wmo']))
         errors += 1
     _, pieces = sql_rows(sql_path, 'atlas_pool_piece')
     if {int(r[0][1]) for r in pieces} != {p['go_entry'] for p in cfg['pieces']}:
         print('atlas_pool_piece rows differ from pool.json')
         errors += 1
-    print('pool               WDT %s, %d piece(s)' % (pooldata.wdt_path(cfg), len(pieces)))
+    _, sockets = sql_rows(sql_path, 'atlas_pool_socket')
+    want = {(p['go_entry'], i) for p in cfg['pieces'] for i in range(len(p['sockets']))}
+    if {(int(r[0][1]), int(r[1][1])) for r in sockets} != want:
+        print('atlas_pool_socket rows differ from pool.json')
+        errors += 1
+    _, maps = sql_rows(sql_path, 'atlas_pool_map')
+    if [(int(r[0][1]), int(r[5][1]), int(r[6][1])) for r in maps] != [(m['id'], m['start'], m['max_pieces'])]:
+        print('atlas_pool_map row differs from pool.json')
+        errors += 1
+    print('pool               WDT %s, %d piece(s), %d socket(s), start %d, up to %d pieces'
+          % (pooldata.wdt_path(cfg), len(pieces), len(sockets), m['start'], m['max_pieces']))
     return errors
 
 

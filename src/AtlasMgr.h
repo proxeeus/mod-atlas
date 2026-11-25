@@ -12,6 +12,7 @@
 #include "AtlasMapItem.h"
 #include "AtlasLoot.h"
 #include "AtlasAtmosphere.h"
+#include "AtlasKit.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -60,8 +61,9 @@ public:
     // The map a run on this source opens in for this party (AtlasClones.h).
     uint32 ChooseMapRunMap(std::vector<Player*> const& party, uint32 sourceMap) const;
 
-    // Generated-map spike (AtlasPool.cpp, DESIGN §6.2): kit pieces placed as
-    // gameobjects in an empty pool map. Read at startup only.
+    // Generated maps (AtlasPool.cpp, DESIGN §6.2): each pool map instance gets
+    // a layout of kit pieces (AtlasKit.h) placed as gameobjects. Kit and pool
+    // maps are read at startup only.
     void LoadPoolPieces();
     bool IsPoolMap(uint32 mapId) const;
     void ProcessPoolMap(Map* map);              // from the map's own update
@@ -538,14 +540,16 @@ private:
     std::unordered_set<uint32>         _cloneOptIn;          // accounts (atlas_clone_optin)
     mutable std::mutex                 _cloneMutex;
 
-    struct PoolPiece
+    struct PoolMap
     {
-        uint32   Entry = 0;
         uint32   MapId = 0;
-        Position Pos;
-        Position Entrance;
+        KitPoint Origin;                 // the start piece's placement
+        uint32   Start = 0;
+        uint32   MaxPieces = 1;
     };
-    std::vector<PoolPiece>                       _poolPieces;    // atlas_pool_piece, set at startup only
+    PoolMap const* GetPoolMap(uint32 mapId) const;
+    std::vector<KitPiece>                        _poolKit;       // atlas_pool_piece + _socket, set at startup only
+    std::vector<PoolMap>                         _poolMaps;      // atlas_pool_map, set at startup only
     std::unordered_set<uint32>                   _poolSpawned;   // instance ids with their pieces (_poolMutex)
     std::unordered_map<ObjectGuid, WorldLocation> _spikeReturns;  // where `.atlas spike leave` goes (_poolMutex)
     std::mutex                                   _poolMutex;

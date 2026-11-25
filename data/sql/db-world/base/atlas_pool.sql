@@ -59,19 +59,46 @@ DELETE FROM `gameobject_template` WHERE `entry` BETWEEN 900100 AND 900199;
 INSERT INTO `gameobject_template` (`entry`, `type`, `displayId`, `name`, `IconName`, `size`, `ScriptName`) VALUES
 (900100,14,649,'Timeways Fragment: Goldmine','',1.0,'');
 
-CREATE TABLE IF NOT EXISTS `atlas_pool_piece` (
-    `go_entry`   INT UNSIGNED NOT NULL COMMENT 'gameobject_template entry (900100-900199)',
+-- The kit, its sockets and each pool map's layout settings (src/AtlasKit.h).
+-- Generated: dropped and made again.
+DROP TABLE IF EXISTS `atlas_pool_socket`;
+DROP TABLE IF EXISTS `atlas_pool_piece`;
+DROP TABLE IF EXISTS `atlas_pool_map`;
+CREATE TABLE `atlas_pool_map` (
     `map`        SMALLINT UNSIGNED NOT NULL COMMENT 'pool map (950-999)',
-    `x`          FLOAT NOT NULL DEFAULT 0,
-    `y`          FLOAT NOT NULL DEFAULT 0,
-    `z`          FLOAT NOT NULL DEFAULT 0,
-    `o`          FLOAT NOT NULL DEFAULT 0,
-    `entrance_x` FLOAT NOT NULL DEFAULT 0 COMMENT 'where players arrive, on the floor of the piece',
+    `origin_x`   FLOAT NOT NULL DEFAULT 0 COMMENT 'where the start piece goes',
+    `origin_y`   FLOAT NOT NULL DEFAULT 0,
+    `origin_z`   FLOAT NOT NULL DEFAULT 0,
+    `origin_o`   FLOAT NOT NULL DEFAULT 0 COMMENT 'degrees',
+    `start`      INT UNSIGNED NOT NULL COMMENT 'kit piece the layout starts with',
+    `max_pieces` TINYINT UNSIGNED NOT NULL DEFAULT 1,
+    PRIMARY KEY (`map`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: pool map layouts';
+CREATE TABLE `atlas_pool_piece` (
+    `go_entry`   INT UNSIGNED NOT NULL COMMENT 'gameobject_template entry (900100-900199), type 14',
+    `entrance_x` FLOAT NOT NULL DEFAULT 0 COMMENT 'where arrivals stand, local, on the floor',
     `entrance_y` FLOAT NOT NULL DEFAULT 0,
     `entrance_z` FLOAT NOT NULL DEFAULT 0,
+    `min_x`      FLOAT NOT NULL DEFAULT 0 COMMENT 'the WMO box, top view, local',
+    `min_y`      FLOAT NOT NULL DEFAULT 0,
+    `max_x`      FLOAT NOT NULL DEFAULT 0,
+    `max_y`      FLOAT NOT NULL DEFAULT 0,
     PRIMARY KEY (`go_entry`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: pool map kit pieces';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: kit pieces';
+CREATE TABLE `atlas_pool_socket` (
+    `go_entry`   INT UNSIGNED NOT NULL,
+    `socket`     TINYINT UNSIGNED NOT NULL,
+    `x`          FLOAT NOT NULL DEFAULT 0 COMMENT 'local',
+    `y`          FLOAT NOT NULL DEFAULT 0,
+    `z`          FLOAT NOT NULL DEFAULT 0,
+    `facing`     FLOAT NOT NULL DEFAULT 0 COMMENT 'out of the piece, degrees',
+    PRIMARY KEY (`go_entry`, `socket`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='mod-atlas: kit piece sockets';
 
-DELETE FROM `atlas_pool_piece` WHERE `go_entry` BETWEEN 900100 AND 900199;
-INSERT INTO `atlas_pool_piece` (`go_entry`, `map`, `x`, `y`, `z`, `o`, `entrance_x`, `entrance_y`, `entrance_z`) VALUES
-(900100,950,-266,-266,0,0,-266,-271,-0.5);
+INSERT INTO `atlas_pool_map` (`map`, `origin_x`, `origin_y`, `origin_z`, `origin_o`, `start`, `max_pieces`) VALUES
+(950,-266,-266,0,0,900100,4);
+INSERT INTO `atlas_pool_piece` (`go_entry`, `entrance_x`, `entrance_y`, `entrance_z`, `min_x`, `min_y`,
+    `max_x`, `max_y`) VALUES
+(900100,0,-5,-0.5,-60.4565773,-38.4920578,45.7029076,26.5744667);
+INSERT INTO `atlas_pool_socket` (`go_entry`, `socket`, `x`, `y`, `z`, `facing`) VALUES
+(900100,0,44.54,9.83,-4.03,12.18);
