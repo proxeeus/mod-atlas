@@ -548,12 +548,16 @@ private:
         KitPoint Origin;                 // the start piece's placement
         uint32   Start = 0;
         uint32   MaxPieces = 1;
+        std::string Theme;
+        std::vector<KitPiece> Kit;       // the kit pieces of its theme: its layouts use only these
     };
     PoolMap const* GetPoolMap(uint32 mapId) const;
     Position PoolEntrance(PoolMap const& pool) const;
     std::vector<KitPiece>                        _poolKit;       // atlas_pool_piece + _socket, set at startup only
+    std::vector<std::string>                     _poolKitTheme;  // the theme of each _poolKit piece
     std::vector<PoolMap>                         _poolMaps;      // atlas_pool_map, set at startup only
     std::unordered_set<uint32>                   _poolSpawned;   // instance ids with their pieces (_poolMutex)
+    std::unordered_map<uint32, float>            _poolVoidZ;     // instance id -> below this is the void (_poolMutex)
     std::unordered_map<ObjectGuid, WorldLocation> _spikeReturns;  // where `.atlas spike leave` goes (_poolMutex)
     std::mutex                                   _poolMutex;
     std::vector<AtmosphereRow>         _atmosphere;

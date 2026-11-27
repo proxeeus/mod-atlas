@@ -262,6 +262,7 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w('    `origin_o`   FLOAT NOT NULL DEFAULT 0 COMMENT \'degrees\',')
     w('    `start`      INT UNSIGNED NOT NULL COMMENT \'kit piece the layout starts with\',')
     w('    `max_pieces` TINYINT UNSIGNED NOT NULL DEFAULT 1,')
+    w('    `theme`      VARCHAR(32) NOT NULL DEFAULT \'\' COMMENT \'kit pieces of this theme build its layouts\',')
     w('    PRIMARY KEY (`map`)')
     w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: pool map layouts\';')
     w('CREATE TABLE `atlas_pool_piece` (')
@@ -274,6 +275,7 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w('    `max_x`      FLOAT NOT NULL DEFAULT 0,')
     w('    `max_y`      FLOAT NOT NULL DEFAULT 0,')
     w('    `role`       TINYINT UNSIGNED NOT NULL DEFAULT 0 COMMENT \'0 grows layouts, 1 caps open doorways\',')
+    w('    `theme`      VARCHAR(32) NOT NULL DEFAULT \'\',')
     w('    PRIMARY KEY (`go_entry`)')
     w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: kit pieces\';')
     w('CREATE TABLE `atlas_pool_socket` (')
@@ -287,18 +289,18 @@ def render_pool(map_dbc, md_dbc, pool_map, pool_md, area_dbc, area_row, boxes, c
     w(') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT=\'mod-atlas: kit piece sockets\';')
     w('')
     ox, oy, oz, oo = m['origin']
-    w('INSERT INTO `atlas_pool_map` (`map`, `origin_x`, `origin_y`, `origin_z`, `origin_o`, `start`, `max_pieces`) '
-      'VALUES')
-    w('(%d,%s,%s,%s,%s,%d,%d);' % ((m['id'],) + tuple(literal(float(v), 'f') for v in (ox, oy, oz, oo))
-                                  + (m['start'], m['max_pieces'])))
+    w('INSERT INTO `atlas_pool_map` (`map`, `origin_x`, `origin_y`, `origin_z`, `origin_o`, `start`, `max_pieces`, '
+      '`theme`) VALUES')
+    w('(%d,%s,%s,%s,%s,%d,%d,%s);' % ((m['id'],) + tuple(literal(float(v), 'f') for v in (ox, oy, oz, oo))
+                                     + (m['start'], m['max_pieces'], literal(m['theme'], 's'))))
     w('INSERT INTO `atlas_pool_piece` (`go_entry`, `entrance_x`, `entrance_y`, `entrance_z`, `min_x`, `min_y`,')
-    w('    `max_x`, `max_y`, `role`) VALUES')
+    w('    `max_x`, `max_y`, `role`, `theme`) VALUES')
     rows = []
     for p in cfg['pieces']:
         x0, y0, _, x1, y1, _ = boxes[p['go_entry']]
-        rows.append('(%d,%s,%d)' % (p['go_entry'], ','.join(literal(float(v), 'f')
-                                                            for v in list(p['entrance_local']) + [x0, y0, x1, y1]),
-                                    1 if p['role'] == 'cap' else 0))
+        rows.append('(%d,%s,%d,%s)' % (p['go_entry'], ','.join(literal(float(v), 'f')
+                                                               for v in list(p['entrance_local']) + [x0, y0, x1, y1]),
+                                       1 if p['role'] == 'cap' else 0, literal(p['theme'], 's')))
     w(',\n'.join(rows) + ';')
     sockets = ['(%d,%d,%s)' % (p['go_entry'], i, ','.join(literal(float(v), 'f')
                                                          for v in list(s['local']) + [s['facing']]))

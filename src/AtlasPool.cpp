@@ -46,8 +46,8 @@ namespace
     constexpr uint32 PIECE_LIFETIME = 4 * 3600;
     // Long enough for the client to load the WMO after the loading screen.
     constexpr auto ARRIVAL_ROOT = std::chrono::seconds(5);
-    // Below the layout's origin by this much is the void: back to the entrance.
-    constexpr float VOID_DEPTH = 120.0f;
+    // Below a layout's lowest piece by this much is the void: back to the entrance.
+    constexpr float VOID_DEPTH = 150.0f;
     // A death in a pool map: back to the entrance, alive, after this long.
     constexpr auto POOL_REVIVE = std::chrono::seconds(3);
 
@@ -70,7 +70,7 @@ AtlasMgr::PoolMap const* AtlasMgr::GetPoolMap(uint32 mapId) const
 
 Position AtlasMgr::PoolEntrance(PoolMap const& pool) const
 {
-    KitPiece const* start = KitFind(_poolKit, pool.Start);
+    KitPiece const* start = KitFind(pool.Kit, pool.Start);
     KitPlacement const origin{ pool.Start, pool.Origin.X, pool.Origin.Y, pool.Origin.Z, pool.Origin.O };
     KitPoint const e = start ? KitToWorld(origin, start->EntranceX, start->EntranceY, start->EntranceZ)
         : KitPoint{ pool.Origin.X, pool.Origin.Y, pool.Origin.Z, pool.Origin.O };
@@ -84,7 +84,13 @@ void AtlasMgr::GuardPoolMap(Map* map)
     PoolMap const* pool = GetPoolMap(map->GetId());
     if (!pool)
         return;
-    float const limit = pool->Origin.Z - VOID_DEPTH;
+    float limit = pool->Origin.Z - VOID_DEPTH;
+    {
+        std::lock_guard<std::mutex> lock(_poolMutex);
+        auto it = _poolVoidZ.find(map->GetInstanceId());
+        if (it != _poolVoidZ.end())
+            limit = it->second;
+    }
     for (MapReference const& ref : map->GetPlayers())
     {
         Player* p = ref.GetSource();
@@ -126,13 +132,14 @@ bool AtlasMgr::IsPoolMap(uint32 mapId) const
 void AtlasMgr::LoadPoolPieces()
 {
     _poolKit.clear();
+    _poolKitTheme.clear();
     _poolMaps.clear();
     if (!WorldDatabase.Query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() "
             "AND table_name = 'atlas_pool_map'"))
         return;
 
     if (QueryResult result = WorldDatabase.Query("SELECT go_entry, entrance_x, entrance_y, entrance_z, min_x, min_y, "
-            "max_x, max_y, role FROM atlas_pool_piece ORDER BY go_entry"))
+            "max_x, max_y, role, theme FROM atlas_pool_piece ORDER BY go_entry"))
     {
         do
         {
@@ -154,6 +161,7 @@ void AtlasMgr::LoadPoolPieces()
                 continue;
             }
             _poolKit.push_back(p);
+            _poolKitTheme.push_back(f[9].Get<std::string>());
         } while (result->NextRow());
     }
 
@@ -176,7 +184,7 @@ void AtlasMgr::LoadPoolPieces()
     }
 
     if (QueryResult result = WorldDatabase.Query("SELECT map, origin_x, origin_y, origin_z, origin_o, start, "
-            "max_pieces FROM atlas_pool_map ORDER BY map"))
+            "max_pieces, theme FROM atlas_pool_map ORDER BY map"))
     {
         do
         {
@@ -187,18 +195,22 @@ void AtlasMgr::LoadPoolPieces()
                 f[4].Get<float>() * float(M_PI) / 180.0f };
             m.Start = f[5].Get<uint32>();
             m.MaxPieces = std::max<uint32>(1, f[6].Get<uint32>());
+            m.Theme = f[7].Get<std::string>();
+            for (std::size_t i = 0; i < _poolKit.size(); ++i)
+                if (_poolKitTheme[i] == m.Theme)
+                    m.Kit.push_back(_poolKit[i]);
             MapEntry const* map = sMapStore.LookupEntry(m.MapId);
             if (m.MapId < POOL_MAP_ID_MIN || m.MapId > POOL_MAP_ID_MAX || !map || !map->IsDungeon()
-                || !sObjectMgr->GetInstanceTemplate(m.MapId) || !KitFind(_poolKit, m.Start))
+                || !sObjectMgr->GetInstanceTemplate(m.MapId) || !KitFind(m.Kit, m.Start))
             {
-                LOG_ERROR("module", "Atlas: pool map {} is not usable (map rows, instance template or its start piece "
-                    "{} missing).", m.MapId, m.Start);
+                LOG_ERROR("module", "Atlas: pool map {} is not usable (map rows, instance template or start piece {} "
+                    "of theme '{}' missing).", m.MapId, m.Start, m.Theme);
                 continue;
             }
-            _poolMaps.push_back(m);
-            LOG_INFO("module", "Atlas: pool map {} — start piece {} at ({:.1f}, {:.1f}, {:.1f}), up to {} pieces, "
-                "{} kit piece(s).", m.MapId, m.Start, m.Origin.X, m.Origin.Y, m.Origin.Z, m.MaxPieces,
-                _poolKit.size());
+            LOG_INFO("module", "Atlas: pool map {} — theme '{}', {} kit piece(s), start piece {} at ({:.1f}, {:.1f}, "
+                "{:.1f}), up to {} pieces.", m.MapId, m.Theme, m.Kit.size(), m.Start, m.Origin.X, m.Origin.Y,
+                m.Origin.Z, m.MaxPieces);
+            _poolMaps.push_back(std::move(m));
         } while (result->NextRow());
     }
 }
@@ -221,9 +233,16 @@ void AtlasMgr::ProcessPoolMap(Map* map)
     }
 
     RunRng rng(RunRng::MakeSeed());
-    std::vector<KitPlacement> layout = KitBuildLayout(_poolKit, pool->Start, pool->Origin, pool->MaxPieces, rng);
+    std::vector<KitPlacement> layout = KitBuildLayout(pool->Kit, pool->Start, pool->Origin, pool->MaxPieces, rng);
     std::size_t const grown = layout.size();
-    std::size_t const caps = KitCapLayout(_poolKit, layout);   // no doorway may open onto the void
+    std::size_t const caps = KitCapLayout(pool->Kit, layout);   // no doorway may open onto the void
+    float lowest = pool->Origin.Z;
+    for (KitPlacement const& p : layout)
+        lowest = std::min(lowest, p.Z);
+    {
+        std::lock_guard<std::mutex> lock(_poolMutex);
+        _poolVoidZ[map->GetInstanceId()] = lowest - VOID_DEPTH;
+    }
     uint32 placed = 0;
     for (KitPlacement const& p : layout)
     {
@@ -235,8 +254,8 @@ void AtlasMgr::ProcessPoolMap(Map* map)
                 map->GetInstanceId());
             continue;
         }
-        // A room is wider than the normal sight range of one object.
-        go->SetVisibilityDistanceOverride(VisibilityDistanceType::Gigantic);
+        // A piece can be hundreds of yards long: seen from anywhere in the zone (up to 533 yd from its origin).
+        go->SetVisibilityDistanceOverride(VisibilityDistanceType::Infinite);
         ++placed;
         LOG_INFO("module", "Atlas: kit piece {} placed in map {} instance {} at ({:.1f}, {:.1f}, {:.1f}) facing "
             "{:.0f} deg.", p.Entry, map->GetId(), map->GetInstanceId(), p.X, p.Y, p.Z, p.O * 180.0f / float(M_PI));
@@ -282,7 +301,7 @@ bool AtlasMgr::EnterSpike(Player* player, std::string& error)
         return false;
     }
     PoolMap const* pool = _poolMaps.empty() ? nullptr : &_poolMaps.front();
-    KitPiece const* start = pool ? KitFind(_poolKit, pool->Start) : nullptr;
+    KitPiece const* start = pool ? KitFind(pool->Kit, pool->Start) : nullptr;
     if (!start)
     {
         error = "No pool map is loaded (atlas_pool.sql not installed?).";

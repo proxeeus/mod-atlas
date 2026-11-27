@@ -130,20 +130,20 @@ def doorways(root, header, room_center):
     return out
 
 
-def adapter_mesh(door, mats):
-    """The passage from a doorway's outline to the standard doorway, and its socket."""
+def adapter_mesh(door, mats, size=(kitwmo.DOOR_W, kitwmo.DOOR_H), length=ADAPTER_LEN, frame=True):
+    """The passage from a doorway's outline to the standard doorway (`size`), `length` yards out, and its socket."""
     (dx, dy), (rx, ry), (cx, cy) = door['out'], door['right'], door['centre']
     r0, r1, _, z1 = door['rect']
     z0 = door['floor']
     z1 = max(z1, z0 + 3.0)
-    ex, ey = cx + dx * ADAPTER_LEN, cy + dy * ADAPTER_LEN
-    hw = kitwmo.DOOR_W / 2
+    ex, ey = cx + dx * length, cy + dy * length
+    hw, dh = size[0] / 2, size[1]
 
     def p(bx, by, r, z):
         return (bx + rx * r, by + ry * r, z)
     near = [p(cx, cy, r0, z0), p(cx, cy, r1, z0), p(cx, cy, r1, z1), p(cx, cy, r0, z1)]      # bl br tr tl
-    far = [p(ex, ey, -hw, z0), p(ex, ey, hw, z0), p(ex, ey, hw, z0 + kitwmo.DOOR_H), p(ex, ey, -hw, z0 + kitwmo.DOOR_H)]
-    mid = ((cx + ex) / 2, (cy + ey) / 2, z0 + kitwmo.DOOR_H / 2)
+    far = [p(ex, ey, -hw, z0), p(ex, ey, hw, z0), p(ex, ey, hw, z0 + dh), p(ex, ey, -hw, z0 + dh)]
+    mid = ((cx + ex) / 2, (cy + ey) / 2, z0 + dh / 2)
     m = kitwmo.Mesh(inside=mid)
     wall, floor, ceil, beam = mats
     m.quad(near[0], near[1], far[1], far[0], floor)
@@ -156,7 +156,8 @@ def adapter_mesh(door, mats):
     m.quad(p(cx, cy, r1, z0), p(cx, cy, r1 + c, z0), p(cx, cy, r1 + c, z1 + c), p(cx, cy, r1, z1 + c), wall)
     m.quad(p(cx, cy, r0, z1), p(cx, cy, r1, z1), p(cx, cy, r1, z1 + c), p(cx, cy, r0, z1 + c), wall)
     # A mine frame at the outer end, the way the Goldmine shores up its tunnels.
-    kitwmo.mine_frame(m, (ex - dx * 0.6, ey - dy * 0.6), (dx, dy), z0, 0.6, beam)
+    if frame:
+        kitwmo.mine_frame(m, (ex - dx * 0.6, ey - dy * 0.6), (dx, dy), z0, 0.6, beam, size)
     socket = {'local': [round(ex, 3), round(ey, 3), round(z0, 3)],
               'facing': round(math.degrees(math.atan2(dy, dx)) % 360.0, 3)}
     return m, socket

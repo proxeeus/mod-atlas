@@ -12,7 +12,8 @@
     "uses (below 4096). light: the map's own sky and fog (lightdata.py), Light 2600-2649, LightParams 950-999."
   ],
   "map": { "id": 950, "mapdifficulty_id": 759, "template": 36, "directory": "AtlasPool", "name": "The Timeways",
-           "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900100, "max_pieces": 12 },
+           "origin": [-266.0, -266.0, 0.0, 0.0], "start": 900130, "max_pieces": 40,
+           "theme": "deep_caves" },
   "area": { "id": 7900, "template": 2366, "name": "The Timeways", "area_bit": 4000 },
   "light": { "id": 2600, "params": 950, "template_light": 84, "template": 87, "underwater_template": 88,
              "fog_end_yd": 50, "fog_start": 0.05, "fog_colour": "1e1830",

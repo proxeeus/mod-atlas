@@ -22,8 +22,8 @@ import kitwmo
 
 POOL_MAP_RANGE = (950, 999)
 PIECE_ENTRY_RANGE = (900100, 900199)
-DISPLAY_ID_RANGE = (9900, 9949)
-WMO_ID_RANGE = (7900, 7949)
+DISPLAY_ID_RANGE = (9900, 9999)
+WMO_ID_RANGE = (7900, 7999)
 AREA_ID_RANGE = (7900, 7949)
 AREA_BIT_MAX = 4095  # the server keeps 128 x 32 explored-zone bits (PLAYER_EXPLORED_ZONES_SIZE)
 DBC_GO_DISPLAY = 'DBFilesClient\\GameObjectDisplayInfo.dbc'
@@ -63,6 +63,9 @@ def load_config(path=None):
     entries = {p['go_entry'] for p in cfg['pieces']}
     if m['start'] not in entries:
         raise ValueError('pool map start piece %d is not in pieces' % m['start'])
+    themed = [p for p in cfg['pieces'] if p['theme'] == m['theme']]
+    if not any(p['go_entry'] == m['start'] for p in themed) or not any(p['role'] == 'cap' for p in themed):
+        raise ValueError('pool map theme %s needs its start piece and a cap' % m['theme'])
     if len(m['origin']) != 4 or m['max_pieces'] < 1:
         raise ValueError('pool map needs origin [x, y, z, facing] and max_pieces >= 1')
     a = cfg['area']
@@ -97,6 +100,8 @@ def kit_pieces(path=None):
             if (key, spec[key]) in seen:
                 raise ValueError('kit piece %s: %s %d used twice' % (spec['file'], key, spec[key]))
             seen.add((key, spec[key]))
+        if not spec.get('theme'):
+            raise ValueError('kit piece %s has no theme' % spec['file'])
         if spec['role'] not in ('piece', 'cap'):
             raise ValueError('kit piece %s: role must be piece or cap' % spec['file'])
         files, info = kitwmo.build_files(spec)
@@ -104,7 +109,7 @@ def kit_pieces(path=None):
                     'file': spec['file'], 'wmo': kitwmo.wmo_path(spec), 'role': spec['role'],
                     'entrance_local': info['entrance'], 'sockets': info['sockets'], 'bounds': info['bounds'],
                     'files': files, 'verts': info['verts'], 'tris': info['tris'], 'groups': info['groups'],
-                    'model': kitvmo.model_name(spec)})
+                    'model': kitvmo.model_name(spec), 'theme': spec['theme']})
     return out
 
 

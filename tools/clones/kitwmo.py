@@ -37,8 +37,18 @@ WALL, FLOOR, CEIL, BEAM = range(4)
 
 
 def load_kit(path=None):
+    """kit.json with each piece's theme settings (door, textures) merged into it."""
     with open(path or os.path.join(HERE, 'kit.json')) as f:
-        return json.load(f)
+        kit = json.load(f)
+    themes = kit.get('themes', {})
+    for spec in kit['pieces']:
+        theme = themes.get(spec.get('theme'), {})
+        for key in ('door', 'textures'):
+            if key in theme and key not in spec:
+                spec[key] = theme[key]
+        if 'textures' in spec and 'adapter_textures' not in spec:
+            spec['adapter_textures'] = spec['textures']
+    return kit
 
 
 class Mesh:
@@ -95,9 +105,9 @@ def _uv(p, n):
 
 # ---- piece shapes ------------------------------------------------------------------------------------------------
 
-def _door_wall(mesh, side, half, height, door):
-    """One wall of a square room of half-size `half`: solid, or with a doorway in the middle."""
-    hw = DOOR_W / 2
+def _door_wall(mesh, side, half, height, door, size=(DOOR_W, DOOR_H)):
+    """One wall of a square room of half-size `half`: solid, or with a doorway (`size`) in the middle."""
+    hw, dh = size[0] / 2, size[1]
     # the wall runs along t from -half to +half; (x, y) of a point at t on this side
     def at(t):
         return {'E': (half, t), 'W': (-half, -t), 'N': (-t, half), 'S': (t, -half)}[side]
@@ -109,7 +119,7 @@ def _door_wall(mesh, side, half, height, door):
         (x0, y0), (x1, y1) = at(t0), at(t1)
         mesh.box_wall(x0, y0, x1, y1, 0.0, height, WALL)
     (x0, y0), (x1, y1) = at(-hw), at(hw)
-    mesh.box_wall(x0, y0, x1, y1, DOOR_H, height, WALL)            # lintel
+    mesh.box_wall(x0, y0, x1, y1, dh, height, WALL)            # lintel
     # The doorway's reveal, as deep as the wall: two joined rooms then keep their walls WALL_T apart (one shared
     # plane would z-fight) and the wall shows its thickness.
     out = {'E': (1, 0), 'W': (-1, 0), 'N': (0, 1), 'S': (0, -1)}[side]
@@ -118,9 +128,9 @@ def _door_wall(mesh, side, half, height, door):
         return x + out[0] * d, y + out[1] * d
     for t in (-hw, hw):                                            # jambs
         (x0, y0), (x1, y1) = deep(t, 0.0), deep(t, WALL_T)
-        mesh.box_wall(x0, y0, x1, y1, 0.0, DOOR_H, WALL)
+        mesh.box_wall(x0, y0, x1, y1, 0.0, dh, WALL)
     a, b, c, d = deep(-hw, 0.0), deep(hw, 0.0), deep(hw, WALL_T), deep(-hw, WALL_T)
-    mesh.quad(a + (DOOR_H,), b + (DOOR_H,), c + (DOOR_H,), d + (DOOR_H,), WALL)     # lintel underside
+    mesh.quad(a + (dh,), b + (dh,), c + (dh,), d + (dh,), WALL)     # lintel underside
     mesh.quad(a + (0.0,), b + (0.0,), c + (0.0,), d + (0.0,), FLOOR)                # threshold
 
 
@@ -136,67 +146,68 @@ def box(mesh, corners_lo, corners_hi, mat):
     mesh.quad(a + (corners_hi[1],), b + (corners_hi[1],), c + (corners_hi[1],), d + (corners_hi[1],), mat)
 
 
-def mine_frame(mesh, centre, out, z0, depth, mat):
+def mine_frame(mesh, centre, out, z0, depth, mat, size=(DOOR_W, DOOR_H)):
     """A wooden support frame in a doorway: two posts and a lintel, `depth` deep, at `centre` facing `out`."""
     (cx, cy), (dx, dy) = centre, out
     rx, ry = dy, -dx
-    hw, t = DOOR_W / 2, 0.5
+    hw, dh, t = size[0] / 2, size[1], 0.5
 
     def foot(r0, r1):
         return [(cx + rx * r0, cy + ry * r0), (cx + rx * r1, cy + ry * r1),
                 (cx + rx * r1 + dx * depth, cy + ry * r1 + dy * depth),
                 (cx + rx * r0 + dx * depth, cy + ry * r0 + dy * depth)]
-    box(mesh, foot(-hw, -hw + t), (z0, z0 + DOOR_H), mat)
-    box(mesh, foot(hw - t, hw), (z0, z0 + DOOR_H), mat)
-    box(mesh, foot(-hw, hw), (z0 + DOOR_H - t, z0 + DOOR_H), mat)
+    box(mesh, foot(-hw, -hw + t), (z0, z0 + dh), mat)
+    box(mesh, foot(hw - t, hw), (z0, z0 + dh), mat)
+    box(mesh, foot(-hw, hw), (z0 + dh - t, z0 + dh), mat)
 
 
-def build_room(size, height, doors):
+def build_room(size, height, doors, door=(DOOR_W, DOOR_H)):
     half = size / 2.0
     m = Mesh(inside=(0.0, 0.0, height / 2))
     m.flat(-half, -half, half, half, 0.0, FLOOR)
     m.flat(-half, -half, half, half, height, CEIL)
     for side in 'ENWS':
-        _door_wall(m, side, half, height, side in doors)
+        _door_wall(m, side, half, height, side in doors, door)
     edge = half + WALL_T
     sockets = [{'local': [SIDES[s][0] * edge, SIDES[s][1] * edge, 0.0], 'facing': SIDES[s][2]} for s in 'ENWS'
                if s in doors]
     return m, sockets, [0.0, 0.0, 0.1]
 
 
-def build_corridor(length):
-    hl, hw = length / 2.0, DOOR_W / 2
-    m = Mesh(inside=(0.0, 0.0, DOOR_H / 2))
+def build_corridor(length, door=(DOOR_W, DOOR_H)):
+    hl, hw, dh = length / 2.0, door[0] / 2, door[1]
+    m = Mesh(inside=(0.0, 0.0, dh / 2))
     m.flat(-hl, -hw, hl, hw, 0.0, FLOOR)
-    m.flat(-hl, -hw, hl, hw, DOOR_H, CEIL)
-    m.box_wall(-hl, hw, hl, hw, 0.0, DOOR_H, WALL)
-    m.box_wall(-hl, -hw, hl, -hw, 0.0, DOOR_H, WALL)
+    m.flat(-hl, -hw, hl, hw, dh, CEIL)
+    m.box_wall(-hl, hw, hl, hw, 0.0, dh, WALL)
+    m.box_wall(-hl, -hw, hl, -hw, 0.0, dh, WALL)
     # a beam frame across the middle, for scale
     for y in (-hw + 0.3, hw - 0.3):
-        m.box_wall(-0.3, y, 0.3, y, 0.0, DOOR_H, BEAM)
-    m.box_wall(-0.3, -hw, -0.3, hw, DOOR_H - 0.6, DOOR_H, BEAM)
+        m.box_wall(-0.3, y, 0.3, y, 0.0, dh, BEAM)
+    m.box_wall(-0.3, -hw, -0.3, hw, dh - 0.6, dh, BEAM)
     sockets = [{'local': [hl, 0.0, 0.0], 'facing': 0.0}, {'local': [-hl, 0.0, 0.0], 'facing': 180.0}]
     return m, sockets, [0.0, 0.0, 0.1]
 
 
-def build_cap():
+def build_cap(door=(DOOR_W, DOOR_H)):
     """A slab that closes a doorway left open: its socket faces -x, the slab stands just past it. Its faces turn
     towards the doorway: the client collides with a face from its front only."""
-    hw = DOOR_W / 2 + 0.5
-    m = Mesh(inside=(-5.0, 0.0, DOOR_H / 2))
+    hw, dh = door[0] / 2 + 0.5, door[1]
+    m = Mesh(inside=(-5.0, 0.0, dh / 2))
     for x in (0.2, 0.8):                     # two faces 0.6 yd apart: a slab with some thickness
-        m.box_wall(x, -hw, x, hw, -0.5, DOOR_H + 0.5, WALL)
+        m.box_wall(x, -hw, x, hw, -0.5, dh + 0.5, WALL)
     return m, [{'local': [0.0, 0.0, 0.0], 'facing': 180.0}], [-2.0, 0.0, 0.1]
 
 
 def build_piece(spec):
     shape = spec['shape']
+    door = tuple(spec.get('door', (DOOR_W, DOOR_H)))
     if shape == 'room':
-        return build_room(spec['size'], spec['height'], spec['doors'])
+        return build_room(spec['size'], spec['height'], spec['doors'], door)
     if shape == 'corridor':
-        return build_corridor(spec['length'])
+        return build_corridor(spec['length'], door)
     if shape == 'cap':
-        return build_cap()
+        return build_cap(door)
     raise SystemExit('unknown kit shape %s' % shape)
 
 
@@ -317,16 +328,17 @@ def with_pool_fog(mfog):
     return bytes(out)
 
 
-def root_file(mesh, wmo_id, group_name):
-    motx, tex_off = _strings([t for t, _, _ in MATERIALS] + [''])
+def root_file(mesh, wmo_id, group_name, materials=None):
+    materials = materials or MATERIALS
+    motx, tex_off = _strings([t for t, _, _ in materials] + [''])
     empty = tex_off[-1]
     momt = b''.join(struct.pack('<16I', MAT_UNCULLED, 0, 0, tex_off[i], 0, 0, empty, colour, ground, 0, 0, 0, 0,
                                 0, 0, 0)
-                    for i, (_, ground, colour) in enumerate(MATERIALS))
+                    for i, (_, ground, colour) in enumerate(materials))
     mogn = b'\0\0' + group_name.encode('ascii') + b'\0'
     mogn += b'\0' * ((-len(mogn)) % 4)
     bounds = mesh.bounds()
-    mohd = struct.pack('<7II I6fHH', len(MATERIALS), 1, 0, 0, 0, 0, 1, 0xff7f7f7f, wmo_id, *bounds, 0, 0)
+    mohd = struct.pack('<7II I6fHH', len(materials), 1, 0, 0, 0, 0, 1, 0xff7f7f7f, wmo_id, *bounds, 0, 0)
     assert len(mohd) == 64
     mogi = struct.pack('<I6fI', 0x8 | 0x1, *bounds, 2)
     mods = b'Set_$DefaultGlobal'.ljust(20, b'\0') + struct.pack('<3I', 0, 0, 0)
@@ -346,8 +358,14 @@ def build_files(spec):
     if spec['shape'] == 'stock_room':
         import stockroom
         return stockroom.build_files(spec)
+    if spec['shape'] == 'wing':
+        import wing
+        return wing.build_files(spec)
     mesh, sockets, entrance = build_piece(spec)
-    root = root_file(mesh, spec['wmo_id'], spec['file'])
+    materials = None
+    if spec.get('textures'):                          # [wall, floor, ceiling, beam], ground types as the defaults
+        materials = [(t, MATERIALS[i][1], MATERIALS[i][2]) for i, t in enumerate(spec['textures'])]
+    root = root_file(mesh, spec['wmo_id'], spec['file'], materials)
     group, tris, verts = group_file(mesh, 2)
     path = wmo_path(spec)
     files = {path: root, path[:-4] + '_000.wmo': group}
