@@ -20,6 +20,8 @@
     { "id": 904, "source": 33,  "mapdifficulty_id": 755, "name": "Echo of Shadowfang Keep",     "enabled": false },
     { "id": 901, "source": 329, "mapdifficulty_id": 756, "name": "Echo of Stratholme",          "enabled": false },
     { "id": 900, "source": 600, "mapdifficulty_id": 757, "name": "Echo of Drak'Tharon Keep",    "enabled": false },
-    { "id": 903, "source": 602, "mapdifficulty_id": 758, "name": "Echo of the Halls of Lightning", "enabled": false }
+    { "id": 903, "source": 602, "mapdifficulty_id": 758, "name": "Echo of the Halls of Lightning", "enabled": false },
+    { "id": 905, "source": 47,  "mapdifficulty_id": 759, "name": "Echo of Razorfen Kraul",      "enabled": true,
+      "look": "timeways" }
   ]
 }
