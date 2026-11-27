@@ -62,9 +62,8 @@ def add_light(tables, map_id, source_map, light, params, look):
         raise SystemExit('Light.dbc / LightParams.dbc already have our ids (is an old patch-T.MPQ in the order?)')
     if any(r[1] == map_id for r in L.rows):
         raise SystemExit('Light.dbc already has a light for map %d' % map_id)
-    src_light = global_light(L, source_map)
-    if not src_light:
-        raise SystemExit('map %d has no global light to copy' % source_map)
+    # A map without a global light uses the client's default one, Light 1 (DayNight::LightLoad): copy that.
+    src_light = global_light(L, source_map) or L.row(1)
     template, under = src_light[7], src_light[8] or src_light[7]
 
     fog = int(look['fog_colour'], 16)

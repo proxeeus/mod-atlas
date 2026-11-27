@@ -18,10 +18,17 @@
     { "id": 902, "source": 36,  "mapdifficulty_id": 754, "name": "Echo of the Deadmines",       "enabled": true,
       "look": "timeways" },
     { "id": 904, "source": 33,  "mapdifficulty_id": 755, "name": "Echo of Shadowfang Keep",     "enabled": false },
-    { "id": 901, "source": 329, "mapdifficulty_id": 756, "name": "Echo of Stratholme",          "enabled": false },
+    { "id": 901, "source": 329, "mapdifficulty_id": 756, "name": "Echo of Stratholme",          "enabled": true,
+      "look": "timeways" },
     { "id": 900, "source": 600, "mapdifficulty_id": 757, "name": "Echo of Drak'Tharon Keep",    "enabled": false },
     { "id": 903, "source": 602, "mapdifficulty_id": 758, "name": "Echo of the Halls of Lightning", "enabled": false },
     { "id": 905, "source": 47,  "mapdifficulty_id": 759, "name": "Echo of Razorfen Kraul",      "enabled": true,
+      "look": "timeways" },
+    { "id": 906, "source": 289, "mapdifficulty_id": 760, "name": "Echo of Scholomance",         "enabled": true,
+      "look": "timeways" },
+    { "id": 907, "source": 43,  "mapdifficulty_id": 761, "name": "Echo of the Wailing Caverns", "enabled": true,
+      "look": "timeways" },
+    { "id": 908, "source": 229, "mapdifficulty_id": 762, "name": "Echo of Blackrock Spire",     "enabled": true,
       "look": "timeways" }
   ]
 }
