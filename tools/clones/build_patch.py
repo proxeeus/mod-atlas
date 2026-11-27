@@ -16,7 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import clonedata  # noqa: E402
 import dbc  # noqa: E402
 import fogdata  # noqa: E402
+import lightdata  # noqa: E402
 import mpq  # noqa: E402
+import wmofog  # noqa: E402
 
 DEFAULT_CLIENT = '/Users/gaming/Desktop/World of Warcraft 3.3.5a'
 
@@ -110,10 +112,37 @@ def main():
     files[fogdata.DBC_SCREEN_EFFECT] = effects.serialize()
     files[fogdata.DBC_SPELL] = spells.serialize()
 
+    # Looks: each clone's own light (thick fog, sky of its colour) and its source's WMOs with one fog entry.
+    light_src = lightdata.sources(client, args.dbc_dir, cfg['patch_name'])
+    light_stock = {n: dbc.Dbc.parse(t.serialize()) for n, (t, _) in light_src.items()}
+    light_tables = {n: t for n, (t, _) in light_src.items()}
+    light_added = {n: [] for n in lightdata.DBCS}
+    looks = []
+    for c in clones:
+        if not c.get('look'):
+            continue
+        look = cfg['looks'][c['look']]
+        light, params = 2600 + c['id'] - 900, 950 + 2 * (c['id'] - 900)
+        for n, ids in lightdata.add_light(light_tables, c['id'], c['source'], light, params, look).items():
+            light_added[n] += ids
+        directory = sources['Map.dbc'].string(sources['Map.dbc'].row(c['source'])[1])
+        wmos = wmofog.patch_files(args.client, directory, cfg['patch_name']) if client else {}
+        files.update(wmos)
+        looks.append((c, light, params, look, sorted(wmos)))
+    if looks:
+        for n, t in light_tables.items():
+            files['DBFilesClient\\%s.dbc' % n] = t.serialize()
+
     os.makedirs(os.path.dirname(out), exist_ok=True)
     raw = mpq.write(out, files)
     archive = roundtrip(out, files, sources, added)
     check_fogs(archive, dbc.Dbc.parse(raw_effects), dbc.RawDbc(raw_spells), fogs)
+    if looks:
+        lightdata.check(archive, light_stock, light_added)
+    for c, light, params, look, wmos in looks:
+        print('look %s on clone %d: light %d, params %d/%d, fog %s yd colour %s; %d WMO(s) with one fog entry: %s'
+              % (c['look'], c['id'], light, params, params + 1, look['fog_end_yd'], look['fog_colour'], len(wmos),
+                 ', '.join(w.split('\\')[-1] for w in wmos)))
 
     digest = clonedata.checksum(map_dbc, md_dbc, added)
     sha = hashlib.sha256(raw).hexdigest()

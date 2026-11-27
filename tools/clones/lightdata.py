@@ -1,6 +1,7 @@
-"""The pool map's own light (pool.json "light"): a global Light.dbc row for the map, its LightParams and their
-LightIntBand / LightFloatBand rows, copied from a template light set and turned into a thick fog whose colour is the
-sky's. Client only (the server has no lights). Layout per Wowdecomp2:
+"""A clone map's own light (clones.json "looks"): a global Light.dbc row for the map, its LightParams and their
+LightIntBand / LightFloatBand rows, copied from its source map's global light and turned into a thick fog whose
+colour is the sky's. Client only (the server has no lights). A thick fog needs a fog end under 27.8 yd (fog mode 1
+turns longer ones into a haze over the draw distance, DayNight::CalcColors). Layout per Wowdecomp2:
   - a map's global light: the Light row of that map at (0, 0, 0) with no falloff; m_lightParamsID[8] (normal,
     underwater, then shared sets);
   - bands: LightIntBand id = band + 18 * params - 17 (0 diffuse, 1 ambient, 2-6 sky top..smog, 7 fog, ...),
@@ -40,23 +41,33 @@ def sources(client, dbc_dir, patch_name='patch-T.MPQ'):
     return out
 
 
-def add_light(tables, cfg):
-    """Add the pool map's light set to `tables` ({name: Dbc}). Returns {name: [added ids]}."""
-    lt = cfg['light']
-    m = cfg['map']
-    if not 10.0 <= lt['fog_end_yd'] < 27.7:
-        raise SystemExit('pool light fog_end_yd must be 10-27.7: from 27.8 on the client thins it into a haze')
-    light, params = lt['id'], lt['params']
+def global_light(L, map_id):
+    """The Light row of a map at (0, 0, 0): the light it uses where no local light reaches."""
+    for r in L.rows:
+        if r[1] == map_id and r[2] == 0 and r[3] == 0 and r[4] == 0:
+            return r
+    return None
+
+
+def add_light(tables, map_id, source_map, light, params, look):
+    """Give `map_id` its own global light: a copy of `source_map`'s global light (its normal and underwater params
+    and their bands) turned into `look` (fog_end_yd, fog_start, fog_colour; the sky takes the fog's colour, no
+    skybox model). `tables` is {name: Dbc}; returns {name: [added ids]}."""
+    if not 10.0 <= look['fog_end_yd'] < 27.7:
+        raise SystemExit('look fog_end_yd must be 10-27.7: from 27.8 on the client thins it into a haze')
     if not LIGHT_ID_RANGE[0] <= light <= LIGHT_ID_RANGE[1] or not PARAMS_ID_RANGE[0] <= params < PARAMS_ID_RANGE[1]:
-        raise SystemExit('pool light ids outside %s / %s' % (LIGHT_ID_RANGE, PARAMS_ID_RANGE))
+        raise SystemExit('light ids outside %s / %s' % (LIGHT_ID_RANGE, PARAMS_ID_RANGE))
     L, P, I, F = (tables[n] for n in DBCS)
     if light in L.ids() or params in P.ids() or params + 1 in P.ids():
         raise SystemExit('Light.dbc / LightParams.dbc already have our ids (is an old patch-T.MPQ in the order?)')
-    if any(r[1] == m['id'] for r in L.rows):
-        raise SystemExit('Light.dbc already has a light for map %d' % m['id'])
+    if any(r[1] == map_id for r in L.rows):
+        raise SystemExit('Light.dbc already has a light for map %d' % map_id)
+    src_light = global_light(L, source_map)
+    if not src_light:
+        raise SystemExit('map %d has no global light to copy' % source_map)
+    template, under = src_light[7], src_light[8] or src_light[7]
 
-    template, under = lt['template'], lt['underwater_template']
-    fog = int(lt['fog_colour'], 16)
+    fog = int(look['fog_colour'], 16)
     added = {n: [] for n in DBCS}
     for new, src in ((params, template), (params + 1, under)):
         row = list(P.row(src))
@@ -76,20 +87,20 @@ def add_light(tables, cfg):
             r = list(F.row(b + 6 * src - 5))
             r[0] = b + 6 * new - 5
             if new == params and b == 0:
-                r = _constant(r, _f32bits(lt['fog_end_yd'] * 36.0))
+                r = _constant(r, _f32bits(look['fog_end_yd'] * 36.0))
             elif new == params and b == 1:
-                r = _constant(r, _f32bits(lt['fog_start']))
+                r = _constant(r, _f32bits(look['fog_start']))
             F.rows.append(r)
             added['LightFloatBand'].append(r[0])
-    shared = list(L.row(lt['template_light']))[9:15]      # the template light's shared sets (storm, death, ...)
-    L.rows.append([light, m['id'], 0, 0, 0, 0, 0, params, params + 1] + shared)
+    shared = list(src_light)[9:15]                        # the source light's shared sets (storm, death, ...)
+    L.rows.append([light, map_id, 0, 0, 0, 0, 0, params, params + 1] + shared)
     added['Light'].append(light)
     for t in (L, P, I, F):
         t.rows.sort(key=lambda r: r[0])
     return added
 
 
-def check(archive, stock, cfg, added):
+def check(archive, stock, added):
     """Each light DBC in the patch = the stock rows unchanged plus ours."""
     for name in DBCS:
         new = dbc.Dbc.parse(archive.read('DBFilesClient\\%s.dbc' % name))

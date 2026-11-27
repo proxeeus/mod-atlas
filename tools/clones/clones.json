@@ -5,8 +5,18 @@
     "client loads the source's terrain."
   ],
   "patch_name": "patch-T.MPQ",
+  "looks_comment": [
+    "A clone's look (lightdata.py, wmofog.py): its own global light, copied from its source map's and turned into a",
+    "thick fog whose colour is also the sky's. fog_end_yd must stay under 27.8 (longer turns into a haze); the",
+    "source's WMOs with more than one fog entry go into the patch with one, so the map fog shows inside them too.",
+    "Light ids 2600 + (clone - 900), LightParams 950 + 2 * (clone - 900) and the next one."
+  ],
+  "looks": {
+    "timeways": { "fog_end_yd": 25, "fog_start": 0.1, "fog_colour": "4a4060" }
+  },
   "clones": [
-    { "id": 902, "source": 36,  "mapdifficulty_id": 754, "name": "Echo of the Deadmines",       "enabled": true },
+    { "id": 902, "source": 36,  "mapdifficulty_id": 754, "name": "Echo of the Deadmines",       "enabled": true,
+      "look": "timeways" },
     { "id": 904, "source": 33,  "mapdifficulty_id": 755, "name": "Echo of Shadowfang Keep",     "enabled": false },
     { "id": 901, "source": 329, "mapdifficulty_id": 756, "name": "Echo of Stratholme",          "enabled": false },
     { "id": 900, "source": 600, "mapdifficulty_id": 757, "name": "Echo of Drak'Tharon Keep",    "enabled": false },
