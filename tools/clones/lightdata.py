@@ -44,6 +44,8 @@ def add_light(tables, cfg):
     """Add the pool map's light set to `tables` ({name: Dbc}). Returns {name: [added ids]}."""
     lt = cfg['light']
     m = cfg['map']
+    if not 10.0 <= lt['fog_end_yd'] < 27.7:
+        raise SystemExit('pool light fog_end_yd must be 10-27.7: from 27.8 on the client thins it into a haze')
     light, params = lt['id'], lt['params']
     if not LIGHT_ID_RANGE[0] <= light <= LIGHT_ID_RANGE[1] or not PARAMS_ID_RANGE[0] <= params < PARAMS_ID_RANGE[1]:
         raise SystemExit('pool light ids outside %s / %s' % (LIGHT_ID_RANGE, PARAMS_ID_RANGE))

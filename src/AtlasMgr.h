@@ -12,7 +12,6 @@
 #include "AtlasMapItem.h"
 #include "AtlasLoot.h"
 #include "AtlasAtmosphere.h"
-#include "AtlasKit.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -60,18 +59,6 @@ public:
     void SetCloneOptIn(uint32 account, bool on);
     // The map a run on this source opens in for this party (AtlasClones.h).
     uint32 ChooseMapRunMap(std::vector<Player*> const& party, uint32 sourceMap) const;
-
-    // Generated maps (AtlasPool.cpp, DESIGN §6.2): each pool map instance gets
-    // a layout of kit pieces (AtlasKit.h) placed as gameobjects. Kit and pool
-    // maps are read at startup only.
-    void LoadPoolPieces();
-    bool IsPoolMap(uint32 mapId) const;
-    void ProcessPoolMap(Map* map);              // from the map's own update
-    void OnPlayerEnteredPool(Player* player);   // from the allmap script
-    void GuardPoolMap(Map* map);                // void safety net, from the map's own update
-    void OnPoolDeath(Player* player);           // back to the entrance, alive (no graveyard run)
-    bool EnterSpike(Player* player, std::string& error);
-    void LeaveSpike(Player* player);
 
     // Session lifecycle
     // seed 0 = the leader's pending GM seed if any, else a fresh one.
@@ -542,24 +529,6 @@ private:
     std::unordered_set<uint32>         _cloneOptIn;          // accounts (atlas_clone_optin)
     mutable std::mutex                 _cloneMutex;
 
-    struct PoolMap
-    {
-        uint32   MapId = 0;
-        KitPoint Origin;                 // the start piece's placement
-        uint32   Start = 0;
-        uint32   MaxPieces = 1;
-        std::string Theme;
-        std::vector<KitPiece> Kit;       // the kit pieces of its theme: its layouts use only these
-    };
-    PoolMap const* GetPoolMap(uint32 mapId) const;
-    Position PoolEntrance(PoolMap const& pool) const;
-    std::vector<KitPiece>                        _poolKit;       // atlas_pool_piece + _socket, set at startup only
-    std::vector<std::string>                     _poolKitTheme;  // the theme of each _poolKit piece
-    std::vector<PoolMap>                         _poolMaps;      // atlas_pool_map, set at startup only
-    std::unordered_set<uint32>                   _poolSpawned;   // instance ids with their pieces (_poolMutex)
-    std::unordered_map<uint32, float>            _poolVoidZ;     // instance id -> below this is the void (_poolMutex)
-    std::unordered_map<ObjectGuid, WorldLocation> _spikeReturns;  // where `.atlas spike leave` goes (_poolMutex)
-    std::mutex                                   _poolMutex;
     std::vector<AtmosphereRow>         _atmosphere;
     std::vector<AtmosphereRow>         _fogs;                // atlas_fog (_atmosphereMutex)
     std::vector<uint32>                _fogSpells;           // every fog spell in atlas_fog (_atmosphereMutex)

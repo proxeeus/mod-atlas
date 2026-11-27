@@ -16,7 +16,6 @@ import clonedata  # noqa: E402
 import dbc  # noqa: E402
 import fogdata  # noqa: E402
 import mpq  # noqa: E402
-import pooldata  # noqa: E402
 from gen_sql import clones_sql, part_sql  # noqa: E402
 
 
@@ -120,77 +119,12 @@ def verify_fogs(archive, sql_path):
     return errors
 
 
-def verify_pool(archive, sql_path):
-    """The pool map's Map.dbc / MapDifficulty.dbc / AreaTable.dbc rows = its SQL rows; its WDT (a global WMO, no
-    terrain) is in the patch."""
-    errors = 0
-    cfg = pooldata.load_config()
-    m = cfg['map']
-    for name, table, fields, rid in (('Map.dbc', 'map_dbc', clonedata.MAP_FIELDS, m['id']),
-                                     ('MapDifficulty.dbc', 'mapdifficulty_dbc', clonedata.MAPDIFFICULTY_FIELDS,
-                                      m['mapdifficulty_id']),
-                                     ('AreaTable.dbc', 'areatable_dbc', pooldata.AREATABLE_FIELDS,
-                                      cfg['area']['id'])):
-        d = dbc.Dbc.parse(archive.read('DBFilesClient\\' + name))
-        _, rows = sql_rows(sql_path, table)
-        raw = d.row(rid)
-        sql = [r for r in rows if int(r[0][1]) == rid]
-        if not raw or len(sql) != 1:
-            print('pool %s row %d missing from the patch or the SQL' % (name, rid))
-            errors += 1
-            continue
-        bad = sum(1 for (_, kind), value, token in zip(fields, clonedata.decode(d, raw, fields), sql[0])
-                  if not same(value, kind, token))
-        errors += bad
-        print('%-18s row %d (pool): %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
-    d = dbc.Dbc.parse(archive.read(pooldata.DBC_GO_DISPLAY))
-    _, rows = sql_rows(sql_path, 'gameobjectdisplayinfo_dbc')
-    by_id = {int(r[0][1]): r for r in rows}
-    for p in cfg['pieces']:
-        raw = d.row(p['display'])
-        if not raw or p['display'] not in by_id:
-            print('kit display %d missing from the patch or the SQL' % p['display'])
-            errors += 1
-            continue
-        bad = sum(1 for (_, kind), value, token in zip(pooldata.GODISPLAY_FIELDS,
-                                                       clonedata.decode(d, raw, pooldata.GODISPLAY_FIELDS),
-                                                       by_id[p['display']]) if not same(value, kind, token))
-        errors += bad
-        if not archive.read(p['wmo']) or not archive.read(p['wmo'][:-4] + '_000.wmo'):
-            print('kit piece %d: WMO files missing from the patch' % p['go_entry'])
-            errors += 1
-    print('kit displays       %d, all fields match' % len(cfg['pieces']) if not errors else 'kit displays differ')
-    wdt = archive.read(pooldata.wdt_path(cfg))
-    name = pooldata.start_piece(cfg)['wmo'].encode('ascii') + b'\0'
-    if not wdt or wdt[20:24] != b'\x01\0\0\0' or name not in wdt:
-        print('pool WDT %s missing, or without its global WMO %s' % (pooldata.wdt_path(cfg),
-                                                                       pooldata.start_piece(cfg)['wmo']))
-        errors += 1
-    _, pieces = sql_rows(sql_path, 'atlas_pool_piece')
-    if {int(r[0][1]) for r in pieces} != {p['go_entry'] for p in cfg['pieces']}:
-        print('atlas_pool_piece rows differ from pool.json')
-        errors += 1
-    _, sockets = sql_rows(sql_path, 'atlas_pool_socket')
-    want = {(p['go_entry'], i) for p in cfg['pieces'] for i in range(len(p['sockets']))}
-    if {(int(r[0][1]), int(r[1][1])) for r in sockets} != want:
-        print('atlas_pool_socket rows differ from pool.json')
-        errors += 1
-    _, maps = sql_rows(sql_path, 'atlas_pool_map')
-    if [(int(r[0][1]), int(r[5][1]), int(r[6][1])) for r in maps] != [(m['id'], m['start'], m['max_pieces'])]:
-        print('atlas_pool_map row differs from pool.json')
-        errors += 1
-    print('pool               WDT %s, %d piece(s), %d socket(s), start %d, up to %d pieces'
-          % (pooldata.wdt_path(cfg), len(pieces), len(sockets), m['start'], m['max_pieces']))
-    return errors
-
-
 def main():
     cfg = clonedata.load_config()
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--patch', default=os.path.join(clonedata.MODULE, 'client_patch', cfg['patch_name']))
     ap.add_argument('--sql', default=clones_sql())
     ap.add_argument('--fog-sql', default=part_sql('fogs'))
-    ap.add_argument('--pool-sql', default=part_sql('pool'))
     args = ap.parse_args()
 
     archive = mpq.MPQ(args.patch)
@@ -226,7 +160,6 @@ def main():
             errors += bad
             print('%-18s row %d: %d of %d fields match' % (name, rid, len(fields) - bad, len(fields)))
     errors += verify_fogs(archive, args.fog_sql)
-    errors += verify_pool(archive, args.pool_sql)
     print('OK' if not errors else '%d difference(s)' % errors)
     sys.exit(1 if errors else 0)
 

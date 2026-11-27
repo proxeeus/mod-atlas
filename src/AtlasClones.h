@@ -23,9 +23,6 @@ namespace Atlas
 
 constexpr uint32 CLONE_MAP_ID_MIN = 900;
 constexpr uint32 CLONE_MAP_ID_MAX = 949;
-// Generated-map pool (DESIGN §6.2): empty maps that kit pieces are placed in.
-constexpr uint32 POOL_MAP_ID_MIN  = 950;
-constexpr uint32 POOL_MAP_ID_MAX  = 999;
 
 constexpr bool IsReservedCloneId(uint32 mapId)
 {

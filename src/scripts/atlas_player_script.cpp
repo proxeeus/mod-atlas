@@ -34,13 +34,6 @@ public:
         sAtlasMgr->HandlePlayerDeath(player, session);
     }
 
-    // Generated maps have no graveyard of their own (the copied map row points to Westfall's).
-    void OnPlayerJustDied(Player* player) override
-    {
-        if (player && sAtlasMgr->IsPoolMap(player->GetMapId()))
-            sAtlasMgr->OnPoolDeath(player);
-    }
-
     void OnPlayerLogin(Player* player) override
     {
         if (!player)

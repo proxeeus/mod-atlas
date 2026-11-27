@@ -114,7 +114,6 @@ void AtlasMgr::LoadFromDB()
     LoadAllPlayerStats();
     LoadLeaderboard();
     LoadCloneMaps();
-    LoadPoolPieces();
     LoadDungeonGeometry();
     LoadMapItems();
     LoadCloneOptIns();

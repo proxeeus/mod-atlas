@@ -23,8 +23,6 @@ public:
     void OnMapUpdate(Map* map, uint32 /*diff*/) override
     {
         sAtlasMgr->ProcessMapSpawns(map);
-        sAtlasMgr->ProcessPoolMap(map);
-        sAtlasMgr->GuardPoolMap(map);
     }
 
     void OnPlayerEnterAll(Map* map, Player* player) override
@@ -35,13 +33,6 @@ public:
         // Only care about dungeon maps
         if (!map->IsDungeon())
             return;
-
-        // The generated-map spike: no session, a kit piece to wait for.
-        if (sAtlasMgr->IsPoolMap(map->GetId()))
-        {
-            sAtlasMgr->OnPlayerEnteredPool(player);
-            return;
-        }
 
         Session* session = sAtlasMgr->GetSessionByPlayer(player->GetGUID());
         if (!session)

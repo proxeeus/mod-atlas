@@ -5,8 +5,7 @@
  * .atlas scaling (the role table at a level, tier, party size and difficulty),
  * .atlas affix list|next (the affixes, and forcing some on the next run)
  * Players: .atlas clones [on|off] (runs in clone maps, for clients with the Atlas patch),
- * .atlas fog [list|off|<spell>] (tries the fogs of the Atlas patch),
- * .atlas spike [leave] (the generated-map spike: a kit piece in an empty pool map)
+ * .atlas fog [list|off|<spell>] (tries the fogs of the Atlas patch)
  */
 
 #include "ScriptMgr.h"
@@ -70,7 +69,6 @@ public:
             { "scaling",       HandleScaling,        SEC_GAMEMASTER,     Console::Yes },
             { "clones",        HandleClones,         SEC_PLAYER,         Console::No  },
             { "fog",           HandleFog,            SEC_PLAYER,         Console::No  },
-            { "spike",         HandleSpike,          SEC_PLAYER,         Console::No  },
         };
         static ChatCommandTable root = { { "atlas", atlasTable } };
         return root;
@@ -191,40 +189,6 @@ public:
             player->AddAura(spell, player);
         h->PSendSysMessage("{} Fog {} on you until you leave this map (.atlas fog off clears it).", CHAT_PREFIX,
             spell);
-        return true;
-    }
-
-    // .atlas spike [leave]: the generated-map spike (DESIGN §6.2). Takes you,
-    // and the bots beside you, into an empty pool map with one kit piece (a
-    // WMO room placed as a gameobject); `leave` brings you all back.
-    static bool HandleSpike(ChatHandler* h, Optional<std::string> arg)
-    {
-        Player* player = h->GetPlayer();
-        if (!player)
-            return false;
-        if (arg && *arg == "leave")
-        {
-            if (!sAtlasMgr->IsPoolMap(player->GetMapId()))
-            {
-                h->PSendSysMessage("{} You are not in the Timeways.", CHAT_PREFIX);
-                return true;
-            }
-            sAtlasMgr->LeaveSpike(player);
-            return true;
-        }
-        if (arg)
-        {
-            h->SendSysMessage("Usage: .atlas spike [leave]");
-            return true;
-        }
-        std::string error;
-        if (!sAtlasMgr->EnterSpike(player, error))
-        {
-            h->PSendSysMessage("{} {}", CHAT_PREFIX, error);
-            return true;
-        }
-        h->PSendSysMessage("{} The Timeways open. Hold still while the room takes shape (.atlas spike leave to "
-            "return).", CHAT_PREFIX);
         return true;
     }
 

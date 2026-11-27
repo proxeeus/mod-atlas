@@ -8,23 +8,17 @@ The same patch carries the **fogs** (`fogs.json`): swirling-fog screen effects (
 spells (Spell.dbc), drawn over the scene so a dungeon's own WMO fog can't hide them, picked per theme, corruption
 level or affix. The spells also go to the server's `spell_dbc`; the ScreenEffect rows are client-only.
 
-It also carries the **generated-map pool** (`pool.json`, DESIGN 6.2 spike): pool map 950 with an empty WDT (no
-terrain, no WMO), in which mod-atlas places kit pieces as gameobjects (type 14, a stock WMO with a stock display, so
-the server already has the collision model). `.atlas spike` takes an opted-in player and their bots there.
-
 Run with `python3 -I` from anywhere; nothing here writes to the client folder or to a database.
 
 | Tool | What it does |
 |---|---|
 | `build_patch.py` | Reads the client's effective `Map.dbc`, `MapDifficulty.dbc`, `ScreenEffect.dbc` and `Spell.dbc` (read-only, archive order as the client, our own `patch-T.MPQ` left out), appends the clone and fog rows and writes `client_patch/patch-T.MPQ` (gitignored, about 49 MB: Spell.dbc is whole) plus a `.json` manifest. Round-trips the archive and checks that no stock row changed. |
-| `gen_sql.py` | Writes `atlas_clones.sql` (`map_dbc`, `mapdifficulty_dbc`, `instance_template`, `atlas_map_source`), `atlas_fogs.sql` (`spell_dbc` 90400-90449, `atlas_fog`), `atlas_pool.sql` (pool map 950 and its area 7900, `gameobject_template` 900100+, the kit: `atlas_pool_piece`, `atlas_pool_socket`, `atlas_pool_map`) and their uninstall scripts in `data/sql/uninstall/` from the same rows. Each waits in `data/sql/staged/` (never applied) until `--install clones` / `fogs` / `pool` moves it to `data/sql/db-world/base/`. `--check` only compares. |
-| `verify.py` | Compares the built patch with the SQL, field by field (clones, fog spells, their screen effects, the pool map and its area). |
-| `kit.json`, `kitwmo.py`, `kitvmo.py` | Our own tileset (TILESET.md): themes (doorway size, textures), piece shapes, their WMO files (root + group, client collision tree) for the patch, and their server collision (`.vmo`, `GameObjectModels.dtree` entries). `build_patch.py` and `gen_sql.py` take the pieces from here (pool pieces, GameObjectDisplayInfo 9900-9949, `gameobjectdisplayinfo_dbc`). |
-| `wing.py`, `stockroom.py` | Real wings: a stock WMO used whole (interior groups and their portals kept, exterior groups dropped, an adapter at each mouth) — the theme kits' real art. `stockroom.py` (one cut group) is kept for its helpers; cut rooms leak and left the kit. |
-| `kit_server.py` | Installs the kit's server collision in the client-data volume: dry run by default; `--apply` backs up the stock dtree once and copies the `.vmo` files and the merged dtree; `--remove` restores. Needs the user's OK (play setup). |
-| `wmofloor.py` | Finds a kit piece's sockets (`pool.json`): a top view of a WMO's floors (`--png`) and floor heights walking out of one of its portals, with a suggested socket (`--portal N`). Read-only. |
+| `gen_sql.py` | Writes `atlas_clones.sql` (`map_dbc`, `mapdifficulty_dbc`, `instance_template`, `atlas_map_source`), `atlas_fogs.sql` (`spell_dbc` 90400-90449, `atlas_fog`) and their uninstall scripts in `data/sql/uninstall/` from the same rows. Each waits in `data/sql/staged/` (never applied) until `--install clones` / `--install fogs` moves it to `data/sql/db-world/base/`. `--check` only compares. |
+| `verify.py` | Compares the built patch with the SQL, field by field (clones, fog spells, their screen effects). |
+| `lightdata.py` | A map's own light (sky and fog) for the patch, written for the scrapped generated maps; to be pointed at clone maps. A thick fog needs a fog end under 27.8 yd, and inside a WMO only shows if the WMO has a single fog entry (Wowdecomp2 DayNight::CalcColors, CMapEntity::QueryCameraFog). |
+| `wmofloor.py` | A top view of a WMO's floors (`--png`) and floor heights walking out of one of its portals (`--portal N`). Read-only. |
 | `link_data.sh` | Data symlinks in the worldserver's client-data volume: dry run by default, `--apply`, `--remove`. |
-| `dbc.py`, `mpq.py`, `clonedata.py`, `fogdata.py`, `pooldata.py` | WDBC reader/writer (and a raw mode for Spell.dbc), MPQ reader/writer and client archive order, the shared clone and fog rows. |
+| `dbc.py`, `mpq.py`, `clonedata.py`, `fogdata.py` | WDBC reader/writer (and a raw mode for Spell.dbc), MPQ reader/writer and client archive order, the shared clone and fog rows. |
 
 ## Adding or changing a clone
 
