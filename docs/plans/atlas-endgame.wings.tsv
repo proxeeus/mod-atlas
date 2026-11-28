@@ -1,0 +1,788 @@
+path	groups	inside	mouths	mouth_sizes	inside_size	inside_tris_hint
+World\wmo\Azeroth\Buildings\Castle\castle01.wmo	2	1	1	13x7	20x26x12	3108
+World\wmo\Azeroth\Buildings\Castle\castle03.wmo	1	1	0		37x24x26	1692
+World\wmo\Azeroth\Buildings\Chapel\Chapel.wmo	2	1	1	3x4	31x18x27	720
+World\wmo\Azeroth\Buildings\Chapel\DuskwoodChapel.wmo	2	1	1	3x4	31x18x27	10556
+World\wmo\Azeroth\Buildings\Chapel\RedridgeChapel.wmo	2	1	1	3x4	31x18x27	6496
+World\wmo\Azeroth\Buildings\Duskwood_Barn\Duskwood_Barn.wmo	3	2	1	4x4	19x25x18	13168
+World\wmo\Azeroth\Buildings\Duskwood_Barracks\duskwood_barracks.wmo	26	25	5	3x6 3x6 7x12 3x6 3x6	59x60x42	39440
+World\wmo\Azeroth\Buildings\Duskwood_Blacksmith\Blacksmith_AB.wmo	2	1	2	4x4 4x4	20x16x11	5160
+World\wmo\Azeroth\Buildings\Duskwood_Blacksmith\Duskwood_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	5092
+World\wmo\Azeroth\Buildings\Duskwood_human_farm\Duskwood_human_farm.wmo	2	1	1	3x3	13x14x9	12740
+World\wmo\Azeroth\Buildings\Duskwood_human_farm\humanfarm_AB.wmo	2	1	1	3x3	13x14x9	12792
+World\wmo\Azeroth\Buildings\Duskwood_HumanTwoStory\Duskwood_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	34792
+World\wmo\Azeroth\Buildings\Duskwood_Inn\Duskwood_Inn.wmo	11	10	1	4x4	57x27x23	51556
+World\wmo\Azeroth\Buildings\Duskwood_MageTower\Duskwood_MageTower.wmo	5	4	1	5x5	51x44x63	10840
+World\wmo\Azeroth\Buildings\Duskwood_MageTower\Duskwood_MageTowerPurple.wmo	5	4	1	5x5	51x44x63	12120
+World\wmo\Azeroth\Buildings\Duskwood_MageTower\NetherPvP_MageTower.wmo	5	4	1	5x5	51x44x63	19228
+World\wmo\Azeroth\Buildings\Duskwood_TownHall\Duskwood_TownHall.wmo	5	4	1	5x7	35x42x31	28660
+World\wmo\Azeroth\Buildings\Duskwood_TownHall_NoWall\Duskwood_TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	27792
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_Barn\DuskwoodAbandoned_Barn.wmo	3	2	1	4x4	18x24x18	7624
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_Blacksmith\DuskwoodAbandoned_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	3592
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_human_farm\DuskwoodAbandoned_human_farm.wmo	2	1	1	3x3	13x14x9	8536
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_HumanTwoStory\DuskwoodAbandoned_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	8680
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_Inn\AndorhalAbandoned_Inn.wmo	11	10	1	4x4	57x27x24	12040
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_Inn\DuskwoodAbandoned_Inn.wmo	11	10	1	4x4	57x27x23	10964
+World\wmo\Azeroth\Buildings\DuskwoodAbandoned_TownHall_NoWall\DuskwoodAbandoned_TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	6280
+World\wmo\Azeroth\Buildings\GnomeHut\GnomeHut.wmo	2	1	1	5x6	17x15x13	6224
+World\wmo\Azeroth\Buildings\GnomeHut\GnomeHutTwoStory.wmo	2	1	1	5x5	21x17x24	4180
+World\wmo\Azeroth\Buildings\GoldshireBlacksmith\goldshireblacksmith.wmo	2	1	2	4x4 4x4	20x16x11	4868
+World\wmo\Azeroth\Buildings\GoldshireInn\GoldshireInn.wmo	12	10	1	4x4	57x27x23	52232
+World\wmo\Azeroth\Buildings\GuardTower\GuardTower.wmo	2	1	2	5x7 14x0	28x28x34	12660
+World\wmo\Azeroth\Buildings\GuardTower\GuardTower_intact.wmo	2	1	2	5x7 12x0	28x28x34	11428
+World\wmo\Azeroth\Buildings\GuildHouses\GuildHouseA.wmo	5	4	2	4x5 4x5	43x40x26	8420
+World\wmo\Azeroth\Buildings\GuildHouses\GuildHouseB.wmo	3	2	2	4x5 7x5	46x38x45	8812
+World\wmo\Azeroth\Buildings\Human_Barn_Silo\barn.wmo	3	2	1	4x4	19x25x18	13020
+World\wmo\Azeroth\Buildings\Human_Barracks\Human_Barracks.wmo	28	27	5	3x6 3x6 7x12 3x6 3x6	59x61x42	75728
+World\wmo\Azeroth\Buildings\Human_Barracks\Human_Barracks_COT.wmo	28	27	5	3x6 3x6 7x12 3x6 3x6	59x61x42	44620
+World\wmo\Azeroth\Buildings\human_farm\farm.wmo	2	1	1	3x3	13x14x9	12928
+World\wmo\Azeroth\Buildings\Human_farm_test\farmtest.wmo	2	1	1	3x3	13x14x9	13008
+World\wmo\Azeroth\Buildings\HumanTwoStory\HumanTwoStory.wmo	6	5	1	3x3	26x29x13	34736
+World\wmo\Azeroth\Buildings\Magetower\COT_magetower01.wmo	5	4	1	5x5	51x44x63	52364
+World\wmo\Azeroth\Buildings\Magetower\magetower.wmo	5	4	1	5x5	51x44x63	52364
+World\wmo\Azeroth\Buildings\Moonbrook_Blacksmith\Moonbrook_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	3464
+World\wmo\Azeroth\Buildings\Moonbrook_human_farm\Moonbrook_human_farm.wmo	2	1	1	3x3	13x14x9	8528
+World\wmo\Azeroth\Buildings\Moonbrook_HumanTwoStory\Moonbrook_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	8544
+World\wmo\Azeroth\Buildings\Moonbrook_Inn\Moonbrook_Inn.wmo	11	10	1	4x4	57x27x23	10736
+World\wmo\Azeroth\Buildings\Moonbrook_TownHall_NoWall\Moonbrook_TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	5908
+World\wmo\Azeroth\Buildings\NSabbey\NSabbey.wmo	14	11	2	5x9 5x0	79x77x56	14716
+World\wmo\Azeroth\Buildings\OilPlatform\OilPlatform.wmo	2	1	1	3x5	19x11x20	10916
+World\wmo\Azeroth\Buildings\OilPlatform\OilPlatformSmall.wmo	2	1	1	3x4	20x10x19	7480
+World\wmo\Azeroth\Buildings\Prison_Camp\prisonHQ.wmo	3	2	1	3x4	29x20x20	28312
+World\wmo\Azeroth\Buildings\Prison_Camp\prisonHQ_New.wmo	4	3	1	3x4	38x32x23	17884
+World\wmo\Azeroth\Buildings\Prison_Camp\prisonHQ_Redridge.wmo	3	2	1	3x4	29x20x20	18072
+World\wmo\Azeroth\Buildings\Prison_Camp\prisonLonghouse_New.wmo	2	1	2	4x5 4x5	38x19x12	12348
+World\wmo\Azeroth\Buildings\Prison_Camp\PrisonOubliette.wmo	2	1	1	6x0	11x11x11	1048
+World\wmo\Azeroth\Buildings\Prison_Camp\PrisonOublietteLarge.wmo	7	6	1	11x0	114x90x32	10788
+World\wmo\Azeroth\Buildings\Prison_Camp\PrisonOublietteWater.wmo	4	2	2	6x0 5x3	78x11x12	1968
+World\wmo\Azeroth\Buildings\RedRidge_Barn\RedRidge_Barn.wmo	3	2	1	4x4	19x25x18	13000
+World\wmo\Azeroth\Buildings\RedRidge_Barracks\redridge_barracks.wmo	26	25	5	3x6 3x6 7x12 3x6 3x6	59x61x42	97684
+World\wmo\Azeroth\Buildings\RedRidge_Blacksmith\RedRidge_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	4692
+World\wmo\Azeroth\Buildings\RedRidge_human_farm\RedRidge_human_farm.wmo	2	1	1	3x3	13x14x9	12784
+World\wmo\Azeroth\Buildings\RedRidge_HumanTwoStory\RedRidge_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	34708
+World\wmo\Azeroth\Buildings\RedRidge_Inn\RedRidge_Inn.wmo	11	10	1	4x4	57x27x23	51720
+World\wmo\Azeroth\Buildings\RedRidge_MageTower\RedRidge_MageTower.wmo	5	4	1	5x5	51x44x63	10656
+World\wmo\Azeroth\Buildings\RedRidge_TownHall\RedRidge_TownHall.wmo	5	4	1	5x7	35x42x31	27684
+World\wmo\Azeroth\Buildings\RedRidge_TownHall_NoWall\RedRidge_TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	27288
+World\wmo\Azeroth\Buildings\Scarlet_Monestary\Scarlet_Monestary.wmo	13	12	2	7x12 7x12	183x80x33	13196
+World\wmo\Azeroth\Buildings\Stormwind\AZ_PvPbarracks.wmo	8	8	0		113x129x49	9844
+World\wmo\Azeroth\Buildings\Stormwind\Stormwind.wmo	286	278	40	10x9 8x9 10x10 10x9 10x10 11x9 9x8 10x10 9x9 8x9 8x9 10x9 10x9 10x9 10x10 8x10 10x10 10x10 10x9 11x10 19x15 19x15 18x12 18x12 3x3 3x4 3x4 3x4 3x4 3x4 3x4 3x4 3x4 8x12 3x3 3x3 3x3 3x3 3x4 15x12	668x1060x349	366528
+World\wmo\Azeroth\Buildings\Stormwind\StormwindHarbor.wmo	306	304	5	19x15 19x15 18x12 18x12 39x17	676x1060x349	361068
+World\wmo\Azeroth\Buildings\Stranglethorn_BootyBay\BootyBay.wmo	46	34	28	3x3 3x4 3x3 3x3 3x4 3x4 3x3 3x3 3x4 3x4 3x3 3x4 9x5 5x5 21x11 10x9 3x3 5x4 4x4 3x4 3x4 3x3 3x3 3x3 3x4 3x3 2x3 9x4	175x258x46	67744
+World\wmo\Azeroth\Buildings\Stranglethorn_BootyBay\BootyBay_house1.wmo	3	2	2	3x3 3x4	20x19x12	15860
+World\wmo\Azeroth\Buildings\Stranglethorn_BootyBay\BootyBay_house2.wmo	2	1	1	3x4	19x19x8	4804
+World\wmo\Azeroth\Buildings\Stranglethorn_BootyBay\BootyBay_warehouse.wmo	2	1	1	9x4	15x11x7	1868
+World\wmo\Azeroth\Buildings\Stranglethorn_BootyBay\Ratchet_Inn.wmo	3	2	1	9x5	97x221x50	8584
+World\wmo\Azeroth\Buildings\Stranglethorn_ruins\Stranglethorn_ruins01.wmo	1	1	0		19x18x32	1140
+World\wmo\Azeroth\Buildings\Stranglethorn_ruins\Stranglethorn_ruins02.wmo	4	3	1	11x8	67x91x40	14716
+World\wmo\Azeroth\Buildings\TownHall\TownHall.wmo	5	4	1	5x7	35x42x31	27708
+World\wmo\Azeroth\Buildings\TownHall_NoWall\TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	27592
+World\wmo\Azeroth\Buildings\Westfall_Barn\Westfall_Barn.wmo	3	2	1	4x4	19x25x18	13168
+World\wmo\Azeroth\Buildings\Westfall_Barracks\westfall_barracks.wmo	26	25	5	3x6 3x6 7x12 3x6 3x6	59x60x42	40004
+World\wmo\Azeroth\Buildings\Westfall_Blacksmith\Westfall_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	4900
+World\wmo\Azeroth\Buildings\Westfall_GuardTower\Westfall_GuardTower.wmo	2	1	2	5x7 12x0	28x28x35	12588
+World\wmo\Azeroth\Buildings\Westfall_human_farm\Westfall_human_farm.wmo	2	1	1	3x3	13x14x9	11636
+World\wmo\Azeroth\Buildings\Westfall_human_farm\Westfall_human_farmB.wmo	2	1	1	3x3	13x14x9	11640
+World\wmo\Azeroth\Buildings\Westfall_HumanTwoStory\Westfall_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	34776
+World\wmo\Azeroth\Buildings\Westfall_Inn\Westfall_Inn.wmo	11	10	1	4x4	57x27x23	51596
+World\wmo\Azeroth\Buildings\Westfall_MageTower\Westfall_MageTower.wmo	5	4	1	5x5	51x44x63	17492
+World\wmo\Azeroth\Buildings\Westfall_TownHall\Westfall_TownHall.wmo	5	4	1	5x7	35x42x31	27648
+World\wmo\Azeroth\Buildings\Westfall_TownHall_NoWall\Westfall_TownHall_NoWall.wmo	5	4	1	5x7	35x42x31	27172
+World\wmo\Azeroth\Buildings\ZulGurub\ZulGurubRuins02.wmo	1	1	0		116x42x48	1152
+World\wmo\Azeroth\Buildings\ZulGurub\ZulRandomRuins.wmo	1	1	0		907x728x215	2256
+World\wmo\Azeroth\Buildings\zulgurub_ziggurat\ZulGurub_Ziggurat.wmo	2	1	2	9x8 9x8	58x53x11	7184
+World\wmo\Azeroth\Collidable Doodads\Stranglethorn\StranglethornRuins02\StranglethornRuins02.wmo	1	1	0		6x13x15	480
+World\wmo\Azeroth\Collidable Doodads\Stranglethorn\StranglethornRuins13\StranglethornRuins13.wmo	1	1	0		45x8x16	776
+World\wmo\Azeroth\Collidable Doodads\SwampofSorrows\WaterHuts\WaterHut_Large.wmo	1	1	0		14x15x15	764
+World\wmo\buildings\OldStrat_barn.wmo	3	2	1	4x4	18x24x18	13020
+World\wmo\buildings\OldStrat_farm.wmo	2	1	1	3x3	13x14x9	12928
+World\wmo\buildings\OldStrat_HumanTwoStory.wmo	6	5	1	3x3	26x29x13	34588
+World\wmo\buildings\OldStrat_Inn.wmo	16	14	1	4x4	253x190x101	31264
+World\wmo\cameron.wmo	1	1	0		3x3x3	448
+World\wmo\Dungeon\AZ_Blackrock\Blackrock.wmo	45	43	2	27x23 27x23	745x521x278	63736
+World\wmo\Dungeon\AZ_Blackrock\Blackrock2.wmo	4	3	3	8x5 6x5 9x10	42x111x17	6256
+World\wmo\Dungeon\AZ_Blackrock\Blackrock_lower_guild.wmo	12	12	0		843x984x306	17152
+World\wmo\Dungeon\AZ_Blackrock\Blackrock_lower_instance.wmo	48	48	0		1228x1113x379	123692
+World\wmo\Dungeon\AZ_Blackrock\Blackrock_upper_guild.wmo	24	23	4	159x208 55x208 55x208 159x118	544x397x139	32804
+World\wmo\Dungeon\AZ_Blackrock\Blackrock_upper_instance.wmo	70	70	0		561x718x360	145568
+World\wmo\Dungeon\AZ_Deadmines\AZ_Deadmines_A.wmo	38	37	1	4x4	251x287x71	42236
+World\wmo\Dungeon\AZ_Deadmines\AZ_Deadmines_B.wmo	44	28	3	10x8 7x6 5x6	485x335x81	39636
+World\wmo\Dungeon\AZ_Deadmines\AZ_Deadmines_C.wmo	9	8	1	9x8	105x104x48	6752
+World\wmo\Dungeon\AZ_Deadmines\AZ_Deadmines_D.wmo	7	6	1	10x8	87x72x41	4968
+World\wmo\Dungeon\AZ_Karazahn\Kharazan.wmo	12	6	9	21x10 16x0 3x4 3x4 15x0 4x5 6x8 3x4 5x5	131x73x214	14364
+World\wmo\Dungeon\AZ_Karazahn\Kharazan_instance.wmo	71	64	15	9x8 7x5 5x6 7x5 5x5 5x5 10x7 4x4 18x0 8x5 47x59 10x7 10x7 10x7 10x7	1206x787x770	326124
+World\wmo\Dungeon\AZ_StormwindPrisons\StormwindJail.wmo	26	26	0		205x302x51	40120
+World\wmo\Dungeon\AZ_StormwindPrisons\StormwindPrison.wmo	31	31	0		214x228x54	22364
+World\wmo\Dungeon\AZ_Subway\Subway.wmo	20	20	0		411x2605x170	52024
+World\wmo\Dungeon\Azjol_Lowercity\Azjol_LowerCityRoof.wmo	24	24	0		3029x3378x1726	13088
+World\wmo\Dungeon\Azjol_Uppercity\Azjol_Uppercity.wmo	5	5	0		454x893x883	80732
+World\wmo\Dungeon\Blacktemple\Blacktemple.wmo	49	44	4	44x73 27x17 29x20 129x0	1216x1343x628	193896
+World\wmo\Dungeon\Blacktemple\Blacktemple_entrance.wmo	3	2	1	26x35	192x149x91	1848
+World\wmo\Dungeon\Blacktemple\ShadowMoon_BattlementLeft.wmo	3	1	1	10x9	50x50x22	4640
+World\wmo\Dungeon\Blacktemple\ShadowMoon_Battlementright.wmo	3	1	1	10x9	50x50x22	4640
+World\wmo\Dungeon\Blacktemple\ShadowMoon_Wall_crack.wmo	2	1	1	20x14	109x102x33	2328
+World\wmo\Dungeon\BoreanMagnataurMicro\BoreanMagnataurMicro.wmo	8	5	3	68x0 28x25 34x26	245x255x117	22500
+World\wmo\Dungeon\BoreanMagnataurMicro\BoreanMagnataurMicro02.wmo	5	3	2	68x0 30x28	210x186x108	18560
+World\wmo\Dungeon\BoreanMagnataurMicro\BoreanMagnataurMicro03.wmo	5	4	1	30x28	497x304x329	20388
+World\wmo\Dungeon\BoreanMagnataurMicro\BoreanMagnataurMicro_1room.wmo	2	1	1	25x20	34x42x22	3016
+World\wmo\Dungeon\CavernsOfTime\CavernsofTime.wmo	37	36	1	22x29	1044x796x306	58932
+World\wmo\Dungeon\CavernsOfTime\CavernsofTimeHyjal.wmo	5	5	0		313x314x84	12588
+World\wmo\Dungeon\CavernsOfTime\COT_Arm1.wmo	10	9	1	52x46	673x621x157	19160
+World\wmo\Dungeon\CavernsOfTime\COT_Arm2.wmo	8	7	1	13x20	596x1106x161	16056
+World\wmo\Dungeon\CavernsOfTime\COT_Arm3.wmo	16	15	1	33x49	336x638x148	4344
+World\wmo\Dungeon\DrakTharon\DrakTharon.wmo	7	1	2	47x32 47x36	299x123x113	14112
+World\wmo\Dungeon\DrakTharon\DrakTharon_TowerA.wmo	2	1	6	38x28 35x17 35x17 15x13 15x13 26x0	70x68x206	5920
+World\wmo\Dungeon\Gjalerbron\Gjalerbron.wmo	30	29	6	12x16 12x16 35x0 36x0 36x0 36x0	516x450x399	27456
+World\wmo\Dungeon\GM_Dungeon\GMDungeon.wmo	1	1	0		40x40x77	572
+World\wmo\Dungeon\Grizzlemaw\Grizzlemaw.wmo	4	2	2	192x0 32x37	390x208x112	64576
+World\wmo\Dungeon\Grizzlemaw\GrizzlemawTermiteDen.wmo	2	1	1	14x11	128x94x58	21316
+World\wmo\Dungeon\Hellfire\Hellfire_Citadel.wmo	5	1	1	16x12	108x98x50	8844
+World\wmo\Dungeon\Hellfire\hellfire_DemonWing.wmo	13	10	3	170x0 8x10 19x17	590x432x305	30492
+World\wmo\Dungeon\Hellfire\Hellfire_Military.wmo	12	11	1	11x7	626x505x181	98500
+World\wmo\Dungeon\Hellfire\Hellfire_raid.wmo	7	7	0		354x205x205	14052
+World\wmo\Dungeon\Hellfire\Hellfire_ramparts.wmo	5	2	2	14x10 16x11	379x538x248	15628
+World\wmo\Dungeon\IceCrown_dungeon\Icecrown_dungeon.wmo	5	5	0		553x860x449	14792
+World\wmo\Dungeon\IceCrown_dungeon\Icecrown_Dungeon_exteriorMicro.wmo	3	1	2	27x20 27x20	174x271x119	2012
+World\wmo\Dungeon\IceCrown_dungeon\Icecrown_Halls_of_reflection.wmo	6	5	1	33x24	796x737x998	11240
+World\wmo\Dungeon\IceCrownRaid\icecrown_elevator02_transport.wmo	1	1	0		28x30x0	472
+World\wmo\Dungeon\IceCrownRaid\IceCrownRaid.wmo	13	9	2	41x0 16x21	798x195x583	49156
+World\wmo\Dungeon\IceCrownRaid\IceCrownRaid_arthas_precipice.wmo	3	1	0		131x137x200	6672
+World\wmo\Dungeon\IceCrownRaid\IceCrownRaid_frostmourne.wmo	1	1	0		131x137x132	2896
+World\wmo\Dungeon\IceCrownRaid\IceCrownRaid_middle_section.wmo	44	42	3	22x20 17x15 17x15	710x1000x880	42076
+World\wmo\Dungeon\KL_AhnQiraj\Ahn_Qiraj.wmo	46	39	7	87x171 38x181 17x152 206x8 93x0 61x17 300x136	1291x1775x321	43612
+World\wmo\Dungeon\KL_AhnQiraj\Ahn_Qiraj_facade.wmo	13	9	4	38x181 87x171 17x152 61x17	341x213x109	5752
+World\wmo\Dungeon\KL_Blackfathom\Blackfathom.wmo	17	16	1	55x0	256x345x48	18528
+World\wmo\Dungeon\KL_Blackfathom\Blackfathom_instance.wmo	25	25	0		811x926x146	71304
+World\wmo\Dungeon\KL_Blackfathom\Old_Blackfathom_facade.wmo	3	2	1	55x0	45x56x39	4852
+World\wmo\Dungeon\KL_DireMaul\KL_Diremaul.wmo	45	42	8	27x43 47x40 47x40 47x43 10x8 47x43 7x9 7x7	1441x1404x294	91764
+World\wmo\Dungeon\KL_DireMaul\KL_Diremaul__BackEnt.wmo	6	5	1	8x11	82x106x44	2960
+World\wmo\Dungeon\KL_DireMaul\KL_Diremaul_Instance.wmo	100	99	7	47x40 47x40 47x43 10x8 47x43 120x0 7x7	1315x1855x355	174032
+World\wmo\Dungeon\KL_Maraudon\KL_Maraudon.wmo	33	32	1	16x15	514x500x92	49424
+World\wmo\Dungeon\KL_Maraudon\KL_Maraudon_instance01.wmo	43	43	0		1331x1105x316	203408
+World\wmo\Dungeon\KL_OnyxiasLair\KL_OnyxiasLair.wmo	8	7	1	21x19	282x274x136	3604
+World\wmo\Dungeon\KL_OnyxiasLair\KL_OnyxiasLair_A.wmo	5	4	1	21x19	159x134x80	5252
+World\wmo\Dungeon\KL_OnyxiasLair\KL_OnyxiasLair_B.wmo	8	7	1	21x19	282x274x136	8976
+World\wmo\Dungeon\KL_OrgrimmarLavaDungeon\LavaDungeon.wmo	12	12	0		519x384x126	26732
+World\wmo\Dungeon\KL_Razorfen\RazorfenDowns.wmo	6	2	1	10x12	94x137x48	16300
+World\wmo\Dungeon\KL_Razorfen\RazorfenDowns_instance.wmo	14	11	1	10x12	353x526x73	59580
+World\wmo\Dungeon\KL_Razorfen\RazorfenKraul.wmo	4	2	1	13x8	122x100x35	3092
+World\wmo\Dungeon\KL_Razorfen\RazorfenKraul_instance.wmo	26	24	1	13x8	522x537x60	40516
+World\wmo\Dungeon\KL_Wailing\wailingcaverns.wmo	16	15	2	19x16 6x5	316x431x151	34604
+World\wmo\Dungeon\KL_Wailing\wailingcaverns_instance.wmo	23	23	0		671x924x251	151112
+World\wmo\Dungeon\KZ_Gnomeragon\KZ_Gnomeragon.wmo	27	26	1	13x13	486x398x194	12580
+World\wmo\Dungeon\KZ_Gnomeragon\KZ_Gnomeragon_Instance.wmo	73	73	0		713x898x241	40172
+World\wmo\Dungeon\KZ_Uldaman\KZ_Uldaman.wmo	62	61	1	13x9	556x664x84	74636
+World\wmo\Dungeon\KZ_Uldaman\KZ_Uldaman_A.wmo	23	22	1	13x9	316x300x75	46568
+World\wmo\Dungeon\KZ_Uldaman\KZ_Uldaman_B.wmo	51	50	1	10x7	556x536x59	89200
+World\wmo\Dungeon\KZ_Uldaman\KZ_Uldaman_C.wmo	6	5	1	10x7	145x59x31	13188
+World\wmo\Dungeon\LD_DragonIsles\DragonIsles_A.wmo	3	1	2	65x66 28x12	884x520x164	1760
+World\wmo\Dungeon\LD_DragonIsles\DragonIsles_B.wmo	3	1	2	18x35 28x12	608x304x87	1640
+World\wmo\Dungeon\LD_DragonIsles\DragonIsles_D.wmo	8	5	4	18x18 67x44 58x18 20x15	314x529x280	1632
+World\wmo\Dungeon\LD_ScarletMonestary\Monestary_Cathedral.wmo	24	24	0		469x278x206	41236
+World\wmo\Dungeon\LD_ScarletMonestary\Monestary_Cemetery.wmo	24	24	0		413x561x244	51240
+World\wmo\Dungeon\LD_ScarletMonestary\Monestary_Library.wmo	26	26	0		178x320x26	40940
+World\wmo\Dungeon\LD_ScarletMonestary\Monestary_War.wmo	20	20	0		475x205x46	53520
+World\wmo\Dungeon\LD_ShadowFang\LD_ShadowFang.wmo	10	6	5	4x4 7x10 6x8 3x4 4x7	166x80x17	6156
+World\wmo\Dungeon\LD_ShadowFang\LD_ShadowFangInterior.wmo	76	71	10	7x10 3x4 6x10 9x7 37x0 54x0 27x0 5x0 4x7 121x0	212x274x98	113472
+World\wmo\Dungeon\LD_Stratholme\FrostWyrm_Final01.wmo	11	4	7	21x32 23x33 19x29 19x29 20x28 20x28 20x29	429x358x286	15432
+World\wmo\Dungeon\LD_Stratholme\Stratholme.wmo	92	91	2	19x38 19x63	767x889x192	121392
+World\wmo\Dungeon\LD_Stratholme\Stratholme_A.wmo	5	4	2	19x38 19x63	234x239x118	13132
+World\wmo\Dungeon\LD_Stratholme\Stratholme_B.wmo	83	82	2	19x38 19x63	766x873x146	119700
+World\wmo\Dungeon\LD_Stratholme\Stratholme_C.wmo	7	6	1	13x13	91x47x14	3924
+World\wmo\Dungeon\LD_Stratholme\Stratholme_raid.wmo	65	64	1	152x0	1126x1199x262	195892
+World\wmo\Dungeon\MD_Algazgate\AlgazGate.wmo	17	15	2	6x8 6x8	139x60x84	2512
+World\wmo\Dungeon\MD_Anvilmarpass\Anvilmarpass.wmo	13	11	2	6x8 6x8	95x199x40	8588
+World\wmo\Dungeon\MD_BarrowDens\BarrowDens.wmo	33	32	1	7x8	227x166x86	18240
+World\wmo\Dungeon\MD_BarrowDens\BarrowDens_B.wmo	17	16	2	19x0 7x5	250x272x71	15212
+World\wmo\Dungeon\MD_BarrowDens\BarrowDens_C.wmo	17	16	1	7x8	359x568x118	80300
+World\wmo\Dungeon\MD_BarrowDens\CorruptBarrowDens.wmo	33	32	1	7x8	227x166x86	18488
+World\wmo\Dungeon\MD_BarrowDensOneRm\BarrowDensOneRm.wmo	12	11	1	7x8	123x94x46	8172
+World\wmo\Dungeon\MD_BarrowDensOneRm\CorruptBarrowDensOneRoom.wmo	12	11	1	7x8	123x94x46	8132
+World\wmo\Dungeon\MD_Caveden\MD_IceDen.wmo	2	1	1	12x10	32x26x17	2284
+World\wmo\Dungeon\MD_Caveden\MD_JungleDen.wmo	2	1	1	12x10	32x26x17	4052
+World\wmo\Dungeon\MD_Caveden\MD_MushroomDen.wmo	2	1	1	12x10	32x26x17	3164
+World\wmo\Dungeon\MD_Caveden\MD_TrollDen.wmo	2	1	1	12x10	32x26x17	6828
+World\wmo\Dungeon\MD_Caveden\MD_TrollDen_Warm.wmo	2	1	1	12x10	32x26x17	3580
+World\wmo\Dungeon\MD_Caveden\MD_VolcanicDen.wmo	2	1	1	12x10	32x26x17	4864
+World\wmo\Dungeon\MD_Caveden\MD_VrykulDen.wmo	2	1	1	12x10	32x26x17	4548
+World\wmo\Dungeon\MD_Caveden\MD_WarmDen.wmo	2	1	1	12x10	32x26x17	3076
+World\wmo\Dungeon\MD_CaveTunnels\BladesEdgeOgreTunnel.wmo	7	5	2	18x17 14x13	300x124x45	2012
+World\wmo\Dungeon\MD_CaveTunnels\BladesEdgeOgreTunnel2.wmo	6	4	2	17x16 22x20	423x94x64	1884
+World\wmo\Dungeon\MD_CaveTunnels\BladesEdgeOgreTunnel3.wmo	6	4	2	21x30 31x78	302x92x101	2096
+World\wmo\Dungeon\MD_CaveTunnels\BladesEdgeOgreTunnel4.wmo	7	5	2	54x25 44x23	463x136x67	1996
+World\wmo\Dungeon\MD_CaveTunnels\BladesEdgeOgreTunnel5.wmo	7	5	2	62x25 49x23	606x150x67	1996
+World\wmo\Dungeon\MD_CaveTunnels\MD_CaveTunnel01.wmo	4	2	2	12x10 12x10	65x32x29	2396
+World\wmo\Dungeon\MD_CaveTunnels\MD_ColdCaveTunnel01.wmo	4	2	2	12x10 12x10	65x28x18	2216
+World\wmo\Dungeon\MD_CaveTunnels\MD_StoneAshen_Tunnel.wmo	25	23	2	12x10 13x11	403x90x41	7564
+World\wmo\Dungeon\MD_CaveTunnels\MD_WarmCaveTunnel01.wmo	4	2	2	12x10 12x10	65x28x19	3300
+World\wmo\Dungeon\MD_CaveTunnels\PvP_Alterac_Ent01.wmo	3	2	1	14x9	202x65x17	5144
+World\wmo\Dungeon\MD_CaveTunnels\PvP_Alterac_Snow01.wmo	3	2	1	14x9	299x65x17	4776
+World\wmo\Dungeon\MD_Crypt\MD_Crypt.wmo	10	9	1	11x0	53x57x33	17704
+World\wmo\Dungeon\MD_Crypt\MD_Crypt_B.wmo	2	1	1	6x7	83x53x31	4824
+World\wmo\Dungeon\MD_Crypt\MD_Crypt_C.wmo	13	11	2	11x0 9x4	388x287x48	49084
+World\wmo\Dungeon\MD_Crypt\MD_Crypt_D.wmo	19	18	1	15x0	286x452x119	34644
+World\wmo\Dungeon\MD_Crypt\MD_Crypt_F_Northrend.wmo	13	11	2	11x0 9x4	388x287x48	37332
+World\wmo\Dungeon\MD_CryptOneRm\MD_CryptOneRm.wmo	5	4	1	11x0	41x39x21	12864
+World\wmo\Dungeon\MD_CryptSchool\MD_CryptSchool.wmo	12	10	1	5x5	53x58x40	19796
+World\wmo\Dungeon\MD_CryptSimpleEnt\MD_CryptSimpleEnt.wmo	5	4	1	11x0	41x39x22	8976
+World\wmo\Dungeon\MD_DiamondMt\DiamondMountain.wmo	5	4	1	15x20	128x338x79	12492
+World\wmo\Dungeon\MD_DragonShrines\MD_RedDragonShrine.wmo	2	1	1	16x11	39x36x55	4800
+World\wmo\Dungeon\MD_Dwarven Tunnels\LargeTunnel.wmo	22	20	2	6x8 6x8	17x520x86	6760
+World\wmo\Dungeon\MD_Dwarven Tunnels\MediumTunnel.wmo	10	8	2	6x8 6x8	17x184x67	3332
+World\wmo\Dungeon\MD_Dwarven Tunnels\MediumTunnel_Snow.wmo	10	8	2	6x8 6x8	17x184x67	3452
+World\wmo\Dungeon\MD_Dwarven Tunnels\SmallTunnel.wmo	8	6	2	6x8 6x8	17x113x38	2732
+World\wmo\Dungeon\MD_Dwarven Tunnels\SmallTunnel_Snow.wmo	8	6	2	6x8 6x8	17x113x38	2852
+World\wmo\Dungeon\MD_FishingHole\MD_FishingHoleIce.wmo	2	1	1	10x0	61x57x31	1764
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine.wmo	10	9	1	9x8	171x84x25	9380
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_1Room.wmo	5	4	1	9x8	89x53x18	5372
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_hellfire_human.wmo	5	4	1	9x8	202x160x77	11760
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantA.wmo	22	21	3	9x8 8x7 5x0	174x129x51	16032
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantB.wmo	11	9	3	9x8 8x7 8x8	232x204x34	16696
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantC.wmo	10	7	3	22x9 9x8 16x14	398x375x122	35404
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantD.wmo	13	11	2	11x8 16x8	402x675x106	68064
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantE.wmo	13	8	5	14x8 14x9 14x9 13x9 15x0	506x433x116	46840
+World\wmo\Dungeon\MD_Goldmine\MD_Goldmine_variantF.wmo	4	3	1	11x8	189x97x32	7420
+World\wmo\Dungeon\MD_gorge\hellfire_cave_01.wmo	2	1	1	123x21	124x53x22	5500
+World\wmo\Dungeon\MD_gorge\hellfire_orc_hideout.wmo	5	4	5	6x7 4x5 11x0 5x5 30x0	125x41x36	7724
+World\wmo\Dungeon\MD_Hive\mini-hive_A.wmo	4	3	1	17x17	82x116x39	3248
+World\wmo\Dungeon\MD_Hive\mini-hive_B.wmo	8	7	1	11x10	261x226x54	4632
+World\wmo\Dungeon\MD_Hive\mini-hive_C.wmo	10	9	1	17x17	380x295x66	4424
+World\wmo\Dungeon\MD_Hive\mini-hive_C_albino.wmo	10	9	1	17x17	380x295x66	4424
+World\wmo\Dungeon\MD_Hive\mini-hive_D.wmo	7	6	3	18x17 19x18 18x17	223x188x43	4140
+World\wmo\Dungeon\MD_Hive\mini-hive_D_albino.wmo	7	6	3	18x17 19x18 18x17	223x188x43	4396
+World\wmo\Dungeon\MD_Hive\mini-hive_E.wmo	10	9	2	18x16 19x20	337x240x64	4932
+World\wmo\Dungeon\MD_Hive\mini-hive_E_albino.wmo	10	9	2	18x16 19x20	337x240x64	4932
+World\wmo\Dungeon\MD_Hive\mini-hive_F.wmo	13	12	2	21x13 17x17	313x371x68	6400
+World\wmo\Dungeon\MD_Hive\mini-hive_F_albino.wmo	14	13	2	21x13 17x17	313x463x68	6444
+World\wmo\Dungeon\MD_Hordemine\MD_Hordemine.wmo	13	12	1	6x5	160x99x22	11328
+World\wmo\Dungeon\MD_Hordemine\MD_Hordemine1Room.wmo	7	6	1	6x5	104x45x17	6576
+World\wmo\Dungeon\MD_Magnataur\MD_Magnataur_01.wmo	8	5	3	68x0 28x25 34x26	245x255x117	16960
+World\wmo\Dungeon\MD_Magnataur\MD_Magnataur_02.wmo	8	5	3	68x0 28x25 34x26	245x255x117	16960
+World\wmo\Dungeon\MD_Magnataur\MD_Magnataur_03.wmo	8	5	3	68x0 28x25 34x26	245x255x117	16960
+World\wmo\Dungeon\MD_Mountaincave\MD_CorruptCave01.wmo	2	1	1	65x66	180x215x120	6136
+World\wmo\Dungeon\MD_Mountaincave\MD_CorruptCave02.wmo	2	1	1	65x66	180x215x120	11972
+World\wmo\Dungeon\MD_Mountaincave\MD_hellfirecave.wmo	5	4	1	12x10	67x89x37	2400
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave.wmo	13	12	1	12x10	213x157x46	9876
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave02.wmo	7	6	1	18x7	180x192x31	6456
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave03.wmo	8	7	1	24x20	281x282x45	8236
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave04.wmo	4	3	1	13x10	236x186x65	10200
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave05.wmo	9	8	1	65x40	709x352x130	39672
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave06.wmo	9	8	1	65x40	709x352x133	35684
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave07.wmo	4	3	1	13x10	189x111x40	10400
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave08.wmo	7	6	1	18x7	200x194x41	6960
+World\wmo\Dungeon\MD_Mountaincave\MD_Icecave_Medium.wmo	8	7	1	12x10	133x114x43	2952
+World\wmo\Dungeon\MD_Mountaincave\MD_Junglecave.wmo	13	12	1	12x10	213x161x130	23416
+World\wmo\Dungeon\MD_Mountaincave\MD_Junglecave07.wmo	6	5	1	13x10	236x155x37	4416
+World\wmo\Dungeon\MD_Mountaincave\MD_Junglecave_Crystal.wmo	8	7	1	12x10	140x117x52	8608
+World\wmo\Dungeon\MD_Mountaincave\MD_Junglecave_Medium.wmo	8	7	1	12x10	133x114x45	2904
+World\wmo\Dungeon\MD_Mountaincave\md_mountaincave_medium.wmo	8	7	1	12x10	133x114x45	2888
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_B.wmo	5	4	1	13x10	232x363x101	4008
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_C.wmo	3	2	1	12x10	152x210x39	4080
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_D.wmo	3	2	1	12x10	152x210x39	4096
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_E.wmo	4	3	1	12x10	179x181x52	2048
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_F.wmo	7	6	1	12x10	220x229x74	2612
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_G.wmo	3	2	1	13x10	232x183x65	2496
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_G_Warm.wmo	3	2	1	13x10	232x183x65	2396
+World\wmo\Dungeon\MD_Mountaincave\MD_Mountaincave_Medium_H.wmo	3	2	1	12x10	196x115x45	25280
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave.wmo	13	12	1	12x10	213x161x130	26168
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave02.wmo	7	6	1	18x7	180x192x31	13808
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave03.wmo	7	6	1	18x7	180x192x30	14244
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave04.wmo	8	7	1	24x20	281x282x45	8404
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave05.wmo	9	8	1	24x20	326x225x45	51604
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave06.wmo	4	3	1	13x10	236x186x65	7744
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave07.wmo	6	5	1	13x10	236x155x37	8808
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave08.wmo	5	4	1	17x9	202x166x37	10888
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave09.wmo	7	6	1	25x14	277x196x86	8808
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave09B.wmo	7	6	1	25x14	277x196x86	18068
+World\wmo\Dungeon\MD_Mountaincave\MD_Mushroomcave10.wmo	7	6	1	18x7	180x192x30	14244
+World\wmo\Dungeon\MD_Mountaincave\MD_Nagacave.wmo	4	3	1	13x10	201x241x62	12996
+World\wmo\Dungeon\MD_Mountaincave\MD_Underwatercave_Medium.wmo	8	7	1	12x10	133x114x45	2888
+World\wmo\Dungeon\MD_Mountaincave\MD_Warmcave.wmo	13	12	1	12x10	213x161x130	19464
+World\wmo\Dungeon\MD_Mountaincave\MD_Warmcave_Medium.wmo	8	7	1	12x10	133x114x45	5796
+World\wmo\Dungeon\MD_NagaTemple\MD_NagaTemple.wmo	5	2	4	10x10 49x34 12x17 10x8	317x328x87	24596
+World\wmo\Dungeon\MD_Ogremound\MD_Brogremound.wmo	9	8	1	18x11	171x131x27	8260
+World\wmo\Dungeon\MD_Ogremound\MD_Brogremound1Room.wmo	2	1	1	18x11	32x27x18	3440
+World\wmo\Dungeon\MD_Ogremound\MD_Grogremound.wmo	9	8	1	18x11	171x131x27	8584
+World\wmo\Dungeon\MD_Ogremound\MD_Grogremound1Room.wmo	2	1	1	18x11	32x27x18	3448
+World\wmo\Dungeon\MD_Ogremound\MD_OgreMine1.wmo	6	5	1	14x13	153x203x73	4300
+World\wmo\Dungeon\MD_Ogremound\MD_OgreMine2.wmo	4	3	1	17x15	113x191x76	2916
+World\wmo\Dungeon\MD_Ogremound\MD_OgreMine3.wmo	6	4	2	16x10 38x15	116x188x41	3572
+World\wmo\Dungeon\MD_Ogremound\MD_Ogremound.wmo	9	8	1	18x11	171x131x27	7824
+World\wmo\Dungeon\MD_Ogremound\MD_Ogremound1Room.wmo	2	1	1	18x11	32x27x18	6008
+World\wmo\Dungeon\MD_Ogremound\MD_Ogremound_Medium.wmo	5	4	1	18x11	92x117x33	5772
+World\wmo\Dungeon\MD_Ogremound\MD_Snogremound.wmo	9	8	1	18x11	171x131x27	7880
+World\wmo\Dungeon\MD_Ogremound\MD_Snogremound1Room.wmo	2	1	1	18x11	32x27x18	5992
+World\wmo\Dungeon\MD_Ogremound\Nagrand_Ogremound01.wmo	4	1	3	20x11 24x18 20x32	231x166x104	9348
+World\wmo\Dungeon\MD_Pirateship\Pirateship.wmo	10	9	5	3x3 9x2 14x2 14x2 9x2	69x25x17	6172
+World\wmo\Dungeon\MD_Pirateship\Pirateship_NoCannons.wmo	10	9	1	3x3	69x26x17	5292
+World\wmo\Dungeon\MD_Pirateship\Pirateship_plank.wmo	10	5	4	3x3 8x4 8x4 3x4	69x25x17	6436
+World\wmo\Dungeon\MD_Pirateship\Pirateship_plank_dock.wmo	11	5	4	3x3 8x4 8x4 3x4	69x25x17	7320
+World\wmo\Dungeon\MD_Ruinedfortress\MD_RuinedFortress.wmo	18	17	1	6x11	73x75x32	9796
+World\wmo\Dungeon\MD_Ruinedkeep\Ruinedkeep.wmo	16	15	2	3x6 7x12	48x60x39	15392
+World\wmo\Dungeon\MD_Ruinedkeep\Ruinedkeep_crypt.wmo	15	14	3	5x6 3x6 7x12	48x60x53	28408
+World\wmo\Dungeon\MD_Ruinedkeep\Ruinedkeep_crypt_facade.wmo	2	1	1	19x10	37x20x23	4276
+World\wmo\Dungeon\MD_Ruinedkeep\Ruinedkeep_crypt_instance.wmo	22	21	1	19x10	380x307x87	150704
+World\wmo\Dungeon\MD_Sinkhole\Sinkhole_small_01.wmo	2	1	1	6x0	6x7x36	1040
+World\wmo\Dungeon\MD_Spidermine\MD_Spidermine.wmo	12	11	1	9x8	171x98x27	12124
+World\wmo\Dungeon\MD_Spidermine\MD_Spidermine_nokobolds.wmo	12	11	1	9x8	171x98x27	10548
+World\wmo\Dungeon\MD_Stratholme_Plaguewood_Tunnel\MD_Stratholme_Plaguewood_Tunnel.wmo	25	23	2	12x10 13x11	403x90x41	11028
+World\wmo\Dungeon\MD_TimbermawHold\MD_Furbog_01.wmo	5	4	1	32x14	347x178x69	20856
+World\wmo\Dungeon\MD_TimbermawHold\MD_TimbermawHold.wmo	35	32	3	11x12 11x12 11x12	523x233x106	38624
+World\wmo\Dungeon\MD_WinterfinCave\MD_WinterfinCave.wmo	9	8	1	24x20	326x225x45	23752
+World\wmo\Dungeon\MD_ZD_Coliseum\ZD_Coliseum.wmo	12	3	3	35x10 35x10 23x22	75x279x41	39460
+World\wmo\Dungeon\micro_dungeons\ND_BearCave_Icecrown.wmo	4	3	1	8x10	200x176x49	18556
+World\wmo\Dungeon\Monestary\Scarlet_Monestary_Interior.wmo	46	43	9	16x9 36x7 36x7 36x7 36x7 28x7 28x7 28x7 28x7	450x221x95	51964
+World\wmo\Dungeon\ND_ArugalsTower\Arugals_Tower01.wmo	5	3	7	10x9 7x6 8x7 13x9 6x10 7x6 23x0	37x62x74	23992
+World\wmo\Dungeon\ND_DalaranPrison\DalaranPrison.wmo	1	1	0		223x217x141	9084
+World\wmo\Dungeon\ND_DrakTharon72\DrakTharon_72_Wing.wmo	28	23	3	6x10 51x33 8x14	370x420x210	47980
+World\wmo\Dungeon\ND_GunDrak\GunDrak_Entrance.wmo	2	1	1	19x33	57x56x49	5628
+World\wmo\Dungeon\ND_GunDrak\GundrakGrate.wmo	3	2	1	78x0	193x155x150	11828
+World\wmo\Dungeon\ND_GunDrak\GunDrakInterior.wmo	24	24	0		677x576x203	57716
+World\wmo\Dungeon\ND_Necropolis\DeathknightNecropolis.wmo	6	5	4	167x0 47x16 62x65 48x55	214x196x188	37888
+World\wmo\Dungeon\ND_Necropolis\ND_CrashedNecropolis01.wmo	3	2	2	63x51 7x11	140x141x82	15748
+World\wmo\Dungeon\ND_Necropolis\ND_Necropolis01.wmo	5	4	7	164x0 164x0 164x0 164x0 164x0 164x0 47x15	241x241x188	22840
+World\wmo\Dungeon\ND_Necropolis\ND_NecropolisCollision.wmo	5	4	6	111x36 107x36 108x36 111x36 155x0 47x15	241x241x203	37120
+World\wmo\Dungeon\ND_NerubianMicros\ND_NerubianEntrance01.wmo	7	4	2	34x2 9x14	270x439x122	25376
+World\wmo\Dungeon\ND_Sholazar_Geodemicro\ND_Sholazar_Geodemicro_final.wmo	2	1	1	51x54	207x322x328	9836
+World\wmo\Dungeon\ND_Stratholme\CoT_Stratholme_Exterior_Collision.wmo	1	1	0		703x1004x1039	424
+World\wmo\Dungeon\ND_Stratholme\Stratholme_Past.wmo	40	39	2	19x13 19x13	606x617x97	147536
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanIceMachine01.wmo	7	6	1	95x95	481x586x486	6176
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanOverlook01.wmo	7	6	1	25x45	407x454x396	6960
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanOverlook02.wmo	2	1	1	25x45	277x411x110	21748
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanOverlook03.wmo	3	2	1	12x23	94x76x60	4796
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanOverlook04.wmo	2	1	1	25x45	175x151x110	4232
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanOverlook05.wmo	2	1	1	12x23	94x76x60	4656
+World\wmo\Dungeon\ND_TitanMicros\ND_TitanPit01.wmo	2	1	1	368x0	528x451x796	2860
+World\wmo\Dungeon\ND_VrykulMicros\SP_VrykulTunnel01.wmo	4	2	2	21x28 21x22	108x339x69	6372
+World\wmo\Dungeon\ND_VrykulMicros\SP_VrykulTunnel02.wmo	11	9	2	21x28 21x22	245x339x71	15236
+World\wmo\Dungeon\ND_VrykulMicros\VR_Icecrown_Micro01.wmo	3	2	1	12x16	128x75x52	6024
+World\wmo\Dungeon\Nexus\Nexus_70.wmo	23	22	3	15x66 33x66 15x66	715x788x437	25500
+World\wmo\Dungeon\Nexus\Nexus_80.wmo	22	4	16	24x33 24x33 24x33 70x0 15x66 15x66 15x66 15x66 33x66 15x66 11x27 16x16 16x16 11x27 14x33 16x16	320x282x193	14488
+World\wmo\Dungeon\Nexus\Nexus_exterior.wmo	14	1	10	24x33 24x33 70x0 15x66 15x66 15x66 15x66 33x66 15x66 31x34	125x125x193	13700
+World\wmo\Dungeon\Nexus\Platforms\Nexus_base_structure01.wmo	2	1	1	28x21	126x66x52	1952
+World\wmo\Dungeon\OL_Auchindoun\Auchindoun_Enterance.wmo	39	24	20	23x21 11x9 11x9 23x21 23x21 23x21 23x21 11x9 11x9 11x9 11x9 11x9 11x9 23x21 23x21 23x21 23x22 23x22 23x22 23x20	723x723x101	63436
+World\wmo\Dungeon\OL_Auchindoun\demon_wing.wmo	21	18	3	303x0 27x46 303x0	449x430x136	68784
+World\wmo\Dungeon\OL_Auchindoun\Draenei_wing.wmo	13	10	3	303x0 32x58 27x46	535x490x353	88376
+World\wmo\Dungeon\OL_Auchindoun\ethereal_wing.wmo	14	13	1	48x86	509x349x167	89540
+World\wmo\Dungeon\OL_Auchindoun\OL_Crypt.wmo	8	7	1	11x0	182x237x29	39852
+World\wmo\Dungeon\OL_Auchindoun\shadow_council_wing.wmo	21	17	4	291x0 21x35 27x30 46x0	620x629x128	97572
+World\wmo\Dungeon\OL_Coilfang\Coilfang_Draenei.wmo	5	5	0		500x860x207	56252
+World\wmo\Dungeon\OL_Coilfang\Coilfang_Marsh.wmo	1	1	0		597x785x721	99920
+World\wmo\Dungeon\OL_Coilfang\Coilfang_Pumping.wmo	5	5	0		525x637x215	27552
+World\wmo\Dungeon\OL_Coilfang\Coilfang_Raid.wmo	12	12	0		961x1266x1032	59372
+World\wmo\Dungeon\OL_Coilfang\Coilfang_zangarentrance.wmo	3	1	1	31x26	294x453x101	24960
+World\wmo\Dungeon\OL_GronnRaid\Gronnraid.wmo	4	4	0		328x461x93	6568
+World\wmo\Dungeon\OL_GronnRaid\Gronnraid_facade.wmo	4	3	1	27x18	175x411x69	5948
+World\wmo\Dungeon\OL_OgreHuts\Ogre_Hut.wmo	2	1	1	9x9	29x37x24	3816
+World\wmo\Dungeon\OL_OgreHuts\Ogre_Hut2Story.wmo	4	2	3	11x10 13x12 21x0	45x50x55	5516
+World\wmo\Dungeon\OL_OgreHuts\Ogre_Hut_Huge.wmo	2	1	1	25x21	89x91x48	6004
+World\wmo\Dungeon\OL_OgreHuts\Ogre_Hut_Mushroom.wmo	2	1	1	9x9	29x37x24	4852
+World\wmo\Dungeon\OL_OgreHuts\Ogre_HutBig.wmo	2	1	1	19x19	71x74x43	5024
+World\wmo\Dungeon\OL_TempestKeep\TK_Arcane.wmo	21	21	0		593x550x1136	37304
+World\wmo\Dungeon\OL_TempestKeep\TK_Atrium.wmo	10	6	4	15x41 15x41 346x0 53x31	485x730x531	45628
+World\wmo\Dungeon\OL_TempestKeep\TK_Factory.wmo	14	14	0		451x419x196	19140
+World\wmo\Dungeon\OL_TempestKeep\TK_Raid.wmo	16	9	5	161x312 161x312 86x61 53x31 53x31	943x993x347	20964
+World\wmo\Dungeon\QT_Sunwell\Sunwell.wmo	54	9	12	9x17 9x17 13x15 10x15 14x31 12x31 13x19 14x21 13x19 40x24 10x16 10x16	497x330x256	68880
+World\wmo\Dungeon\QT_Sunwell_5Man\Sunwell_5Man.wmo	21	17	2	9x15 9x15	289x463x155	61288
+World\wmo\Dungeon\QT_Sunwell_Facades\Sunwell_Magister_Facade.wmo	11	1	1	11x18	32x32x27	14896
+World\wmo\Dungeon\QT_Sunwell_Facades\Sunwell_Raid_Facade.wmo	54	4	6	14x21 13x19 13x19 40x24 10x16 10x16	349x282x76	31804
+World\wmo\Dungeon\SunkenTemple\AZ_SunkenTemple.wmo	36	35	1	10x12	388x261x155	31144
+World\wmo\Dungeon\SunkenTemple\AZ_SunkenTemple_Instance.wmo	122	122	0		463x458x179	41828
+World\wmo\Dungeon\Terokkar_trees\Terokkar_tree_micro.wmo	3	2	2	6x8 8x8	24x24x56	13444
+World\wmo\Dungeon\Terokkar_trees\Terokkar_trees01.wmo	3	2	2	8x8 6x8	24x24x56	9064
+World\wmo\Dungeon\test\collintest.wmo	1	1	0		3x3x3	448
+World\wmo\Dungeon\test\light_test.wmo	41	20	20	5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5	81x134x5	4476
+World\wmo\Dungeon\Thor_Modan\Thor_Modan.wmo	4	2	2	21x43 328x0	379x306x88	7572
+World\wmo\Dungeon\Ulduar\Ulduar_dwarf77.wmo	15	14	3	143x156 192x0 161x0	725x921x445	35148
+World\wmo\Dungeon\Ulduar\Ulduar_Ext01.wmo	7	1	1	37x159	188x58x237	6180
+World\wmo\Dungeon\Ulduar\Ulduar_Ext02.wmo	4	1	1	38x70	146x147x122	7576
+World\wmo\Dungeon\Ulduar\Ulduar_Forge.wmo	2	1	1	39x40	93x100x110	6884
+World\wmo\Dungeon\Ulduar\Ulduar_irongiant80.wmo	11	8	6	59x17 216x137 98x223 224x0 224x0 98x223	786x513x248	24188
+World\wmo\Dungeon\Ulduar\Ulduar_Raid.wmo	49	47	3	47x58 72x72 72x72	1674x3369x795	98184
+World\wmo\Dungeon\Ulduar\Ulduar_Tower01.wmo	2	1	5	10x7 10x7 10x7 10x7 15x0	32x32x26	1964
+World\wmo\Dungeon\Ulduar\Ulduar_Tower01C.wmo	2	1	5	10x7 10x7 10x7 10x7 16x0	32x32x26	1852
+World\wmo\Dungeon\Ulduar\Ulduar_Wall03.wmo	4	1	0		1032x382x67	3300
+World\wmo\Dungeon\Ulduar\Ulduar_Wall04.wmo	2	1	0		286x126x54	1828
+World\wmo\Dungeon\Ulduar\Ulduar_Wall05.wmo	9	2	2	34x189 37x179	188x96x237	6900
+World\wmo\Dungeon\Ulduar\Ulduar_Wall07.wmo	8	2	1	39x40	1660x648x165	12492
+World\wmo\Dungeon\Valgarde\IC_VrykulTunnel01.wmo	6	5	1	14x17	235x345x90	17956
+World\wmo\Dungeon\Valgarde\Valgarde.wmo	18	13	5	14x17 11x17 15x19 14x17 8x12	474x479x376	34320
+World\wmo\Dungeon\Valgarde\Valgarde_70GW.wmo	17	15	2	14x17 14x17	501x455x268	67808
+World\wmo\Dungeon\Valgarde\Valgarde_80GW.wmo	25	23	10	224x79 262x0 106x79 85x79 242x0 348x210 89x210 99x210 540x0 503x0	509x530x353	58248
+World\wmo\Dungeon\Wintergrasp\Wintergrasp_Raid.wmo	16	16	0		832x508x426	19540
+World\wmo\Dungeon\woodtroll_temple\woodtroll_temple.wmo	8	6	2	5x10 5x10	128x260x30	11512
+World\wmo\Dungeon\woodtroll_temple\woodtroll_temple02.wmo	7	6	1	5x10	128x259x36	11440
+World\wmo\Kalimdor\Buildings\ClassicalElfRuins\AZRClassicalElfRuin09.wmo	3	2	2	7x27 10x10	179x197x84	9060
+World\wmo\Kalimdor\Buildings\ClassicalElfRuins\AZRClassicalElfRuin11.wmo	2	2	0		269x326x137	3748
+World\wmo\Kalimdor\Buildings\ClassicalElfRuins\ClassicalElfTemple.wmo	2	1	1	10x10	115x119x85	8412
+World\wmo\Kalimdor\Buildings\ClassicalElfRuins\ClassicalElfTemple2.wmo	2	1	1	10x10	115x119x84	2740
+World\wmo\Kalimdor\Buildings\Dwarf\OL_dwarfbarracks.wmo	12	11	1	16x6	63x95x40	61096
+World\wmo\Kalimdor\Buildings\Dwarf\OL_Dwarven_GuardTower.wmo	2	1	2	6x5 38x0	41x39x14	35228
+World\wmo\Kalimdor\Buildings\Dwarf\OL_mud_hovel.wmo	2	1	1	2x3	22x16x8	33184
+World\wmo\Kalimdor\Buildings\Dwarf\OL_wet_Inn.wmo	8	7	1	3x4	45x58x21	44148
+World\wmo\Kalimdor\Buildings\GoblinHut\GoblinHut.wmo	2	1	1	5x6	17x14x12	6120
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Goblin_ice_observatory.wmo	2	1	2	5x5 5x9	30x25x21	4800
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Goblin_igloo_A.wmo	2	1	1	3x5	22x22x13	9768
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Goblin_igloo_B.wmo	2	1	1	3x4	30x25x11	12404
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Goblin_igloo_C.wmo	2	1	1	3x4	12x12x11	11980
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Goblin_igloo_D.wmo	3	2	1	16x0	28x49x11	4092
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Tanaris_GoblinBld_A.wmo	2	1	1	3x5	22x22x13	9768
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Tanaris_GoblinBld_B.wmo	2	1	1	3x4	30x25x11	12404
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Tanaris_GoblinBld_C.wmo	2	1	1	3x4	12x12x11	13752
+World\wmo\Kalimdor\Buildings\GoblinHut\KL_Tanaris_GoblinBld_D.wmo	3	2	1	16x0	38x53x11	4252
+World\wmo\Kalimdor\Buildings\GoblinLab\GoblinLab.wmo	3	2	2	8x9 9x15	33x15x33	3984
+World\wmo\Kalimdor\Buildings\NightElfAbbey\NightElfAbbey.wmo	11	5	5	8x9 9x11 30x0 20x5 5x7	93x101x94	15820
+World\wmo\Kalimdor\Buildings\NightElfDruidTower\DSNightElfDruidTower.wmo	3	2	3	3x4 5x5 3x4	36x31x53	6564
+World\wmo\Kalimdor\Buildings\NightElfDruidTower\NightElfDruidTower.wmo	3	2	3	3x4 5x5 3x4	36x31x53	6924
+World\wmo\Kalimdor\Buildings\NightElfGuardTower\NightElfGuardTower_B.wmo	2	1	2	7x8 12x0	17x17x40	4344
+World\wmo\Kalimdor\Buildings\NightElfOutpost\NightElfOutpost.wmo	2	1	2	7x7 7x7	30x20x10	5180
+World\wmo\Kalimdor\Buildings\NightElfOutpost\NightElfOutpost_B.wmo	2	1	2	7x7 7x7	30x20x11	1704
+World\wmo\Kalimdor\Buildings\NightElfSmallHouse\DSNightElfSmallHouse.wmo	3	2	1	4x4	17x19x9	11052
+World\wmo\Kalimdor\Buildings\NightElfSmallHouse\DSNightElfSmallHouse2.wmo	3	2	1	4x4	17x19x9	11000
+World\wmo\Kalimdor\Buildings\NightElfSmallHouse\NightElfSmallHouse.wmo	3	2	1	4x4	17x19x9	11152
+World\wmo\Kalimdor\Buildings\NightElfSmallHouse\NightElfSmallHouse_WSG.wmo	3	2	1	4x4	17x19x9	11176
+World\wmo\Kalimdor\Buildings\OrcBarracks\AbandonedOrcBarracks.wmo	4	3	1	9x15	78x63x45	6284
+World\wmo\Kalimdor\Buildings\OrcBarracks\BlackrockOrcBarracks.wmo	4	3	1	9x15	78x63x45	19460
+World\wmo\Kalimdor\Buildings\OrcBarracks\OrcBarracks.wmo	4	3	1	9x15	78x63x44	10948
+World\wmo\Kalimdor\Buildings\OrcBarracks\SwampOrcBarracks.wmo	4	3	1	9x15	78x63x45	11128
+World\wmo\Kalimdor\Buildings\OrcFortress\BlackrockOrcFortress.wmo	21	20	1	6x11	74x72x28	27500
+World\wmo\Kalimdor\Buildings\OrcFortress\OrcFortress.wmo	21	20	1	6x11	74x72x28	17384
+World\wmo\Kalimdor\Buildings\OrcFortress\SwampOrcFortress.wmo	21	20	1	6x11	74x72x28	6316
+World\wmo\Kalimdor\Buildings\OrcGreatHall\AbandonedOrcGreatHall.wmo	4	3	3	6x5 6x5 6x5	41x36x40	6196
+World\wmo\Kalimdor\Buildings\OrcGreatHall\BlackrockOrcGreatHall.wmo	4	3	3	6x5 6x6 6x6	41x36x40	2828
+World\wmo\Kalimdor\Buildings\OrcGreatHall\OrcGreatHall.wmo	4	3	3	6x5 6x5 6x5	41x36x40	8156
+World\wmo\Kalimdor\Buildings\OrcGreatHall\SwampOrcGreatHall.wmo	4	3	3	6x5 6x5 6x5	41x36x40	8620
+World\wmo\Kalimdor\Buildings\OrcHut\BlackrockOrcHut.wmo	3	2	1	7x5	21x20x16	9620
+World\wmo\Kalimdor\Buildings\OrcHut\OrcHut.wmo	3	2	1	7x5	21x20x16	9600
+World\wmo\Kalimdor\Buildings\OrcHut\OrcHut_WSG.wmo	3	2	1	7x5	21x20x16	9628
+World\wmo\Kalimdor\Buildings\OrcInn\OrcInn.wmo	3	2	1	7x5	40x38x32	6828
+World\wmo\Kalimdor\Buildings\OrcMageTower\abandonedOrcMageTower.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	2900
+World\wmo\Kalimdor\Buildings\OrcMageTower\BlackrockOrcMageTower.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	9640
+World\wmo\Kalimdor\Buildings\OrcMageTower\OrcMageTower.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	9608
+World\wmo\Kalimdor\Buildings\OrcMageTower\OrcMageTower_expansion.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	9608
+World\wmo\Kalimdor\Buildings\OrcMageTower\SwampOrcMageTower.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	9756
+World\wmo\Kalimdor\Buildings\OrcMageTower\SwampOrcMageTower_expansion.wmo	5	4	4	5x4 3x5 3x5 26x0	36x39x48	9756
+World\wmo\Kalimdor\Buildings\OrcMedium\AbandonedOrcMedium.wmo	3	2	1	6x5	44x33x23	3960
+World\wmo\Kalimdor\Buildings\OrcMedium\BlackrockOrcMedium.wmo	3	2	1	6x5	44x33x23	21748
+World\wmo\Kalimdor\Buildings\OrcMedium\OrcMedium.wmo	3	2	1	6x5	44x33x23	21712
+World\wmo\Kalimdor\Buildings\OrcMedium\SwampOrcMedium.wmo	3	2	1	6x5	44x33x23	21748
+World\wmo\Kalimdor\Buildings\OrcTower\AbandonedOrcTower.wmo	3	2	1	3x5	14x16x12	1612
+World\wmo\Kalimdor\Buildings\OrcTower\BlackrockOrcTower.wmo	2	1	1	3x5	13x14x12	4540
+World\wmo\Kalimdor\Buildings\OrcTower\OrcTower.wmo	2	1	1	3x5	13x14x12	4508
+World\wmo\Kalimdor\Buildings\OrcTower\SwampOrcTower.wmo	2	1	1	3x5	13x14x12	4536
+World\wmo\Kalimdor\Buildings\OrcTwoStory\BlackrockOrcTwoStory.wmo	2	1	1	7x5	21x21x29	11320
+World\wmo\Kalimdor\Buildings\OrcTwoStory\OrcTwoStory.wmo	2	1	1	7x5	21x21x29	11300
+World\wmo\Kalimdor\Buildings\OrcZeppelinHouse\OrcZeppelinHouse.wmo	2	1	2	6x5 17x0	30x31x30	11360
+World\wmo\Kalimdor\Buildings\OrcZeppelinHouse\OrcZeppelinHouse_Durotar01.wmo	2	1	2	6x5 17x0	30x31x30	7688
+World\wmo\Kalimdor\Buildings\OrcZeppelinHouse\OrcZeppelinHouse_GromGol.wmo	2	1	2	6x5 17x0	30x31x30	8660
+World\wmo\Kalimdor\Buildings\TaurenHunterTent\TaurenHunterTent.wmo	3	2	1	12x9	70x39x42	3484
+World\wmo\Kalimdor\Buildings\TaurenHuts\TaurenHutBig.wmo	2	1	1	5x6	25x57x22	11152
+World\wmo\Kalimdor\Buildings\TaurenHuts\TaurenHutD.wmo	2	1	2	4x4 9x0	26x26x17	7292
+World\wmo\Kalimdor\Buildings\TaurenLonghouse\TaurenLonghouse.wmo	2	1	2	8x7 4x7	42x19x20	9436
+World\wmo\Kalimdor\Buildings\TrollBurrow\AbandonedTrollBurrow.wmo	2	1	2	5x5 8x0	19x20x7	1808
+World\wmo\Kalimdor\Buildings\TrollBurrow\BlackrockTrollBurrow.wmo	2	1	2	5x5 8x0	19x20x7	4308
+World\wmo\Kalimdor\Buildings\TrollBurrow\SwampTrollBurrow.wmo	2	1	2	5x5 8x0	19x20x7	4304
+World\wmo\Kalimdor\Buildings\TrollBurrow\TrollBurrow.wmo	2	1	2	5x5 8x0	19x20x7	4284
+World\wmo\Kalimdor\Buildings\TrollHotel\troll_hotel01.wmo	2	1	4	5x5 7x5 16x9 8x5	43x38x19	14696
+World\wmo\Kalimdor\Buildings\WyvernNest\WyvernNest.wmo	2	1	2	16x0 4x4	14x16x11	872
+World\wmo\Kalimdor\CollidableDoodads\Darkshore\DarkshoreDocks\DarkshoreDocksAberdeen.wmo	3	1	0		67x60x59	560
+World\wmo\Kalimdor\CollidableDoodads\Hyjal\HyjalDemon\HyjalDemon01.wmo	1	1	0		51x47x29	1604
+World\wmo\Kalimdor\CollidableDoodads\Hyjal\WorldTreeRoots\WorldTreeRoots01.wmo	1	1	0		85x27x102	328
+World\wmo\Kalimdor\CollidableDoodads\Hyjal\WorldTreeRoots\WorldTreeRoots02.wmo	1	1	0		161x60x49	332
+World\wmo\Kalimdor\CollidableDoodads\Silithus\NightElfOutpost_silithus.wmo	2	1	2	7x7 7x7	30x20x11	1704
+World\wmo\Kalimdor\Darnassis\Darnassis.wmo	104	54	82	7x27 10x10 18x11 16x9 25x9 12x15 16x14 14x15 14x15 21x9 21x9 14x15 14x15 21x9 21x9 7x7 8x7 17x6 10x7 10x7 8x7 8x7 7x27 18x11 18x11 18x11 17x6 17x6 17x6 17x6 10x7 10x7 8x7 8x7 11x7 11x7 8x7 8x7 10x7 10x7 8x7 8x7 11x7 13x7 9x7 10x7 12x15 16x15 16x9 25x9 10x7 12x7 8x7 9x7 14x15 14x15 21x9 21x9 10x7 10x7 8x7 8x7 10x7 10x7 8x7 8x7 14x15 14x15 21x9 21x9 10x7 12x7 8x7 9x7 12x15 16x15 16x9 25x9 4x5 3x4 5x5 3x4	477x645x132	80836
+World\wmo\Kalimdor\DraeneiCity\OL_Draenei_City.wmo	31	23	2	14x22 21x26	592x737x429	148500
+World\wmo\Kalimdor\NetherCollector\NetherCollector.wmo	6	5	4	6x16 7x17 6x16 6x16	192x192x45	12736
+World\wmo\Kalimdor\NetherCollector\NetherCollector_google.wmo	6	5	4	6x16 7x17 6x16 6x16	192x192x45	12620
+World\wmo\Kalimdor\NetherCollector\NetherCollector_off.wmo	6	5	4	6x16 7x17 6x16 6x16	192x192x45	14076
+World\wmo\Kalimdor\Ogrimmar\KL_PvPBarracks.wmo	14	14	0		356x302x139	15248
+World\wmo\Kalimdor\Ogrimmar\Ogrimmar.wmo	144	142	2	27x26 108x174	654x1089x184	139340
+World\wmo\Kalimdor\ThunderBluff\GiantTotem.wmo	2	1	5	6x8 12x12 12x12 9x8 11x8	25x38x62	3032
+World\wmo\Kalimdor\ThunderBluff\LowerMesaB.wmo	4	1	2	8x7 4x7	42x37x18	4532
+World\wmo\Kalimdor\ThunderBluff\LowerMesaC.wmo	5	1	2	4x4 9x0	27x25x17	6168
+World\wmo\Kalimdor\ThunderBluff\LowerMesaF.wmo	7	2	4	4x4 9x0 4x7 8x7	40x79x20	6988
+World\wmo\Kalimdor\ThunderBluff\MidMesaA.wmo	7	1	2	4x7 8x7	43x35x18	7580
+World\wmo\Kalimdor\ThunderBluff\MidMesaB.wmo	6	1	2	4x4 9x0	25x24x16	4672
+World\wmo\Kalimdor\ThunderBluff\MidMesaD.wmo	6	2	3	8x7 4x7 6x6	82x56x25	13908
+World\wmo\Kalimdor\ThunderBluff\UndeadCave.wmo	4	3	1	8x10	134x87x45	4180
+World\wmo\Kalimdor\ThunderBluff\UpperMesaA.wmo	6	2	3	4x7 8x7 6x6	55x102x27	7148
+World\wmo\Kalimdor\ThunderBluff\UpperMesaB.wmo	7	1	2	8x7 4x7	40x41x18	5680
+World\wmo\Kalimdor\ThunderBluff\UpperMesaE.wmo	5	1	2	4x4 9x0	26x27x17	8420
+World\wmo\Kalimdor\ThunderBluff\WarriorMesaA.wmo	2	1	2	4x4 9x0	27x26x17	3880
+World\wmo\Kalimdor\Winterspring\MD_WinterspringCave01.wmo	5	4	1	65x66	462x213x140	11028
+World\wmo\Kalimdor\Winterspring\MD_WinterspringCave02.wmo	8	3	5	65x66 50x39 205x69 71x23 82x31	340x464x202	14856
+World\wmo\KhazModan\Buildings\Anvilmar\AnvilMar.wmo	6	5	1	5x4	97x51x20	24504
+World\wmo\KhazModan\Buildings\dwarven_1story_hovel\mud_hovel\mud_hovel.wmo	2	1	1	2x3	22x17x8	33188
+World\wmo\KhazModan\Buildings\dwarven_1story_hovel\snow_hovel\hovel_machine.wmo	2	1	1	2x3	22x17x8	6180
+World\wmo\KhazModan\Buildings\dwarven_1story_hovel\snow_hovel\snow_hovel.wmo	2	1	1	2x3	22x17x8	33228
+World\wmo\KhazModan\Buildings\dwarven_2story_hovel\mud_2story\mud_2story.wmo	2	1	1	2x3	24x19x13	30288
+World\wmo\KhazModan\Buildings\dwarven_2story_hovel\snow_2story\snow_2story.wmo	2	1	1	2x3	24x19x13	30284
+World\wmo\KhazModan\Buildings\Dwarven_Barracks\snow_barracks\snow_dwarfbarracks.wmo	12	11	1	16x6	63x95x40	110436
+World\wmo\KhazModan\Buildings\Dwarven_Barracks\wetlands_barracks\wet_dwarfbarracks.wmo	12	11	1	16x6	63x95x40	61680
+World\wmo\KhazModan\Buildings\Dwarven_Blacksmith\Snow_Blacksmith\snow_blacksmith.wmo	2	1	1	4x4	33x34x15	17912
+World\wmo\KhazModan\Buildings\Dwarven_Blacksmith\Wetland_Blacksmith\wetland_blacksmith.wmo	2	1	1	4x4	33x34x15	17748
+World\wmo\KhazModan\Buildings\Dwarven_GriffonAviary\Dwarven_GriffonAviary.wmo	5	3	2	4x6 29x12	83x58x142	3252
+World\wmo\KhazModan\Buildings\Dwarven_GuardTower\Dwarven_GuardTower.wmo	2	1	2	6x5 38x0	41x39x14	35232
+World\wmo\KhazModan\Buildings\Dwarven_Inn\snow_Inn\Snow_Inn.wmo	7	6	1	3x4	45x58x21	44012
+World\wmo\KhazModan\Buildings\Dwarven_Inn\wetlands_Inn\wet_Inn.wmo	8	7	1	3x4	45x58x21	44148
+World\wmo\KhazModan\Buildings\Dwarven_SnowTower\Dwarven_PVPSnowTower.wmo	2	1	2	6x5 25x0	41x39x14	35068
+World\wmo\KhazModan\Buildings\Dwarven_SnowTower\Dwarven_SnowTower.wmo	2	1	2	6x5 38x0	41x39x14	35228
+World\wmo\KhazModan\Buildings\Dwarven_Tavern\snow_tavern\Snow_Tavern.wmo	5	4	1	2x4	45x32x18	44020
+World\wmo\KhazModan\Buildings\Dwarven_Tavern\wetlands_tavern\wet_Tavern.wmo	5	4	1	2x4	45x32x18	43944
+World\wmo\KhazModan\Buildings\ThandolSpan_Bridge\ThandolSpan.wmo	7	5	4	4x3 4x3 3x5 3x5	47x16x24	12744
+World\wmo\KhazModan\Cities\Ironforge\ironforge.wmo	104	103	1	20x25	635x645x255	199312
+World\wmo\KhazModan\Collidable Doodads\LochModan\NetherguardWall\NetherguardWall.wmo	1	1	0		241x245x41	1432
+World\wmo\Lorderon\Buildings\EasternPlaguelands\Cathedral\Cathedral.wmo	7	6	1	5x8	93x42x27	5924
+World\wmo\Lorderon\Buildings\EasternPlaguelands\UndeadSlaughterhouse\SlaughterHouse.wmo	12	10	1	7x11	65x53x33	3308
+World\wmo\Lorderon\Buildings\EasternPlaguelands\UndeadZiggurat\Undead_RogueTemple01.wmo	7	1	6	10x9 10x9 10x9 10x9 10x9 10x9	38x38x29	3500
+World\wmo\Lorderon\Buildings\EasternPlaguelands\UndeadZiggurat\Undead_SkullTower01.wmo	8	7	2	5x6 5x6	49x46x38	4204
+World\wmo\Lorderon\Buildings\EasternPlaguelands\UndeadZiggurat\UndeadZiggurat.wmo	2	1	2	5x9 23x0	42x31x32	3156
+World\wmo\Lorderon\Buildings\Ghostlands\Fountain\GhostlandsFountian.wmo	1	1	0		13x14x7	932
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_Gate\BloodElf_Gate01.wmo	7	2	4	5x32 5x8 5x8 5x32	60x216x76	1760
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_GuardTower\HighElf_GuardTower01.wmo	2	1	1	8x9	19x19x13	3320
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_MiliatryTent\BloodElf_MilitaryTent.wmo	2	1	1	4x4	26x13x6	4236
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_smallhouse\Bloodelf_SmallHouse01.wmo	2	1	4	5x11 5x11 5x11 5x11	24x24x21	14964
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_smallhouse\Bloodelf_SmallHouse02.wmo	2	1	1	5x11	25x25x21	9228
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_smallhouse\Bloodelf_SmallHouse03.wmo	2	1	1	5x11	25x25x21	4492
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_smallhouse\HighElf_SmallHouse01.wmo	2	1	1	5x11	25x25x21	2768
+World\wmo\Lorderon\Buildings\Silvermoon\BloodElf_TwoStory01\BloodElf_TwoStory01.wmo	3	2	7	6x6 6x6 6x11 6x11 6x6 6x6 6x6	35x45x42	49620
+World\wmo\Lorderon\Buildings\Silvermoon\Silvermoon_City_01.wmo	118	60	5	31x26 193x0 5x8 21x33 21x33	747x644x374	359960
+World\wmo\Lorderon\Buildings\ZulAman\Entrance\Zulaman_Entrance.wmo	18	2	2	36x43 36x43	139x145x54	19216
+World\wmo\Lorderon\Buildings\ZulAman\FTrollTemples\LynxGod_HighPriest.wmo	4	2	2	14x9 14x9	124x96x37	13416
+World\wmo\Lorderon\Buildings\ZulAman\FTrollTemples\Zulaman_EntranceBack.wmo	12	2	2	36x43 36x43	139x146x54	16104
+World\wmo\Lorderon\Buildings\ZulAman\FTrollTemples\Zulaman_Warlord_Zuljin_Temple.wmo	6	2	2	12x8 12x8	77x108x37	12356
+World\wmo\Lorderon\Buildings\ZulAman\ZulAman_Pieces\ZulAmanWall02.wmo	1	1	0		45x175x72	868
+World\wmo\Lorderon\CollidableDoodads\ArathiHighlands\HumanRuinedBuildings\HuRuinedBuilding_Collapsed.wmo	4	3	1	12x9	305x211x80	8092
+World\wmo\Lorderon\CollidableDoodads\ArathiHighlands\HumanRuinedBuildings\HuRuinedBuildingsSm01_WineCellar.wmo	7	6	1	12x9	349x193x31	16636
+World\wmo\Lorderon\Undercity\Undercity.wmo	206	204	2	9x11 23x26	636x744x213	178488
+World\wmo\Northrend\Battleground\ND_BG_Keep01.wmo	4	1	1	33x17	94x76x127	5488
+World\wmo\Northrend\Battleground\ND_BG_Tower01.wmo	3	1	5	18x0 10x7 10x7 10x7 10x7	32x32x27	4652
+World\wmo\Northrend\Battleground\ND_BG_Tower01C.wmo	2	1	5	10x7 10x7 10x7 10x7 16x0	32x32x27	4044
+World\wmo\Northrend\BoreanTundra\BoreanTundraAllianceTown\BoreanTundraAllianceTown.wmo	5	2	1	3x4	25x51x12	25072
+World\wmo\Northrend\Buildings\Forsaken\HF_VengeanceLandingWalls02.wmo	8	6	5	3x4 3x4 3x3 23x3 23x3	65x35x17	5936
+World\wmo\Northrend\Buildings\Forsaken\ND_DerelictWall_01.wmo	1	1	0		152x135x45	1760
+World\wmo\Northrend\Buildings\Forsaken\ND_Forsaken_Apothecary.wmo	4	2	6	5x4 3x3 2x4 3x3 3x4 1x3	30x26x17	18056
+World\wmo\Northrend\Buildings\Forsaken\ND_Forsaken_Hall.wmo	5	4	1	3x10	56x47x46	15148
+World\wmo\Northrend\Buildings\Forsaken\ND_Forsaken_House.wmo	2	1	1	4x7	15x19x22	5884
+World\wmo\Northrend\Buildings\Human\DB_Barracks.wmo	13	12	3	5x6 7x12 12x6	48x53x26	9264
+World\wmo\Northrend\Buildings\Human\ND_AllianceGunship.wmo	22	8	4	55x0 5x4 7x4 8x8	130x67x65	21608
+World\wmo\Northrend\Buildings\Human\ND_AllianceGunship_BG.wmo	5	1	1	5x4	27x31x21	6176
+World\wmo\Northrend\Buildings\Human\ND_AllianceGunship_Icecrown.wmo	5	1	1	5x4	27x31x21	6500
+World\wmo\Northrend\Buildings\Human\ND_Human_Barracks\ND_Human_Barracks.wmo	25	12	13	9x8 9x8 35x8 5x6 5x6 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5	76x70x42	21208
+World\wmo\Northrend\Buildings\Human\ND_Human_BG_Keep\ND_Human_BG_Keep.wmo	25	12	9	9x8 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5	76x70x41	20888
+World\wmo\Northrend\Buildings\Human\ND_Human_Boreanalliancetown_Barracks\ND_Human_Boreanalliancetown_Barracks.wmo	25	12	13	9x8 9x8 35x8 5x6 5x6 5x5 5x5 5x5 5x5 5x5 5x5 5x5 5x5	76x70x42	21320
+World\wmo\Northrend\Buildings\Human\ND_Human_Construction01\ND_ArgentCrusadeColiseum.wmo	13	8	8	8x9 8x9 8x9 8x9 8x9 8x9 8x9 8x9	180x185x11	19656
+World\wmo\Northrend\Buildings\Human\ND_Human_Construction01\ND_ArgentCrusadeColiseum_construction.wmo	2	1	0		318x115x14	1996
+World\wmo\Northrend\Buildings\Human\ND_Human_Construction01\ND_ArgentCrusadeColiseum_instance.wmo	7	5	1	185x0	1089x893x486	23104
+World\wmo\Northrend\Buildings\Human\ND_Human_Construction01\ND_ArgentCrusadeTentOne.wmo	3	2	1	8x12	59x62x26	31980
+World\wmo\Northrend\Buildings\Human\ND_Human_Construction01\ND_ArgentCrusadeTentTwo.wmo	3	2	1	6x13	38x78x28	9832
+World\wmo\Northrend\Buildings\Human\ND_Human_Destruction02\ND_Human_Destruction02.wmo	1	1	0		36x33x37	1856
+World\wmo\Northrend\Buildings\Human\ND_Human_House01\ND_Human_House01.wmo	2	1	1	3x6	27x10x21	7432
+World\wmo\Northrend\Buildings\Human\ND_Human_House02\ND_Human_House02.wmo	2	1	2	4x4 4x4	25x28x26	8096
+World\wmo\Northrend\Buildings\Human\ND_Human_House03\ND_Human_House03.wmo	2	1	1	3x4	10x26x19	5272
+World\wmo\Northrend\Buildings\Human\ND_Human_Inn\ND_Human_Inn.wmo	4	2	2	7x6 3x5	52x24x36	17352
+World\wmo\Northrend\Buildings\Human\ND_Human_Tower\ND_Human_Tower_No_Roof.wmo	2	1	2	5x11 35x0	25x27x37	2504
+World\wmo\Northrend\Buildings\Human\ND_Human_Tower_Open.wmo	2	1	2	5x11 35x0	25x27x37	2744
+World\wmo\Northrend\Buildings\Human\ND_Human_TownHall\ND_Human_TownHall.wmo	3	2	3	4x4 9x0 3x4	24x51x34	7464
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall\ND_Human_Wall.wmo	2	1	0		7x33x33	632
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall\ND_Human_Wall_End.wmo	2	1	0		12x12x47	1128
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall\ND_Human_Wall_End_Small02.wmo	2	1	0		5x5x23	1128
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall\ND_Human_Wall_Middle.wmo	2	2	0		18x8x34	1220
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall_01\ND_Human_Wall_01.wmo	2	1	0		6x34x33	1364
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall_Small\ND_Human_Wall_Small02.wmo	2	1	0		3x17x16	632
+World\wmo\Northrend\Buildings\Human\ND_Human_Wall_Small\ND_Human_Wall_Small_End.wmo	2	1	0		3x2x14	1340
+World\wmo\Northrend\Buildings\Human\ShipandDock.wmo	4	3	1	3x4	66x165x49	7992
+World\wmo\Northrend\Buildings\Human\Tents\ND_Human_Tent01.wmo	2	1	1	2x3	5x4x5	960
+World\wmo\Northrend\Buildings\Human_Barracks\Human_Barracks_Small.wmo	2	1	1	5x8	31x37x17	4496
+World\wmo\Northrend\Buildings\IceTroll\IT_TrollHouse01.wmo	2	1	1	10x16	94x50x39	5840
+World\wmo\Northrend\Buildings\IceTroll\IT_TrollHouse01_Ruined.wmo	3	1	0		94x50x39	4152
+World\wmo\Northrend\Buildings\IceTroll\IT_TrollHouse01_snow.wmo	2	1	1	10x16	94x50x39	6184
+World\wmo\Northrend\Buildings\IceTroll\IT_TrollHouse04.wmo	2	1	1	7x15	19x20x21	2240
+World\wmo\Northrend\Buildings\IceTroll\Welded\ZulDrak_Tier4_WesternWall.wmo	6	2	2	12x14 13x13	246x315x24	2996
+World\wmo\Northrend\Buildings\IronDwarf\ND_IronDwarf_LargeBuilding\ND_IronDwarf_LargeBuilding.wmo	2	1	2	10x14 36x0	76x125x110	9512
+World\wmo\Northrend\Buildings\IronDwarf\ND_IronDwarf_RoundBuilding\ND_IronDwarf_RoundBuilding.wmo	2	1	1	7x9	51x47x32	4648
+World\wmo\Northrend\Buildings\IronDwarf\ND_IronDwarf_SmallBuilding\ND_IronDwarf_SmallBuilding.wmo	2	1	1	11x10	43x25x21	3928
+World\wmo\Northrend\Buildings\NightElf\Ruins\ND_DBNightElfRuin_02.wmo	2	1	0		75x87x40	4488
+World\wmo\Northrend\Buildings\Oilrig\OilPlatform_Gnome.wmo	3	1	1	5x6	17x12x13	9040
+World\wmo\Northrend\Buildings\Oilrig\OilRigStack01.wmo	1	1	0		52x56x145	748
+World\wmo\Northrend\Buildings\Titan\TI_Road_06.wmo	1	1	0		2884x574x321	932
+World\wmo\Northrend\Buildings\Trapper\GH_Trapperbuilding_02.wmo	2	1	1	3x4	12x12x18	5324
+World\wmo\Northrend\Buildings\Trapper\GH_Trappertower_01.wmo	2	1	2	5x6 12x0	12x12x36	4872
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_DestoyedHut03\ND_Tuskarr_DestoyedHut03.wmo	2	1	1	7x7	26x34x11	2424
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_Hut01\ND_Tuskarr_Hut01.wmo	2	1	1	11x11	19x22x15	3760
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_Hut03\ND_Tuskarr_Hut03.wmo	2	1	1	7x10	35x34x16	3912
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_Hut04\ND_Tuskarr_Hut04.wmo	2	1	1	6x4	11x11x8	2304
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_Hut05\ND_Tuskarr_Hut05.wmo	2	1	1	6x6	7x6x5	1752
+World\wmo\Northrend\Buildings\Tuskarr\ND_Tuskarr_Hut06\ND_Tuskarr_Hut06.wmo	2	1	1	28x22	40x28x22	3688
+World\wmo\Northrend\Buildings\Tuskarr\TS_Altar_01.wmo	1	1	0		44x115x9	728
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_cliffhang02.wmo	2	1	2	18x26 41x0	26x39x28	4936
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_cliffhang01_Snow.wmo	4	1	3	76x11 16x20 30x13	31x90x37	8036
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_cliffhang02_Snow.wmo	2	1	2	18x26 41x0	26x39x28	4584
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Dwelling_01.wmo	2	1	1	5x7	51x36x35	10496
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Dwelling_01Snow.wmo	2	1	1	5x7	51x36x35	11276
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Dwelling_03_ASnow.wmo	2	1	1	4x8	14x24x24	11128
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Dwelling_03_BSnow.wmo	2	1	1	4x8	14x24x25	5172
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Tower_01.wmo	2	1	1	6x9	13x18x26	4340
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Tower_03.wmo	2	1	1	5x9	14x18x26	3820
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_01\ND_Vrykul_Tower_03Snow.wmo	2	1	1	5x9	14x18x26	4588
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_03\ND_Vrykul_Dwelling_03_A.wmo	2	1	1	4x8	14x24x25	11436
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_Dwelling_03\ND_Vrykul_Dwelling_03_B.wmo	2	1	1	4x8	14x24x25	4760
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_LongHouse.wmo	2	1	2	4x7 4x7	80x71x36	15856
+World\wmo\Northrend\Buildings\Vrykul\ND_Vrykul_LongHouseSnow.wmo	2	1	1	45x7	80x71x36	15508
+World\wmo\Northrend\Buildings\WinterOrc\ND_HordeGunship.wmo	2	1	1	9x15	32x49x17	11856
+World\wmo\Northrend\Buildings\WinterOrc\ND_Orc_BG_Keep.wmo	5	4	1	11x11	72x64x90	9988
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Barracks\ND_WinterOrc_Barracks.wmo	3	2	2	11x11 6x8	75x64x69	6644
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Forge\ND_WinterOrc_Forge.wmo	2	1	2	8x6 35x0	39x39x36	2312
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Fortress\ND_WinterOrc_Fortress.wmo	15	2	10	39x62 39x62 24x102 36x0 5x7 5x7 5x8 5x7 8x9 8x9	209x230x189	39328
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Tower\ND_WinterOrc_Tower.wmo	2	1	2	4x6 9x3	40x40x63	2092
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Tower\ND_WinterOrc_Tower_Open.wmo	2	1	2	4x6 16x0	27x27x39	2164
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Walls\ND_WinterOrc_Gate.wmo	2	1	0		7x40x35	1684
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Walls\ND_WinterOrc_Wall.wmo	2	1	0		3x56x33	1384
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Walls\ND_WinterOrc_Wall2.wmo	2	1	0		3x30x32	1380
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Walls\ND_WinterOrc_WallColumn.wmo	2	1	0		8x8x37	1012
+World\wmo\Northrend\Buildings\WinterOrc\ND_WinterOrc_Walls\ND_WinterOrc_WallMedium.wmo	2	1	0		3x14x13	1384
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_BigWall.wmo	6	1	1	16x12	43x34x29	6868
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_CouncilHut\ND_WinterTauren_CouncilHut.wmo	2	1	1	5x6	37x37x18	4248
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_CouncilHutB\ND_WinterTauren_CouncilHutB.wmo	2	1	1	4x5	33x31x16	3884
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_Loft\ND_WinterTauren_Loft.wmo	2	1	1	5x6	15x15x17	3184
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_Loft_Destroyed.wmo	2	1	1	5x6	15x15x13	2188
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_LongHouse\ND_WinterTauren_LongHouse.wmo	2	1	1	4x5	20x37x19	2872
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_LongHouse_B\ND_WinterTauren_LongHouse_B.wmo	2	1	1	4x5	20x37x19	2356
+World\wmo\Northrend\Buildings\WinterTauren\ND_WinterTauren_LongHouse_Destroyed.wmo	2	1	1	4x5	20x37x19	3016
+World\wmo\Northrend\Buildings\WinterTauren_CouncilHut\WinterTauren_CouncilHut.wmo	2	1	1	4x6	39x37x18	2304
+World\wmo\Northrend\Buildings\WinterTauren_CouncilHut\WinterTauren_Snow_CouncilHut.wmo	2	1	1	4x6	39x37x18	3008
+World\wmo\Northrend\Buildings\WinterTauren_CouncilHutB\WinterTauren_Snow_CouncilHutB.wmo	2	1	1	4x5	33x31x16	2748
+World\wmo\Northrend\Buildings\WinterTauren_Loft\WinterTauren_Loft.wmo	2	1	1	6x7	18x18x20	2232
+World\wmo\Northrend\Buildings\WinterTauren_Loft\WinterTauren_Snow_Loft.wmo	2	1	1	5x6	15x15x17	2804
+World\wmo\Northrend\Buildings\WinterTauren_LongHouse\WinterTauren_LongHouse.wmo	2	1	1	4x6	24x44x22	2336
+World\wmo\Northrend\Buildings\WinterTauren_LongHouse\WinterTauren_Snow_LongHouse.wmo	2	1	1	4x5	20x37x19	3412
+World\wmo\Northrend\Buildings\WinterTauren_LongHouse\WinterTauren_Snow_LongHouse_B.wmo	2	1	1	4x5	20x37x19	3436
+World\wmo\Northrend\Buildings\Wyrmrest.wmo	7	2	7	43x43 44x43 25x34 25x34 37x68 18x24 18x24	211x226x293	15792
+World\wmo\Northrend\Dalaran\ND_Dalaran.wmo	91	70	67	4x5 4x4 17x0 7x10 7x10 4x7 4x7 4x7 4x7 4x7 4x7 4x7 4x5 5x14 3x4 7x5 4x5 4x5 5x7 4x5 4x5 3x4 2x4 4x7 2x4 4x7 16x23 6x7 15x10 8x5 6x15 7x5 7x5 4x4 3x5 4x5 4x5 4x5 4x4 4x5 4x5 4x5 4x5 11x8 4x5 6x11 4x5 4x5 4x5 15x10 5x6 5x6 3x5 7x11 19x29 8x17 18x0 11x10 7x5 2x8 2x8 6x13 7x13 2x6 7x11 7x12 2x8	475x329x357	291616
+World\wmo\Northrend\Dragonblight\DB_LowerRightExcavation.wmo	1	1	0		95x111x28	600
+World\wmo\Northrend\Dragonblight\DB_PirateShip_GangPlank.wmo	11	9	5	3x3 9x2 14x2 14x2 9x2	69x25x17	6944
+World\wmo\Northrend\Dragonblight\Dragonshrine\BD_Shrine.wmo	6	5	1	19x19	431x418x96	7676
+World\wmo\Northrend\Dragonblight\NewHearthglen\NH_Abbey.wmo	14	11	2	5x9 5x0	79x77x56	13460
+World\wmo\Northrend\Dragonblight\NewHearthglen\NH_Blacksmith.wmo	2	1	2	4x4 4x4	20x16x11	4648
+World\wmo\Northrend\Dragonblight\NewHearthglen\NH_Cathedral.wmo	6	5	1	5x8	93x42x27	7516
+World\wmo\Northrend\GrizzlyHills\Furbolg\Furbolg_Loghome.wmo	2	1	1	3x3	7x16x9	4948
+World\wmo\Northrend\HowlingFjord\Caves\MD_HFWolfDen.wmo	2	1	1	12x10	32x26x17	3932
+World\wmo\Northrend\HowlingFjord\DaggercapCave.wmo	3	1	2	164x147 118x102	404x388x188	5160
+World\wmo\Northrend\HowlingFjord\Dwarven\HF_DwarvenExcavation01.wmo	20	1	2	18x33 20x32	133x170x93	19112
+World\wmo\Northrend\Icecrown\Scarlet_Onslaught_Docks.wmo	22	10	8	3x3 8x4 4x4 3x4 3x3 8x4 4x4 3x4	69x111x18	10688
+World\wmo\Northrend\Icecrown\Scarlet_Onslaught_Ship.wmo	10	5	4	3x3 8x4 4x4 3x4	69x25x17	6436
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_Citadel_exterior.wmo	26	6	4	229x0 43x99 25x43 21x25	1151x958x1292	38776
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_cityGate_01.wmo	4	1	0		152x855x96	4372
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_cityGate_02.wmo	9	2	1	30x53	957x225x208	36920
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_DomeBuilding_01.wmo	2	1	1	30x53	187x159x53	17312
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_DomeBuilding_02.wmo	2	1	1	30x53	187x159x53	2488
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_DomeBuilding_04.wmo	2	1	1	30x53	187x160x53	10688
+World\wmo\Northrend\Icecrown\ScourgeWalls\Icecrown_Gate_01.wmo	4	1	0		642x539x217	3176
+World\wmo\Northrend\IsleofConquest\IoC_OilPlatform.wmo	2	1	1	3x5	19x11x20	11028
+World\wmo\Northrend\IsleofConquest\IoC_Orc_BG_Keep.wmo	5	4	1	11x11	75x73x80	7192
+World\wmo\Northrend\IsleofConquest\ND_IoC_Docks.wmo	5	3	2	3x3 13x4	38x40x11	28612
+World\wmo\Northrend\Landfeatures\HowlingFjord\Cliffs\Hfjord_CoastCliff_01.wmo	6	1	2	54x18 24x19	92x143x64	6848
+World\wmo\Northrend\Landfeatures\northrend_BG\ND_HordeBoat_BG.wmo	8	6	2	23x3 23x3	32x67x17	10156
+World\wmo\Northrend\Landfeatures\valgarde\Valgarde_walls.wmo	3	1	0		32x162x48	1172
+World\wmo\Northrend\Landfeatures\VentureDocks\Venture_Docks_01.wmo	16	12	7	3x3 9x2 14x2 14x2 9x2 3x3 3x4	69x124x17	21752
+World\wmo\Northrend\micro_dungeons\ND_Sholazar_OracleTree\Oracle_tree.wmo	2	1	3	8x8 8x8 14x0	27x27x51	9632
+World\wmo\Northrend\ND_BearCaves\ND_BearCave.wmo	4	3	1	8x10	200x176x49	12460
+World\wmo\Northrend\ND_IceCaves\ND_Icecave.wmo	13	12	1	12x10	213x157x46	10264
+World\wmo\Northrend\ND_IceCaves\ND_Icecave03.wmo	8	7	1	24x20	281x282x45	9460
+World\wmo\Northrend\ND_IceCaves\ND_Icecave_Medium.wmo	8	7	1	12x10	133x114x43	3264
+World\wmo\Northrend\ND_IceCaves\ND_IceDen.wmo	2	1	1	12x10	32x26x17	2544
+World\wmo\Northrend\ND_IceCaves\ND_WinterspringCave01.wmo	5	4	1	65x66	462x213x140	10996
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple01.wmo	5	4	1	16x14	81x98x61	2824
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple02.wmo	2	1	1	15x14	78x67x47	2392
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple03.wmo	2	1	1	12x9	38x32x62	1940
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple04.wmo	2	1	1	10x7	52x43x50	2244
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple05.wmo	12	11	3	12x9 12x9 12x13	80x102x82	3896
+World\wmo\Northrend\NerubianBuildings\ND_Nerubian_Temple06.wmo	2	1	1	15x12	60x62x49	2004
+World\wmo\Northrend\TitanPit\TitanPit.wmo	1	1	0		661x529x659	448
+World\wmo\Northrend\Wintergrasp\Alliance_Vehicle_Destroyed_01.wmo	1	1	0		21x22x10	576
+World\wmo\Northrend\Wintergrasp\Alliance_Vehicle_Destroyed_02.wmo	1	1	0		8x8x8	456
+World\wmo\Northrend\Wintergrasp\Horde_Vehicle_Destroyed_01.wmo	1	1	0		16x15x7	576
+World\wmo\Northrend\Wintergrasp\Horde_Vehicle_Destroyed_02.wmo	1	1	0		4x4x4	572
+World\wmo\Northrend\Wintergrasp\WG_Keep01.wmo	6	3	1	33x17	350x89x109	7836
+World\wmo\Northrend\Wintergrasp\WG_Pylon03.wmo	2	1	1	3x3	10x9x12	3596
+World\wmo\Northrend\Wintergrasp\WG_Siege01.wmo	2	1	2	6x6 13x12	34x31x21	6260
+World\wmo\Northrend\Wintergrasp\WG_Siege01C.wmo	2	1	2	13x12 6x6	32x31x20	7084
+World\wmo\Northrend\Wintergrasp\WG_Tower01.wmo	3	1	5	12x0 10x7 10x7 10x7 10x7	32x32x27	4848
+World\wmo\Northrend\Wintergrasp\WG_Tower01C.wmo	2	1	5	10x7 10x7 10x7 10x7 16x0	32x32x27	4196
+World\wmo\Northrend\Wintergrasp\WG_Tower02.wmo	3	1	5	12x0 10x7 10x7 10x7 10x7	32x32x27	4844
+World\wmo\Outland\ArokkoaBuildings\Arakkoahouse.wmo	2	1	1	5x7	18x19x13	3112
+World\wmo\Outland\ArokkoaBuildings\Arakkoashack.wmo	2	1	1	4x6	16x17x11	3364
+World\wmo\Outland\DraeniBuildings\AncDrae_terrace.wmo	2	1	2	14x12 12x9	30x51x18	12896
+World\wmo\Outland\DraeniBuildings\AncDraeFlyM.wmo	2	1	3	19x7 14x7 16x13	98x61x53	28696
+World\wmo\Outland\DraeniBuildings\AncDraeHutA.wmo	2	1	1	8x6	28x38x15	12348
+World\wmo\Outland\DraeniBuildings\AncDraeHutB.wmo	2	1	1	10x8	51x33x18	10380
+World\wmo\Outland\DraeniBuildings\AncDraeHutC.wmo	2	1	1	8x6	49x38x15	15724
+World\wmo\Outland\DraeniBuildings\AncDraePost.wmo	2	1	2	16x0 7x6	33x38x22	7552
+World\wmo\Outland\DraeniBuildings\draeniHutHooded01.wmo	3	2	1	5x5	20x12x15	3088
+World\wmo\Outland\DraeniBuildings\draeniTower01.wmo	2	1	2	8x9 20x0	34x39x39	2336
+World\wmo\Outland\DraeniBuildings\HF_draenei_outposttemple.wmo	2	1	1	10x9	34x55x22	10128
+World\wmo\Outland\DraeniBuildings\outland_draeni_hut_1.wmo	2	1	1	4x4	10x11x10	4172
+World\wmo\Outland\HumanBuildings\outlandhumantower03.wmo	1	1	0		75x59x24	2080
+World\wmo\Outland\HumanBuildings\outlandhumantower04.wmo	1	1	0		75x59x24	1960
+World\wmo\Outland\HumanBuildings\RuinedHumanGuardTower02.wmo	2	2	0		70x55x46	1744
+World\wmo\Outland\LostOnes\LO_house01.wmo	3	2	1	5x5	20x12x15	1428
+World\wmo\Outland\LostOnes\LO_house02.wmo	2	1	1	4x4	10x11x10	1156
+World\wmo\Outland\LostOnes\LO_Tower01.wmo	2	1	2	8x9 20x0	34x39x25	1680
+World\wmo\Outland\Neterstorm\GoblinBuildings\OL_Nether_GoblinBld_A.wmo	2	1	1	3x5	22x22x11	12976
+World\wmo\Outland\Neterstorm\GoblinBuildings\OL_Nether_GoblinBld_B.wmo	2	1	1	3x4	30x25x11	12432
+World\wmo\Outland\Neterstorm\GoblinBuildings\OL_Nether_GoblinBld_C.wmo	2	1	1	3x4	12x12x11	17136
+World\wmo\Outland\Neterstorm\GoblinBuildings\OL_Nether_GoblinBld_D.wmo	3	2	1	16x0	28x49x11	4172
+World\wmo\Outland\Neterstorm\GoblinBuildings\OL_Nether_GoblinTop_C.wmo	2	1	1	2x3	12x12x11	11824
+World\wmo\Outland\NetherMicros\NetherMicro_01.wmo	16	15	1	12x11	223x156x49	20492
+World\wmo\Outland\NetherMicros\NetherMicro_02.wmo	12	11	1	16x14	314x169x43	11808
+World\wmo\Outland\OrcBuildings\outlandorcfortressruin01.wmo	17	16	1	6x11	77x72x28	4852
+World\wmo\Outland\OrcBuildings\outlandorcfortressruin01_expansion.wmo	17	16	1	6x11	77x72x28	4852
+World\wmo\Outland\Shadowmoon\CoilfangMicro\Coilfang_micro.wmo	9	8	1	20x19	273x354x91	18608
+World\wmo\Outland\Shadowmoon\Prison\OL_ShadowmoonPrison.wmo	7	6	1	11x0	113x90x33	11148
+World\wmo\Outland\Shadowmoon\Slagpit\Shadowmoon_Slagpit01.wmo	6	4	2	13x9 14x9	322x406x72	17232
+World\wmo\Outland\SporeBuildings\SporeHut_01.wmo	2	1	1	3x3	15x13x10	3572
+World\wmo\Outland\Terokkar\ShattrathCity.wmo	29	19	39	22x25 22x25 22x25 22x25 8x11 8x11 8x11 8x11 23x0 20x22 20x19 39x23 41x23 8x6 19x34 19x34 19x34 19x34 15x11 11x9 12x9 14x12 12x9 14x12 12x10 13x0 19x7 14x7 16x13 8x6 14x12 12x9 12x9 14x12 8x6 19x55 19x55 19x34 19x34	929x703x225	187832
+World\wmo\Outland\TrollBuildings\Zangar_troll_hotel01.wmo	2	1	4	5x5 7x5 16x9 8x5	41x38x19	15136
+World\wmo\Outland\ZangarMushroomBase\Mushroombase.wmo	12	3	4	6x5 6x6 4x4 5x6	112x87x16	32016
+World\wmo\PvP\Buildings\CTF\CTFNightelf_A.wmo	10	5	7	8x7 10x11 9x11 7x9 5x6 7x8 5x6	59x155x50	16436
+World\wmo\PvP\Buildings\CTF\CTFOrc_A.wmo	15	9	11	6x5 9x7 13x9 23x10 6x5 5x5 21x0 25x0 14x12 5x5 7x8	60x183x56	20144
+World\wmo\PvP\Buildings\CTF\PVPEntrance_Nightelf.wmo	2	1	1	5x5	12x13x8	2076
+World\wmo\PvP\Buildings\CTF\PVPEntrance_Orc.wmo	5	4	1	6x5	74x28x15	5984
+World\wmo\PvP\Buildings\Dalaran\dalaran_sewer_arena.wmo	2	2	0		186x178x116	5268
+World\wmo\PvP\Buildings\DwarfStronghold\DwarfStronghold.wmo	2	1	1	16x6	55x48x16	4180
+World\wmo\PvP\Buildings\Lordaeron\PVP_Lordaeron_Arena.wmo	5	4	5	34x0 9x12 34x0 9x0 9x12	24x187x48	20212
+World\wmo\PvP\Buildings\OrcBarracksPvP\AlteracGeneralOrcFortress.wmo	3	2	1	13x15	71x63x45	4280
+World\wmo\PvP\Buildings\OrcBarracksPvP\OrcBarracksPvP.wmo	4	3	1	13x15	70x63x45	4144
+World\wmo\PvP\Buildings\Orgrimmar\OrgrimmarArena.wmo	1	1	0		362x242x116	10496
+World\wmo\Test\test_petes_wmo_rotation_test.wmo	2	1	0		56x32x161	1392
+World\wmo\transports\BlackCitadel\BlackCitadel.wmo	2	1	4	12x13 12x13 12x13 12x13	144x144x73	6088
+World\wmo\transports\passengership\transportship_A.wmo	4	3	2	3x3 13x4	40x25x13	11972
+World\wmo\transports\transport_ship\transportship.wmo	4	3	2	3x3 3x4	40x25x11	12004
+World\wmo\transports\transport_ship_Pirate\Transport_Pirate_ship.wmo	7	6	5	3x4 3x4 3x3 23x3 23x3	69x25x17	14760
+World\wmo\transports\transport_ship_UD\Transport_Ship_UD.wmo	7	6	5	3x4 3x4 3x3 23x3 23x3	69x25x17	6152
+World\wmo\transports\transport_zeppelin\transport_zeppelin.wmo	2	1	2	4x6 5x4	21x12x7	2860
+World\wmo\transports\Undead\Ship_UD_Transport.wmo	7	6	5	3x4 3x4 3x3 23x3 23x3	69x25x17	6152
+World\wmo\transports\WMO_elevators\Azjol_Platform_Top_01_transport.wmo	1	1	0		38x38x12	804
+World\wmo\transports\WMO_elevators\GunDrak_Elevator_01_transport.wmo	1	1	0		30x27x3	468
+World\wmo\transports\WMO_elevators\GunDrak_TrapDoor01_transport.wmo	1	1	0		30x27x2	440
+World\wmo\transports\WMO_elevators\GunDrak_Trapdoor_02_transport.wmo	1	1	0		28x43x18	460
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard01_transport.wmo	1	1	0		46x98x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard02_transport.wmo	1	1	0		47x41x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard03_transport.wmo	1	1	0		53x43x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard04_transport.wmo	1	1	0		39x49x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard05_transport.wmo	1	1	0		39x49x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard06_transport.wmo	1	1	0		53x43x83	464
+World\wmo\transports\WMO_elevators\IC_arthas_iceshard07_transport.wmo	1	1	0		52x41x83	464
+World\wmo\transports\WMO_elevators\IceCrown_Grate_01_transport.wmo	1	1	0		16x16x1	464
+World\wmo\transports\WMO_elevators\ND_ArgentCrusadeColiseum_Trapdoor_01_transport.wmo	1	1	0		138x124x1	460
+World\wmo\transports\WMO_elevators\ND_Ship_UD_BG_Transport.wmo	7	6	5	3x4 3x4 3x3 23x3 23x3	69x25x17	6152
+World\wmo\transports\WMO_elevators\Orc_Fortress_Elevator01_transport.wmo	1	1	0		19x30x15	580
+World\wmo\transports\WMO_elevators\org_arena_axe_pillar_transport.wmo	1	1	0		4x5x5	448
+World\wmo\transports\WMO_elevators\org_arena_elevator_transport.wmo	1	1	0		15x15x1	440
+World\wmo\transports\WMO_elevators\org_arena_ivory_pillar_transport.wmo	1	1	0		9x9x8	448
+World\wmo\transports\WMO_elevators\org_arena_lightning_pillar_transport.wmo	1	1	0		4x5x5	448
+World\wmo\transports\WMO_elevators\org_arena_pillar.wmo	1	1	0		9x9x8	448
+World\wmo\transports\WMO_elevators\org_arena_pillar_transport.wmo	1	1	0		9x9x8	448
+World\wmo\transports\WMO_elevators\org_arena_yellow_elevator_transport.wmo	1	1	0		15x15x1	440
+World\wmo\transports\WMO_elevators\UL_Ulduar_Trapdoor_01_transport.wmo	1	1	0		24x38x1	460
+World\wmo\transports\WMO_elevators\UL_Ulduar_Trapdoor_02_transport.wmo	1	1	0		39x24x47	460

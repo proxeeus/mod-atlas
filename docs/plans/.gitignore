@@ -1,0 +1,5 @@
+# Local-only data: client DBC copies (Blizzard data, never published), caches and data dumps
+tools/client-dbc/
+tools/*.pkl
+tools/*.csv
+tools/*.json
